@@ -1,0 +1,11 @@
+# Binaries and executables
+*.exe
+
+# Python caches and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# System files
+.DS_Store
+Thumbs.db
