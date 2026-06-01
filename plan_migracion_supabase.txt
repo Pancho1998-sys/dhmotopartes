@@ -1,0 +1,26 @@
+Plan de Migración de Firebase a Supabase para DHMotopartes
+
+1. ROLES DEL SISTEMA:
+- "usuario" (Comprador/Cliente): Quedan guardados sus datos para el checkout (correo, nombre, apellido y DNI).
+- "admin" (Cajero/Operador): Usa el sistema POS para vender. Requiere login. Datos almacenados: nombre, apellido, DNI.
+- "superadmin" (Administrador Principal): Puede usar el sistema completo y tiene la capacidad de agregar o quitar el rol de "admin" a otras personas. La cuenta con correo francisco.r.s.w.98@gmail.com (contraseña: superadmin123) se creará con este rol por defecto.
+
+2. BASE DE DATOS (Supabase SQL):
+Cuando estemos listos, ejecutaremos un Script SQL en Supabase para crear:
+- Tabla `user_profiles`: Para guardar los datos personales (nombre, apellido, DNI) y el rol asignado ('usuario', 'admin', 'superadmin'). Se vinculará directamente a los usuarios de Supabase Auth.
+- Tabla `app_state`: Para guardar el estado global del POS (inventario actual, historial de ventas, movimientos de caja) en formato JSONB. Esto nos permite mantener la velocidad del sistema actual sin tener que reescribir toda la lógica de la aplicación.
+
+3. CAMBIOS EN EL CÓDIGO FRONTEND:
+- index.html: 
+   * Quitar los scripts de Firebase e importar el SDK de Supabase. 
+   * Adaptar la pantalla de registro de clientes (para pedir DNI, nombre, apellido, correo) y crear un pequeño panel donde el "superadmin" pueda dar de alta/baja a los "admins" (cajeros).
+- app.js: 
+   * Actualizar el sistema de login y autenticación (`supabase.auth.signInWithPassword()`).
+   * Actualizar las funciones `loadDatabase()` y `saveDatabase()` para que sincronicen la información con la tabla `app_state` de Supabase en vez de Firebase.
+- Nuevo archivo `supabase-config.js` para reemplazar a `firebase-config.js` con las credenciales de conexión.
+
+4. PASOS A SEGUIR CUANDO TENGAS SUPABASE LISTO:
+1. Crear un nuevo proyecto en Supabase (supabase.com).
+2. Obtener la "Project URL" y la "anon public key" del panel de configuración de API.
+3. Avisarme, y te daré el Script SQL para ejecutar en el panel de Supabase.
+4. Te proporcionaré el código actualizado de `app.js` e `index.html` para implementar los cambios localmente.
