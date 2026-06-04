@@ -729,6 +729,71 @@
                             </div>
                         </div>
 
+                        <!-- Cajeros / Admins Panel (Only visible for superadmin) -->
+                        <div class="dashboard-panel col-span-2" id="superadmin-cajeros-panel" style="display: none;">
+                            <div class="panel-header">
+                                <h3 class="panel-title"><i data-lucide="users" class="text-primary icon-inline"></i> Control de Cajeros / Operadores</h3>
+                            </div>
+                            <div class="panel-body">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;" class="cajeros-grid">
+                                    <!-- Form to Register New Cashier -->
+                                    <div class="data-op-card" style="border: 1px solid var(--border-color); padding: 16px; border-radius: var(--radius-md);">
+                                        <h4 style="margin-bottom: 12px;"><i data-lucide="user-plus" class="icon-inline"></i> Dar de Alta Nuevo Cajero</h4>
+                                        <form id="new-cajero-form" class="settings-form">
+                                            <div class="form-row">
+                                                <div class="form-group col-6">
+                                                    <label for="cajero-first-name">Nombre *</label>
+                                                    <input type="text" id="cajero-first-name" required placeholder="Ej. Carlos">
+                                                </div>
+                                                <div class="form-group col-6">
+                                                    <label for="cajero-last-name">Apellido *</label>
+                                                    <input type="text" id="cajero-last-name" required placeholder="Ej. Gómez">
+                                                </div>
+                                            </div>
+                                            <div class="form-row">
+                                                <div class="form-group col-6">
+                                                    <label for="cajero-dni">DNI *</label>
+                                                    <input type="text" id="cajero-dni" required placeholder="Ej. 40123456">
+                                                </div>
+                                                <div class="form-group col-6">
+                                                    <label for="cajero-email">Correo Electrónico *</label>
+                                                    <input type="email" id="cajero-email" required placeholder="cajero@email.com">
+                                                </div>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="cajero-password">Contraseña *</label>
+                                                <input type="password" id="cajero-password" required placeholder="Mínimo 6 caracteres">
+                                            </div>
+                                            <button type="submit" class="btn btn-primary w-full">
+                                                <i data-lucide="plus-circle"></i> Registrar y Crear Usuario
+                                            </button>
+                                        </form>
+                                    </div>
+                                    
+                                    <!-- List of Cajeros -->
+                                    <div class="data-op-card" style="border: 1px solid var(--border-color); padding: 16px; border-radius: var(--radius-md); display: flex; flex-direction: column;">
+                                        <h4 style="margin-bottom: 12px;"><i data-lucide="shield-check" class="icon-inline"></i> Personal de Caja Autorizado</h4>
+                                        <div class="table-responsive" style="flex: 1; max-height: 300px; overflow-y: auto;">
+                                            <table class="data-table" style="font-size: 13px;">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Email / Usuario</th>
+                                                        <th>DNI</th>
+                                                        <th>Nombre</th>
+                                                        <th>Rol</th>
+                                                        <th class="text-center">Acción</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="cajeros-table-body">
+                                                    <!-- Cajeros rendered dynamically -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </section>
 
@@ -895,9 +960,19 @@
             <form id="customer-form">
                 <input type="hidden" id="customer-id-field">
                 <div class="modal-body">
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="cust-first-name">Nombre *</label>
+                            <input type="text" id="cust-first-name" required placeholder="Ej. Juan">
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="cust-last-name">Apellido *</label>
+                            <input type="text" id="cust-last-name" required placeholder="Ej. Pérez">
+                        </div>
+                    </div>
                     <div class="form-group">
-                        <label for="cust-name">Nombre Completo *</label>
-                        <input type="text" id="cust-name" required placeholder="Ej. Juan Pérez">
+                        <label for="cust-dni">DNI *</label>
+                        <input type="text" id="cust-dni" required placeholder="Ej. 30123456">
                     </div>
                     <div class="form-group">
                         <label for="cust-phone">Número de Teléfono</label>
@@ -1042,11 +1117,9 @@
         </div>
     </div>
 
-    <!-- Firebase SDK Scripts (Compat Mode) -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-    <script src="firebase-config.js"></script>
+    <!-- Supabase JS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
 
     <!-- Application Script Files -->
     <script src="components.js"></script>

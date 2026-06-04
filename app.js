@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initDatetime();
     setupEventListeners();
     setupBarcodeListener();
+    setupCajeroRegistration();
     
     // Listen for custom hash changes
     window.addEventListener('hashchange', handleRoute);
@@ -59,7 +60,10 @@ function updateSidebarStatus(online, text) {
     }
 }
 
-// Setup Firebase Auth & Login UI flow
+let currentUserRole = 'usuario';
+let currentUserProfile = null;
+
+// Setup Supabase Auth & Login UI flow
 function setupAuthentication() {
     const loginOverlay = document.getElementById('login-overlay');
     const loginForm = document.getElementById('login-form');
@@ -72,11 +76,10 @@ function setupAuthentication() {
     
     // Set up logout button click listener
     if (btnLogout) {
-        btnLogout.addEventListener('click', () => {
-            if (firebaseInitialized && authRef) {
-                authRef.signOut().then(() => {
-                    playScanSound('warning');
-                });
+        btnLogout.addEventListener('click', async () => {
+            if (supabaseInitialized && supabase) {
+                await supabase.auth.signOut();
+                playScanSound('warning');
             } else {
                 alert("Sesión local finalizada.");
                 window.location.reload();
@@ -84,14 +87,14 @@ function setupAuthentication() {
         });
     }
 
-    if (!firebaseInitialized) {
-        // Firebase is not configured yet. Show local mode notice and let user bypass.
+    if (!supabaseInitialized) {
+        // Supabase is not configured yet. Show local mode notice and let user bypass.
         if (loginOverlay) {
             loginOverlay.classList.add('active');
             loginOverlay.style.display = 'flex';
         }
         if (loginStatus) {
-            loginStatus.innerHTML = `⚠️ <strong>Base de datos en la nube no configurada.</strong><br>Completa las credenciales en <code>firebase-config.js</code> para conectar el sistema a internet.`;
+            loginStatus.innerHTML = `⚠️ <strong>Base de datos en la nube no configurada.</strong><br>Completa las credenciales en <code>supabase-config.js</code> para conectar el sistema a internet.`;
         }
         if (loginBtnLocal) {
             loginBtnLocal.style.display = 'block';
@@ -104,13 +107,13 @@ function setupAuthentication() {
                 renderApp();
             });
         }
-        // Disable submit button since there is no Firebase to authenticate against
+        // Disable submit button since there is no Supabase to authenticate against
         const btnSubmit = document.getElementById('login-btn-submit');
         if (btnSubmit) btnSubmit.disabled = true;
         return;
     }
 
-    // Firebase is configured!
+    // Supabase is configured!
     if (loginOverlay) {
         loginOverlay.classList.add('active');
         loginOverlay.style.display = 'flex';
@@ -119,27 +122,84 @@ function setupAuthentication() {
         loginStatus.textContent = "Ingresa tus credenciales para acceder a la base de datos remota.";
     }
 
-    // Set up Firebase auth state listener
-    authRef.onAuthStateChanged(async (user) => {
-        if (user) {
-            console.log("Usuario autenticado:", user.email);
-            const emailInitials = user.email.slice(0, 2).toUpperCase();
-            const avatarEl = document.getElementById('user-avatar');
-            const nameEl = document.getElementById('user-name-display');
+    // Set up Supabase auth state listener
+    supabase.auth.onAuthStateChange(async (event, session) => {
+        if (session && session.user) {
+            const user = session.user;
+            console.log("Usuario autenticado en Supabase:", user.email);
             
-            if (avatarEl) avatarEl.textContent = emailInitials;
-            if (nameEl) nameEl.textContent = user.email.split('@')[0];
-            if (btnLogout) btnLogout.style.display = 'inline-flex';
-            
-            if (loginOverlay) {
-                loginOverlay.classList.remove('active');
-                loginOverlay.style.display = 'none';
+            try {
+                // Fetch profile and check role
+                let { data: profile, error } = await supabase
+                    .from('user_profiles')
+                    .select('first_name, last_name, dni, role')
+                    .eq('id', user.id)
+                    .single();
+                
+                if (error || !profile) {
+                    console.error("Error al obtener perfil, reintentando...", error);
+                    // If it fails, wait and retry (sometimes triggers take a split second)
+                    await new Promise(r => setTimeout(r, 800));
+                    const { data: retryProfile } = await supabase
+                        .from('user_profiles')
+                        .select('first_name, last_name, dni, role')
+                        .eq('id', user.id)
+                        .single();
+                    if (!retryProfile) {
+                        alert("Error al cargar perfil de usuario en la base de datos.");
+                        await supabase.auth.signOut();
+                        return;
+                    }
+                    profile = retryProfile;
+                }
+                
+                // Authorize only admins and superadmins
+                if (profile.role !== 'admin' && profile.role !== 'superadmin') {
+                    alert("Acceso denegado: Este panel es exclusivo para Cajeros (Admin) o Superadministradores.");
+                    await supabase.auth.signOut();
+                    return;
+                }
+                
+                currentUserRole = profile.role;
+                currentUserProfile = profile;
+                
+                const initials = ((profile.first_name || '')[0] || '') + ((profile.last_name || '')[0] || '');
+                const emailInitials = initials.toUpperCase() || user.email.slice(0, 2).toUpperCase();
+                
+                const avatarEl = document.getElementById('user-avatar');
+                const nameEl = document.getElementById('user-name-display');
+                
+                if (avatarEl) avatarEl.textContent = emailInitials;
+                if (nameEl) nameEl.textContent = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || user.email.split('@')[0];
+                if (btnLogout) btnLogout.style.display = 'inline-flex';
+                
+                if (loginOverlay) {
+                    loginOverlay.classList.remove('active');
+                    loginOverlay.style.display = 'none';
+                }
+                
+                // Show/Hide cashier management if superadmin
+                const cajerosPanel = document.getElementById('superadmin-cajeros-panel');
+                if (cajerosPanel) {
+                    if (currentUserRole === 'superadmin') {
+                        cajerosPanel.style.display = 'block';
+                        renderCajerosList();
+                    } else {
+                        cajerosPanel.style.display = 'none';
+                    }
+                }
+                
+                // Load DB from Supabase
+                await loadDatabase();
+                
+            } catch (err) {
+                console.error("Auth state processing failed:", err);
             }
-            
-            // Load DB from Firebase in real-time
-            await loadDatabase();
         } else {
             console.log("Usuario desautenticado.");
+            currentUserRole = 'usuario';
+            currentUserProfile = null;
+            
             if (loginOverlay) {
                 loginOverlay.classList.add('active');
                 loginOverlay.style.display = 'flex';
@@ -148,15 +208,16 @@ function setupAuthentication() {
             
             // Clean active sync state if logging out
             firebaseSyncActive = false;
+            // Clear realtime channel
             try {
-                dbRef.ref('pos_db').off();
+                supabase.channel('public:app_state').unsubscribe();
             } catch(e){}
         }
     });
 
     // Handle login form submit
     if (loginForm) {
-        loginForm.addEventListener('submit', (e) => {
+        loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = loginEmail.value.trim();
             const password = loginPassword.value;
@@ -169,43 +230,43 @@ function setupAuthentication() {
                 if (window.lucide) lucide.createIcons();
             }
             
-            authRef.signInWithEmailAndPassword(email, password)
-                .then((userCredential) => {
-                    playScanSound('success');
-                })
-                .catch((error) => {
-                    console.error("Error al iniciar sesión:", error);
-                    playScanSound('fail');
-                    if (loginError) {
-                        loginError.style.display = 'block';
-                        loginError.textContent = "Error: " + getFriendlyAuthErrorMessage(error.code);
-                    }
-                })
-                .finally(() => {
-                    if (btnSubmit) {
-                        btnSubmit.disabled = false;
-                        btnSubmit.innerHTML = `<i data-lucide="log-in"></i> Acceder al Sistema`;
-                        if (window.lucide) lucide.createIcons();
-                    }
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password
                 });
+                
+                if (error) throw error;
+                playScanSound('success');
+            } catch (error) {
+                console.error("Error al iniciar sesión:", error);
+                playScanSound('fail');
+                if (loginError) {
+                    loginError.style.display = 'block';
+                    loginError.textContent = "Error: " + getFriendlyAuthErrorMessage(error);
+                }
+            } finally {
+                if (btnSubmit) {
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerHTML = `<i data-lucide="log-in"></i> Acceder al Sistema`;
+                    if (window.lucide) lucide.createIcons();
+                }
+            }
         });
     }
 }
 
-function getFriendlyAuthErrorMessage(code) {
-    switch (code) {
-        case 'auth/invalid-email':
-            return 'El correo electrónico no es válido.';
-        case 'auth/user-disabled':
-            return 'Este usuario ha sido deshabilitado.';
-        case 'auth/user-not-found':
-            return 'Usuario no registrado.';
-        case 'auth/wrong-password':
-            return 'Contraseña incorrecta.';
-        case 'auth/invalid-credential':
-            return 'Credenciales incorrectas o expiradas.';
-        default:
-            return 'Error de autenticación. Verifica tus datos.';
+function getFriendlyAuthErrorMessage(error) {
+    if (!error) return 'Error desconocido.';
+    const message = error.message.toLowerCase();
+    if (message.includes('invalid login credentials') || message.includes('invalid credentials')) {
+        return 'Correo o contraseña incorrectos.';
+    }
+    if (message.includes('email not confirmed')) {
+        return 'El correo electrónico no ha sido verificado.';
+    }
+    return error.message;
+}
     }
 }
 
@@ -226,26 +287,51 @@ function syncSettingsInputs() {
     }
 }
 
-// Load DB from Shared Firebase Server API or fallback to LocalStorage/Demo Data
+// Load DB from Supabase or fallback to LocalStorage/Demo Data
 async function loadDatabase() {
-    if (firebaseInitialized && authRef && authRef.currentUser) {
+    const session = supabase ? (await supabase.auth.getSession()).data.session : null;
+    if (supabaseInitialized && session && session.user) {
         try {
             if (!firebaseSyncActive) {
-                dbRef.ref('pos_db').on('value', (snapshot) => {
-                    const data = snapshot.val();
-                    if (data) {
-                        state = data;
-                        if (!state.cashMovements) state.cashMovements = [];
-                        syncSettingsInputs();
-                        renderApp();
-                    }
-                });
+                // Load current global state
+                const { data, error } = await supabase
+                    .from('app_state')
+                    .select('state')
+                    .eq('id', 1)
+                    .single();
+                
+                if (error) {
+                    console.error("Error loading state from Supabase:", error);
+                } else if (data && data.state) {
+                    state = data.state;
+                    if (!state.cashMovements) state.cashMovements = [];
+                    syncSettingsInputs();
+                    renderApp();
+                }
+
+                // Subscribe to real-time updates
+                supabase.channel('public:app_state')
+                    .on(
+                        'postgres_changes',
+                        { event: 'UPDATE', schema: 'public', table: 'app_state', filter: 'id=eq.1' },
+                        (payload) => {
+                            console.log("Realtime state update received from Supabase");
+                            if (payload.new && payload.new.state) {
+                                state = payload.new.state;
+                                if (!state.cashMovements) state.cashMovements = [];
+                                syncSettingsInputs();
+                                renderApp();
+                            }
+                        }
+                    )
+                    .subscribe();
+                
                 firebaseSyncActive = true;
             }
             updateSidebarStatus(true, "Conectado Nube");
             return;
         } catch (e) {
-            console.error("Error setting up Firebase sync:", e);
+            console.error("Error setting up Supabase sync:", e);
         }
     }
 
@@ -265,18 +351,26 @@ async function loadDatabase() {
     }
 }
 
-// Save DB state to LocalStorage and background push to Firebase
-function saveDatabase() {
+// Save DB state to LocalStorage and background push to Supabase
+async function saveDatabase() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     
-    if (firebaseInitialized && authRef && authRef.currentUser) {
-        dbRef.ref('pos_db').set(state)
-            .then(() => {
-                console.log("Database synchronized to Firebase successfully.");
-            })
-            .catch(err => {
-                console.error("Could not sync to Firebase:", err);
-            });
+    const session = supabase ? (await supabase.auth.getSession()).data.session : null;
+    if (supabaseInitialized && session && session.user) {
+        try {
+            const { error } = await supabase
+                .from('app_state')
+                .update({ state: state, updated_at: new Date().toISOString() })
+                .eq('id', 1);
+            
+            if (error) {
+                console.error("Error syncing state to Supabase:", error);
+            } else {
+                console.log("Database synchronized to Supabase successfully.");
+            }
+        } catch (err) {
+            console.error("Could not sync to Supabase:", err);
+        }
     } else {
         fetch('/api/db', {
             method: 'POST',
@@ -1610,7 +1704,8 @@ function renderCustomersTable() {
     const filtered = state.customers.filter(c => {
         return c.name.toLowerCase().includes(searchVal) ||
                (c.phone && c.phone.includes(searchVal)) ||
-               (c.email && c.email.toLowerCase().includes(searchVal));
+               (c.email && c.email.toLowerCase().includes(searchVal)) ||
+               (c.dni && c.dni.includes(searchVal));
     });
 
     const totalItems = filtered.length;
@@ -1638,7 +1733,10 @@ function renderCustomersTable() {
         rowsHtml += `
             <tr>
                 <td>${c.id}</td>
-                <td style="font-weight: 600;">${c.name}</td>
+                <td style="font-weight: 600;">
+                    ${c.name}
+                    <div style="font-size: 11px; color: var(--text-muted); font-weight: normal; margin-top: 2px;">DNI: ${c.dni || 'No registrado'}</div>
+                </td>
                 <td>${c.phone || '<span class="text-muted">No registrado</span>'}</td>
                 <td>${c.email || '<span class="text-muted">No registrado</span>'}</td>
                 <td class="text-center" style="font-weight: 700; color: var(--primary);">${c.points} pts</td>
@@ -1675,23 +1773,36 @@ function saveCustomer(e) {
     e.preventDefault();
     
     const id = document.getElementById('customer-id-field').value;
-    const name = document.getElementById('cust-name').value.trim();
+    const firstName = document.getElementById('cust-first-name').value.trim();
+    const lastName = document.getElementById('cust-last-name').value.trim();
+    const dni = document.getElementById('cust-dni').value.trim();
     const phone = document.getElementById('cust-phone').value.trim();
     const email = document.getElementById('cust-email').value.trim();
     const points = parseInt(document.getElementById('cust-points').value) || 0;
+    
+    const compiledName = `${firstName} ${lastName}`;
 
     if (!id) {
         // Create new
         state.customers.push({
             id: `c_${Date.now()}`,
-            name, phone, email, points,
+            firstName,
+            lastName,
+            name: compiledName,
+            dni,
+            phone,
+            email,
+            points,
             dateRegistered: new Date().toISOString().split('T')[0]
         });
     } else {
         // Edit existing
         const customer = state.customers.find(c => c.id === id);
         if (customer) {
-            customer.name = name;
+            customer.firstName = firstName;
+            customer.lastName = lastName;
+            customer.name = compiledName;
+            customer.dni = dni;
             customer.phone = phone;
             customer.email = email;
             customer.points = points;
@@ -1717,7 +1828,9 @@ window.editCustomer = function(id) {
 
     document.getElementById('customer-modal-title').textContent = "Editar Cliente";
     document.getElementById('customer-id-field').value = c.id;
-    document.getElementById('cust-name').value = c.name;
+    document.getElementById('cust-first-name').value = c.firstName || c.name.split(' ')[0] || '';
+    document.getElementById('cust-last-name').value = c.lastName || c.name.split(' ').slice(1).join(' ') || '';
+    document.getElementById('cust-dni').value = c.dni || '';
     document.getElementById('cust-phone').value = c.phone || '';
     document.getElementById('cust-email').value = c.email || '';
     document.getElementById('cust-points').value = c.points;
@@ -2493,11 +2606,207 @@ function exportInventoryExcel() {
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventario DHMotopartes');
         
-        // Write file
         XLSX.writeFile(workbook, 'inventario_completo.xlsx');
         playScanSound('success');
     } catch (err) {
         console.error("Inventory export failed:", err);
         alert("Ocurrió un error al exportar el inventario a Excel: " + err.message);
     }
+}
+
+/* ==========================================================================
+   9. SUPERADMIN CASHIER MANAGEMENT PANEL
+   ========================================================================== */
+async function renderCajerosList() {
+    if (!supabaseInitialized || currentUserRole !== 'superadmin') return;
+    
+    const tbody = document.getElementById('cajeros-table-body');
+    if (!tbody) return;
+    
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="5" class="text-center text-muted" style="padding: 20px;">
+                <i data-lucide="loader" class="animate-spin" style="animation: spin 1s linear infinite;"></i> Cargando personal...
+            </td>
+        </tr>
+    `;
+    if (window.lucide) lucide.createIcons();
+    
+    try {
+        const { data: profiles, error } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .order('email', { ascending: true });
+            
+        if (error) throw error;
+        
+        if (!profiles || profiles.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center text-muted" style="padding: 20px;">
+                        No hay personal registrado.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        const session = (await supabase.auth.getSession()).data.session;
+        const currentUid = session ? session.user.id : null;
+        
+        let rowsHtml = '';
+        profiles.forEach(p => {
+            const isSelf = p.id === currentUid;
+            const selectDisabled = isSelf ? 'disabled' : '';
+            
+            rowsHtml += `
+                <tr>
+                    <td style="font-weight: 600;">${p.email}</td>
+                    <td>${p.dni || '-'}</td>
+                    <td>${p.first_name || ''} ${p.last_name || ''}</td>
+                    <td>
+                        <select onchange="updateCajeroRole('${p.id}', this.value)" ${selectDisabled} style="padding: 4px 8px; font-size: 12px; width: auto; height: auto;">
+                            <option value="usuario" ${p.role === 'usuario' ? 'selected' : ''}>Usuario / Cliente</option>
+                            <option value="admin" ${p.role === 'admin' ? 'selected' : ''}>Cajero (Admin)</option>
+                            <option value="superadmin" ${p.role === 'superadmin' ? 'selected' : ''}>Superadmin</option>
+                        </select>
+                    </td>
+                    <td class="text-center">
+                        <button class="btn btn-danger btn-outline btn-icon-only" onclick="deleteCajero('${p.id}')" ${selectDisabled} title="Eliminar Cajero" style="width: 28px; height: 28px;">
+                            <i data-lucide="trash-2" style="width:12px; height:12px;"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = rowsHtml;
+        if (window.lucide) lucide.createIcons();
+    } catch (err) {
+        console.error("Error rendering cajeros:", err);
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center text-danger" style="padding: 20px;">
+                    Error al cargar personal: ${err.message}
+                </td>
+            </tr>
+        `;
+    }
+}
+
+window.updateCajeroRole = async function(userId, newRole) {
+    if (!supabaseInitialized || currentUserRole !== 'superadmin') return;
+    
+    try {
+        const { error } = await supabase
+            .from('user_profiles')
+            .update({ role: newRole })
+            .eq('id', userId);
+            
+        if (error) throw error;
+        
+        playScanSound('success');
+        alert("Rol de usuario actualizado correctamente.");
+        renderCajerosList();
+    } catch (err) {
+        console.error("Error updating role:", err);
+        alert("Error al actualizar rol: " + err.message);
+        renderCajerosList();
+    }
+};
+
+window.deleteCajero = async function(userId) {
+    if (!supabaseInitialized || currentUserRole !== 'superadmin') return;
+    
+    if (confirm("¿Estás seguro de que deseas eliminar este usuario del sistema? Se eliminará de la base de datos y de la autenticación.")) {
+        try {
+            if (supabaseAdmin) {
+                const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+                if (authError) throw authError;
+            } else {
+                const { error: dbError } = await supabase
+                    .from('user_profiles')
+                    .delete()
+                    .eq('id', userId);
+                if (dbError) throw dbError;
+            }
+            
+            playScanSound('fail');
+            alert("Usuario eliminado correctamente.");
+            renderCajerosList();
+        } catch (err) {
+            console.error("Error deleting cashier:", err);
+            alert("Error al eliminar cajero: " + err.message);
+            renderCajerosList();
+        }
+    }
+};
+
+function setupCajeroRegistration() {
+    const form = document.getElementById('new-cajero-form');
+    if (!form) return;
+    
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        if (!supabaseInitialized || currentUserRole !== 'superadmin') {
+            alert("Acción no permitida.");
+            return;
+        }
+        
+        const firstName = document.getElementById('cajero-first-name').value.trim();
+        const lastName = document.getElementById('cajero-last-name').value.trim();
+        const dni = document.getElementById('cajero-dni').value.trim();
+        const email = document.getElementById('cajero-email').value.trim();
+        const password = document.getElementById('cajero-password').value;
+        
+        if (password.length < 6) {
+            alert("La contraseña debe tener al menos 6 caracteres.");
+            return;
+        }
+        
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const origHtml = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<i data-lucide="loader" class="animate-spin" style="animation: spin 1s linear infinite;"></i> Registrando...`;
+        if (window.lucide) lucide.createIcons();
+        
+        try {
+            if (!supabaseAdmin) {
+                throw new Error("Cliente administrador de Supabase no inicializado (verifica la Service Role Key).");
+            }
+            
+            const { data, error } = await supabaseAdmin.auth.admin.createUser({
+                email: email,
+                password: password,
+                email_confirm: true,
+                user_metadata: {
+                    first_name: firstName,
+                    last_name: lastName,
+                    dni: dni
+                }
+            });
+            
+            if (error) throw error;
+            
+            const newUserId = data.user.id;
+            const { error: profileError } = await supabase
+                .from('user_profiles')
+                .update({ role: 'admin' })
+                .eq('id', newUserId);
+                
+            if (profileError) throw profileError;
+            
+            playScanSound('success');
+            alert(`Cajero ${firstName} ${lastName} registrado con éxito.`);
+            form.reset();
+            renderCajerosList();
+        } catch (err) {
+            console.error("Error creating cashier:", err);
+            alert("Error al registrar cajero: " + err.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = origHtml;
+            if (window.lucide) lucide.createIcons();
+        }
+    });
 }
