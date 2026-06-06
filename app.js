@@ -77,8 +77,8 @@ function setupAuthentication() {
     // Set up logout button click listener
     if (btnLogout) {
         btnLogout.addEventListener('click', async () => {
-            if (supabaseInitialized && supabase) {
-                await supabase.auth.signOut();
+            if (supabaseInitialized && supabaseClient) {
+                await supabaseClient.auth.signOut();
                 playScanSound('warning');
             } else {
                 alert("Sesión local finalizada.");
@@ -123,14 +123,14 @@ function setupAuthentication() {
     }
 
     // Set up Supabase auth state listener
-    supabase.auth.onAuthStateChange(async (event, session) => {
+    supabaseClient.auth.onAuthStateChange(async (event, session) => {
         if (session && session.user) {
             const user = session.user;
             console.log("Usuario autenticado en Supabase:", user.email);
             
             try {
                 // Fetch profile and check role
-                let { data: profile, error } = await supabase
+                let { data: profile, error } = await supabaseClient
                     .from('user_profiles')
                     .select('first_name, last_name, dni, role')
                     .eq('id', user.id)
@@ -140,14 +140,14 @@ function setupAuthentication() {
                     console.error("Error al obtener perfil, reintentando...", error);
                     // If it fails, wait and retry (sometimes triggers take a split second)
                     await new Promise(r => setTimeout(r, 800));
-                    const { data: retryProfile } = await supabase
+                    const { data: retryProfile } = await supabaseClient
                         .from('user_profiles')
                         .select('first_name, last_name, dni, role')
                         .eq('id', user.id)
                         .single();
                     if (!retryProfile) {
                         alert("Error al cargar perfil de usuario en la base de datos.");
-                        await supabase.auth.signOut();
+                        await supabaseClient.auth.signOut();
                         return;
                     }
                     profile = retryProfile;
@@ -156,7 +156,7 @@ function setupAuthentication() {
                 // Authorize only admins and superadmins
                 if (profile.role !== 'admin' && profile.role !== 'superadmin') {
                     alert("Acceso denegado: Este panel es exclusivo para Cajeros (Admin) o Superadministradores.");
-                    await supabase.auth.signOut();
+                    await supabaseClient.auth.signOut();
                     return;
                 }
                 
@@ -210,7 +210,7 @@ function setupAuthentication() {
             firebaseSyncActive = false;
             // Clear realtime channel
             try {
-                supabase.channel('public:app_state').unsubscribe();
+                supabaseClient.channel('public:app_state').unsubscribe();
             } catch(e){}
         }
     });
@@ -231,7 +231,7 @@ function setupAuthentication() {
             }
             
             try {
-                const { data, error } = await supabase.auth.signInWithPassword({
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
                     email,
                     password
                 });
@@ -287,12 +287,12 @@ function syncSettingsInputs() {
 
 // Load DB from Supabase or fallback to LocalStorage/Demo Data
 async function loadDatabase() {
-    const session = supabase ? (await supabase.auth.getSession()).data.session : null;
+    const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
     if (supabaseInitialized && session && session.user) {
         try {
             if (!firebaseSyncActive) {
                 // Load current global state
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('app_state')
                     .select('state')
                     .eq('id', 1)
@@ -308,7 +308,7 @@ async function loadDatabase() {
                 }
 
                 // Subscribe to real-time updates
-                supabase.channel('public:app_state')
+                supabaseClient.channel('public:app_state')
                     .on(
                         'postgres_changes',
                         { event: 'UPDATE', schema: 'public', table: 'app_state', filter: 'id=eq.1' },
@@ -353,10 +353,10 @@ async function loadDatabase() {
 async function saveDatabase() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     
-    const session = supabase ? (await supabase.auth.getSession()).data.session : null;
+    const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
     if (supabaseInitialized && session && session.user) {
         try {
-            const { error } = await supabase
+            const { error } = await supabaseClient
                 .from('app_state')
                 .update({ state: state, updated_at: new Date().toISOString() })
                 .eq('id', 1);
@@ -2631,7 +2631,7 @@ async function renderCajerosList() {
     if (window.lucide) lucide.createIcons();
     
     try {
-        const { data: profiles, error } = await supabase
+        const { data: profiles, error } = await supabaseClient
             .from('user_profiles')
             .select('*')
             .order('email', { ascending: true });
@@ -2649,7 +2649,7 @@ async function renderCajerosList() {
             return;
         }
         
-        const session = (await supabase.auth.getSession()).data.session;
+        const session = (await supabaseClient.auth.getSession()).data.session;
         const currentUid = session ? session.user.id : null;
         
         let rowsHtml = '';
@@ -2695,7 +2695,7 @@ window.updateCajeroRole = async function(userId, newRole) {
     if (!supabaseInitialized || currentUserRole !== 'superadmin') return;
     
     try {
-        const { error } = await supabase
+        const { error } = await supabaseClient
             .from('user_profiles')
             .update({ role: newRole })
             .eq('id', userId);
@@ -2721,7 +2721,7 @@ window.deleteCajero = async function(userId) {
                 const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
                 if (authError) throw authError;
             } else {
-                const { error: dbError } = await supabase
+                const { error: dbError } = await supabaseClient
                     .from('user_profiles')
                     .delete()
                     .eq('id', userId);
@@ -2787,7 +2787,7 @@ function setupCajeroRegistration() {
             if (error) throw error;
             
             const newUserId = data.user.id;
-            const { error: profileError } = await supabase
+            const { error: profileError } = await supabaseClient
                 .from('user_profiles')
                 .update({ role: 'admin' })
                 .eq('id', newUserId);
