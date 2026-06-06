@@ -267,8 +267,6 @@ function getFriendlyAuthErrorMessage(error) {
     }
     return error.message;
 }
-    }
-}
 
 // Sync settings inputs with state settings
 function syncSettingsInputs() {
