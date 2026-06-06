@@ -113,6 +113,12 @@
                             <span>Caja y Movimientos</span>
                         </a>
                     </li>
+                    <li id="nav-item-saas" style="display: none;">
+                        <a href="#saas" class="nav-link" id="nav-saas">
+                            <i data-lucide="globe"></i>
+                            <span>SaaS Panel (Global)</span>
+                        </a>
+                    </li>
                     <li>
                         <a href="#configuracion" class="nav-link" id="nav-configuracion">
                             <i data-lucide="settings"></i>
@@ -797,6 +803,44 @@
                     </div>
                 </section>
 
+                <!-- 7. SAAS GLOBAL ADMIN VIEW -->
+                <section id="view-saas" class="app-view">
+                    <div class="view-header-bar">
+                        <div class="search-filters-row">
+                            <div class="search-box">
+                                <i data-lucide="search" class="search-icon"></i>
+                                <input type="text" id="saas-search" placeholder="Buscar empresa por nombre..." aria-label="Buscar empresa">
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" id="saas-add-store-btn" onclick="openModal('modal-saas-store')">
+                            <i data-lucide="plus-circle"></i> Registrar Nueva Empresa
+                        </button>
+                    </div>
+
+                    <div class="dashboard-panel">
+                        <div class="panel-header">
+                            <h3 class="panel-title"><i data-lucide="building" class="text-primary icon-inline"></i> Empresas Registradas (SaaS)</h3>
+                        </div>
+                        <div class="panel-body">
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID Empresa (store_id)</th>
+                                            <th>Nombre Comercial</th>
+                                            <th>Fecha de Alta</th>
+                                            <th class="text-center">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="saas-stores-table-body">
+                                        <!-- Stores loaded dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
             </main>
         </div>
     </div>
@@ -804,6 +848,32 @@
     <!-- ==============================================
          GLOBAL MODALS & DIALOGS
          ============================================== -->
+
+    <!-- 0. SAAS NEW STORE MODAL -->
+    <div class="modal-backdrop" id="modal-saas-store">
+        <div class="modal-box modal-medium">
+            <div class="modal-header">
+                <h3 class="modal-title">Registrar Nueva Empresa (SaaS)</h3>
+                <button class="btn-icon modal-close-btn" data-close-modal="modal-saas-store"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="saas-new-store-form">
+                    <div class="form-group">
+                        <label for="saas-store-name">Nombre Comercial de la Tienda</label>
+                        <input type="text" id="saas-store-name" required placeholder="Ej. Repuestos López">
+                    </div>
+                    <div class="alert-info-box">
+                        <i data-lucide="info"></i>
+                        <p class="small">Se creará la empresa en la base de datos de forma independiente. Luego podrás crear un usuario (Store Owner) asignado a este store_id.</p>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-outline" data-close-modal="modal-saas-store">Cancelar</button>
+                <button class="btn btn-primary" onclick="createNewSaasStore()">Crear Empresa</button>
+            </div>
+        </div>
+    </div>
 
     <!-- 1. CHECKOUT MODAL -->
     <div class="modal-backdrop" id="modal-checkout">

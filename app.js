@@ -62,6 +62,7 @@ function updateSidebarStatus(online, text) {
 
 let currentUserRole = 'usuario';
 let currentUserProfile = null;
+let myStoreId = null;
 
 // Setup Supabase Auth & Login UI flow
 function setupAuthentication() {
@@ -132,17 +133,16 @@ function setupAuthentication() {
                 // Fetch profile and check role
                 let { data: profile, error } = await supabaseClient
                     .from('user_profiles')
-                    .select('first_name, last_name, dni, role')
+                    .select('first_name, last_name, dni, role, store_id')
                     .eq('id', user.id)
                     .single();
                 
                 if (error || !profile) {
                     console.error("Error al obtener perfil, reintentando...", error);
-                    // If it fails, wait and retry (sometimes triggers take a split second)
                     await new Promise(r => setTimeout(r, 800));
                     const { data: retryProfile } = await supabaseClient
                         .from('user_profiles')
-                        .select('first_name, last_name, dni, role')
+                        .select('first_name, last_name, dni, role, store_id')
                         .eq('id', user.id)
                         .single();
                     if (!retryProfile) {
@@ -153,15 +153,22 @@ function setupAuthentication() {
                     profile = retryProfile;
                 }
                 
-                // Authorize only admins and superadmins
-                if (profile.role !== 'admin' && profile.role !== 'superadmin') {
-                    alert("Acceso denegado: Este panel es exclusivo para Cajeros (Admin) o Superadministradores.");
+                // Authorize
+                if (profile.role !== 'admin' && profile.role !== 'superadmin' && profile.role !== 'saas_admin') {
+                    alert("Acceso denegado: Este panel es exclusivo para Cajeros, Superadministradores de Tienda o SaaS Admin.");
+                    await supabaseClient.auth.signOut();
+                    return;
+                }
+                
+                if (profile.role !== 'saas_admin' && !profile.store_id) {
+                    alert("Error: Tu cuenta no está vinculada a ninguna tienda (store_id nulo). Contacta al administrador.");
                     await supabaseClient.auth.signOut();
                     return;
                 }
                 
                 currentUserRole = profile.role;
                 currentUserProfile = profile;
+                myStoreId = profile.store_id;
                 
                 const initials = ((profile.first_name || '')[0] || '') + ((profile.last_name || '')[0] || '');
                 const emailInitials = initials.toUpperCase() || user.email.slice(0, 2).toUpperCase();
@@ -178,6 +185,18 @@ function setupAuthentication() {
                     loginOverlay.style.display = 'none';
                 }
                 
+                // Show/Hide SaaS panel link if global admin
+                const navSaas = document.getElementById('nav-item-saas');
+                if (navSaas) {
+                    if (currentUserRole === 'saas_admin') {
+                        navSaas.style.display = 'block';
+                        window.location.hash = '#saas';
+                        loadSaasStores();
+                    } else {
+                        navSaas.style.display = 'none';
+                    }
+                }
+                
                 // Show/Hide cashier management if superadmin
                 const cajerosPanel = document.getElementById('superadmin-cajeros-panel');
                 if (cajerosPanel) {
@@ -189,8 +208,10 @@ function setupAuthentication() {
                     }
                 }
                 
-                // Load DB from Supabase
-                await loadDatabase();
+                // Load DB from Supabase (Skip loading store DB if saas_admin)
+                if (currentUserRole !== 'saas_admin') {
+                    await loadDatabase();
+                }
                 
             } catch (err) {
                 console.error("Auth state processing failed:", err);
@@ -199,6 +220,7 @@ function setupAuthentication() {
             console.log("Usuario desautenticado.");
             currentUserRole = 'usuario';
             currentUserProfile = null;
+            myStoreId = null;
             
             if (loginOverlay) {
                 loginOverlay.classList.add('active');
@@ -210,7 +232,7 @@ function setupAuthentication() {
             firebaseSyncActive = false;
             // Clear realtime channel
             try {
-                supabaseClient.channel('public:app_state').unsubscribe();
+                supabaseClient.channel('public:store_states').unsubscribe();
             } catch(e){}
         }
     });
@@ -290,16 +312,26 @@ async function loadDatabase() {
     const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
     if (supabaseInitialized && session && session.user) {
         try {
-            if (!firebaseSyncActive) {
+            if (!firebaseSyncActive && myStoreId) {
                 // Load current global state
                 const { data, error } = await supabaseClient
-                    .from('app_state')
+                    .from('store_states')
                     .select('state')
-                    .eq('id', 1)
+                    .eq('store_id', myStoreId)
                     .single();
                 
                 if (error) {
                     console.error("Error loading state from Supabase:", error);
+                    if (error.code === 'PGRST116') {
+                        // Store state row doesn't exist yet, we will create it when saving
+                        console.log("No existe estado previo para esta tienda. Iniciando vacío.");
+                        state.products = [];
+                        state.sales = [];
+                        state.customers = [];
+                        state.cashMovements = [];
+                        syncSettingsInputs();
+                        renderApp();
+                    }
                 } else if (data && data.state) {
                     state = data.state;
                     if (!state.cashMovements) state.cashMovements = [];
@@ -307,11 +339,11 @@ async function loadDatabase() {
                     renderApp();
                 }
 
-                // Subscribe to real-time updates
-                supabaseClient.channel('public:app_state')
+                // Subscribe to real-time updates for this specific store
+                supabaseClient.channel('public:store_states')
                     .on(
                         'postgres_changes',
-                        { event: 'UPDATE', schema: 'public', table: 'app_state', filter: 'id=eq.1' },
+                        { event: 'UPDATE', schema: 'public', table: 'store_states', filter: `store_id=eq.${myStoreId}` },
                         (payload) => {
                             console.log("Realtime state update received from Supabase");
                             if (payload.new && payload.new.state) {
@@ -354,12 +386,11 @@ async function saveDatabase() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     
     const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
-    if (supabaseInitialized && session && session.user) {
+    if (supabaseInitialized && session && session.user && myStoreId) {
         try {
             const { error } = await supabaseClient
-                .from('app_state')
-                .update({ state: state, updated_at: new Date().toISOString() })
-                .eq('id', 1);
+                .from('store_states')
+                .upsert({ store_id: myStoreId, state: state, updated_at: new Date().toISOString() });
             
             if (error) {
                 console.error("Error syncing state to Supabase:", error);
@@ -479,7 +510,7 @@ function initRouter() {
 
 function handleRoute() {
     const hash = window.location.hash || '#dashboard';
-    const views = ['dashboard', 'pos', 'inventario', 'clientes', 'historial', 'caja', 'configuracion'];
+    const views = ['dashboard', 'pos', 'inventario', 'clientes', 'historial', 'caja', 'configuracion', 'saas'];
     
     // Parse target view
     const targetView = hash.replace('#', '');
@@ -510,7 +541,8 @@ function handleRoute() {
         'clientes': 'Clientes CRM',
         'historial': 'Historial de Ventas',
         'caja': 'Control de Caja y Movimientos',
-        'configuracion': 'Configuración del Sistema'
+        'configuracion': 'Configuración del Sistema',
+        'saas': 'Panel SaaS Global'
     };
     
     document.getElementById('page-title').textContent = titleMap[targetView] || 'DHMotopartes';
@@ -531,6 +563,13 @@ function handleRoute() {
         renderHistory();
     } else if (targetView === 'caja') {
         renderCaja();
+    } else if (targetView === 'saas') {
+        if (currentUserRole === 'saas_admin') {
+            loadSaasStores();
+        } else {
+            alert("No tienes permisos para acceder a esta sección.");
+            window.location.hash = '#dashboard';
+        }
     }
 }
 
@@ -2789,7 +2828,7 @@ function setupCajeroRegistration() {
             const newUserId = data.user.id;
             const { error: profileError } = await supabaseClient
                 .from('user_profiles')
-                .update({ role: 'admin' })
+                .update({ role: 'admin', store_id: myStoreId })
                 .eq('id', newUserId);
                 
             if (profileError) throw profileError;
@@ -2808,3 +2847,97 @@ function setupCajeroRegistration() {
         }
     });
 }
+
+/* ==========================================================================
+   10. SAAS GLOBAL ADMIN CONTROLLERS
+   ========================================================================== */
+async function loadSaasStores() {
+    if (!supabaseInitialized || currentUserRole !== 'saas_admin') return;
+
+    const tbody = document.getElementById('saas-stores-table-body');
+    if (!tbody) return;
+
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="4" class="text-center text-muted" style="padding: 20px;">
+                <i data-lucide="loader" class="animate-spin" style="animation: spin 1s linear infinite;"></i> Cargando empresas...
+            </td>
+        </tr>
+    `;
+    if (window.lucide) lucide.createIcons();
+
+    try {
+        const { data: stores, error } = await supabaseClient
+            .from('stores')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (!stores || stores.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="4" class="text-center text-muted" style="padding: 20px;">
+                        No hay empresas registradas en la plataforma.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        let rowsHtml = '';
+        stores.forEach(s => {
+            rowsHtml += `
+                <tr>
+                    <td style="font-family: monospace; font-size: 12px;" class="text-muted">${s.id}</td>
+                    <td style="font-weight: 600;">${s.name}</td>
+                    <td>${new Date(s.created_at).toLocaleDateString('es-ES')}</td>
+                    <td class="text-center">
+                        <button class="btn btn-secondary btn-icon-only" onclick="navigator.clipboard.writeText('${s.id}')" title="Copiar ID" style="width: 28px; height: 28px;">
+                            <i data-lucide="copy" style="width:12px; height:12px;"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = rowsHtml;
+        if (window.lucide) lucide.createIcons();
+    } catch (err) {
+        console.error("Error loading stores:", err);
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center text-danger" style="padding: 20px;">
+                    Error al cargar empresas: ${err.message}
+                </td>
+            </tr>
+        `;
+    }
+}
+
+window.createNewSaasStore = async function() {
+    if (!supabaseInitialized || currentUserRole !== 'saas_admin') return;
+
+    const storeName = document.getElementById('saas-store-name').value.trim();
+    if (!storeName) {
+        alert("El nombre comercial es requerido.");
+        return;
+    }
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('stores')
+            .insert([{ name: storeName }])
+            .select();
+
+        if (error) throw error;
+
+        playScanSound('success');
+        alert("Empresa creada exitosamente. El ID se mostrará en la tabla.");
+        document.getElementById('saas-new-store-form').reset();
+        closeModal('modal-saas-store');
+        loadSaasStores();
+    } catch (err) {
+        console.error("Error creating store:", err);
+        alert("Error al crear empresa: " + err.message);
+    }
+};
