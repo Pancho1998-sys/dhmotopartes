@@ -1,6 +1,7 @@
 -- ==============================================================================
--- PLAN DE MIGRACIÓN SAAS (Multi-Tenant) PARA DHMOTOPARTES
+-- SCRIPT DE INSTALACIÓN COMPLETA PARA DHMOTOPARTES (SaaS / Multi-Tenant)
 -- Ejecuta esto en el panel de SQL Editor de tu proyecto Supabase.
+-- Como es un proyecto nuevo, este script creará todo desde cero.
 -- ==============================================================================
 
 -- 1. Crear la tabla de Tiendas (Empresas)
@@ -10,67 +11,88 @@ CREATE TABLE IF NOT EXISTS public.stores (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 2. Modificar la tabla user_profiles para incluir el store_id
--- Si la tabla user_profiles ya existe, le agregamos la columna store_id
-ALTER TABLE public.user_profiles
-ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES public.stores(id) ON DELETE SET NULL;
+-- 2. Crear la tabla user_profiles (Perfiles de usuario)
+CREATE TABLE IF NOT EXISTS public.user_profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    first_name TEXT,
+    last_name TEXT,
+    dni TEXT,
+    role TEXT DEFAULT 'usuario'::text NOT NULL,
+    store_id UUID REFERENCES public.stores(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
 
--- 3. Modificar la tabla app_state para usar store_id en lugar de id = 1
--- Vamos a crear una nueva tabla que reemplace a la original, para evitar conflictos de tipos.
+-- 3. Crear la tabla store_states (Para guardar el JSON de cada tienda)
 CREATE TABLE IF NOT EXISTS public.store_states (
     store_id UUID PRIMARY KEY REFERENCES public.stores(id) ON DELETE CASCADE,
     state JSONB NOT NULL DEFAULT '{}'::jsonb,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Migrar los datos antiguos (si existen en app_state) a una tienda "Demo" inicial
--- a. Crear la tienda Demo
-INSERT INTO public.stores (id, name)
-VALUES ('00000000-0000-0000-0000-000000000001', 'Primera Tienda Demo')
-ON CONFLICT DO NOTHING;
+-- ==============================================================================
+-- TRIGGER PARA CREAR PERFIL AUTOMÁTICAMENTE CUANDO ALGUIEN SE REGISTRA
+-- ==============================================================================
+-- Esta función captura los registros de Firebase/Supabase Auth y crea su perfil en la base de datos
+CREATE OR REPLACE FUNCTION public.handle_new_user() 
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.user_profiles (id, first_name, last_name, role)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'first_name', ''),
+    COALESCE(NEW.raw_user_meta_data->>'last_name', ''),
+    'usuario' -- rol por defecto, luego tú te lo cambiarás a 'saas_admin'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- b. Migrar el estado
-INSERT INTO public.store_states (store_id, state, updated_at)
-SELECT '00000000-0000-0000-0000-000000000001', state, updated_at 
-FROM public.app_state WHERE id = 1
-ON CONFLICT (store_id) DO NOTHING;
+-- Eliminar el trigger si ya existía para evitar errores
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 
--- Opcional: Eliminar la tabla vieja app_state luego de confirmar que la migración fue exitosa
--- DROP TABLE IF EXISTS public.app_state;
+-- Crear el trigger para que escuche a la tabla auth.users
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
 -- ==============================================================================
 -- SEGURIDAD: ROW LEVEL SECURITY (RLS)
 -- ==============================================================================
 
 ALTER TABLE public.stores ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.store_states ENABLE ROW LEVEL SECURITY;
 
 -- Políticas para Stores (Tiendas)
--- Todos pueden ver las tiendas (o podrías restringirlo solo a saas_admin)
--- Por ahora permitimos lectura para que el app.js pueda listar el nombre de la tienda
-CREATE POLICY "Permitir lectura de stores" ON public.stores FOR SELECT USING (true);
-CREATE POLICY "Permitir insercion de stores a saas_admin" ON public.stores FOR INSERT WITH CHECK (
+CREATE POLICY "Permitir lectura de stores" ON public.stores FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Permitir insercion de stores a saas_admin" ON public.stores FOR INSERT TO authenticated WITH CHECK (
     EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'saas_admin')
+);
+
+-- Políticas para User Profiles
+CREATE POLICY "Lectura de perfiles" ON public.user_profiles FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Actualizacion de perfiles" ON public.user_profiles FOR UPDATE TO authenticated USING (
+    id = auth.uid() OR EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('superadmin', 'saas_admin'))
 );
 
 -- Políticas para Store States (Estado de la aplicación)
--- Solo puedes leer el estado si el store_id coincide con el store_id de tu perfil
-CREATE POLICY "Leer state propio" ON public.store_states FOR SELECT USING (
+CREATE POLICY "Leer state propio" ON public.store_states FOR SELECT TO authenticated USING (
     store_id IN (SELECT store_id FROM public.user_profiles WHERE id = auth.uid())
 );
 
--- Solo puedes actualizar el estado si el store_id coincide con tu perfil y eres admin o superadmin
-CREATE POLICY "Actualizar state propio" ON public.store_states FOR UPDATE USING (
+CREATE POLICY "Actualizar state propio" ON public.store_states FOR UPDATE TO authenticated USING (
     store_id IN (SELECT store_id FROM public.user_profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin'))
 );
 
--- Solo saas_admin puede insertar un nuevo estado (cuando crea una tienda nueva)
-CREATE POLICY "Insertar state saas_admin" ON public.store_states FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'saas_admin')
+CREATE POLICY "Insertar state propio" ON public.store_states FOR INSERT TO authenticated WITH CHECK (
+    store_id IN (SELECT store_id FROM public.user_profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin'))
 );
 
 -- ==============================================================================
--- VISTAS O FUNCIONES ÚTILES PARA REALTIME
+-- HABILITAR REALTIME (Para sincronización en vivo)
 -- ==============================================================================
--- Debes habilitar REALTIME en la tabla store_states:
+BEGIN;
+  DROP PUBLICATION IF EXISTS supabase_realtime;
+  CREATE PUBLICATION supabase_realtime;
+COMMIT;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.store_states;
