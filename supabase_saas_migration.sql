@@ -4,6 +4,13 @@
 -- Como es un proyecto nuevo, este script creará todo desde cero.
 -- ==============================================================================
 
+-- 0. LIMPIEZA DE TABLAS ANTERIORES (Para evitar errores de esquemas viejos)
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP TABLE IF EXISTS public.store_states CASCADE;
+DROP TABLE IF EXISTS public.user_profiles CASCADE;
+DROP TABLE IF EXISTS public.stores CASCADE;
+DROP TABLE IF EXISTS public.app_state CASCADE;
+
 -- 1. Crear la tabla de Tiendas (Empresas)
 CREATE TABLE IF NOT EXISTS public.stores (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
