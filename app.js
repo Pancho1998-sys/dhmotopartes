@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initDatetime();
     setupEventListeners();
     setupBarcodeListener();
-    setupCajeroRegistration();
+    // setupCajeroRegistration();
     
     // Listen for custom hash changes
     window.addEventListener('hashchange', handleRoute);
