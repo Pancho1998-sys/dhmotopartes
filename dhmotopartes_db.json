@@ -9,7 +9,6 @@
             "price": 850,
             "stock": 42,
             "stockMin": 10,
-            "location": "Estante B-1",
             "image": ""
         },
         {
@@ -21,7 +20,6 @@
             "price": 1200,
             "stock": 22,
             "stockMin": 5,
-            "location": "Estante A-4",
             "image": ""
         },
         {
@@ -33,7 +31,6 @@
             "price": 2200,
             "stock": 15,
             "stockMin": 8,
-            "location": "Estante C-2",
             "image": ""
         },
         {
@@ -45,7 +42,6 @@
             "price": 12500,
             "stock": 4,
             "stockMin": 3,
-            "location": "Estante D-1",
             "image": ""
         },
         {
@@ -57,7 +53,6 @@
             "price": 4500,
             "stock": 12,
             "stockMin": 4,
-            "location": "Cajón 1",
             "image": ""
         },
         {
@@ -69,7 +64,6 @@
             "price": 6200,
             "stock": 2,
             "stockMin": 2,
-            "location": "Estante D-4",
             "image": ""
         },
         {
@@ -81,7 +75,6 @@
             "price": 28900,
             "stock": 6,
             "stockMin": 2,
-            "location": "Exhibidor 1",
             "image": ""
         },
         {
@@ -93,7 +86,6 @@
             "price": 1100,
             "stock": 0,
             "stockMin": 5,
-            "location": "Estante B-3",
             "image": ""
         },
         {
@@ -105,7 +97,6 @@
             "price": 19500,
             "stock": 9,
             "stockMin": 3,
-            "location": "Baterías-A",
             "image": ""
         },
         {
@@ -117,19 +108,6 @@
             "price": 3400,
             "stock": 15,
             "stockMin": 5,
-            "location": "Cajón 2",
-            "image": ""
-        },
-        {
-            "id": "p_1779466065302",
-            "sku": "1011495",
-            "name": "CARBURADOR  110 KM POWER",
-            "category": "Repuestos de Motor",
-            "cost": 12273,
-            "price": 25000,
-            "stock": 2,
-            "stockMin": 1,
-            "location": "",
             "image": ""
         }
     ],
@@ -137,7 +115,7 @@
     "sales": [
         {
             "id": "V-1006",
-            "date": "2026-05-16T16:02:15.402Z",
+            "date": "2026-05-31T12:43:39.152Z",
             "customerId": "c1",
             "customerName": "Martín Gómez (Taller El Rayo)",
             "items": [
@@ -165,7 +143,7 @@
         },
         {
             "id": "V-1005",
-            "date": "2026-05-17T16:02:15.402Z",
+            "date": "2026-06-01T12:43:39.152Z",
             "customerId": "c1",
             "customerName": "Martín Gómez (Taller El Rayo)",
             "items": [
@@ -193,7 +171,7 @@
         },
         {
             "id": "V-1004",
-            "date": "2026-05-18T16:02:15.402Z",
+            "date": "2026-06-02T12:43:39.152Z",
             "customerId": "c1",
             "customerName": "Martín Gómez (Taller El Rayo)",
             "items": [
@@ -221,7 +199,7 @@
         },
         {
             "id": "V-1003",
-            "date": "2026-05-19T16:02:15.402Z",
+            "date": "2026-06-03T12:43:39.152Z",
             "customerId": "c1",
             "customerName": "Martín Gómez (Taller El Rayo)",
             "items": [
@@ -249,7 +227,7 @@
         },
         {
             "id": "V-1002",
-            "date": "2026-05-20T16:02:15.402Z",
+            "date": "2026-06-04T12:43:39.152Z",
             "customerId": "c1",
             "customerName": "Martín Gómez (Taller El Rayo)",
             "items": [
@@ -277,7 +255,7 @@
         },
         {
             "id": "V-1001",
-            "date": "2026-05-21T16:02:15.402Z",
+            "date": "2026-06-05T12:43:39.152Z",
             "customerId": "c1",
             "customerName": "Martín Gómez (Taller El Rayo)",
             "items": [
@@ -305,7 +283,7 @@
         },
         {
             "id": "V-1000",
-            "date": "2026-05-22T16:02:15.402Z",
+            "date": "2026-06-06T12:43:39.152Z",
             "customerId": "c1",
             "customerName": "Martín Gómez (Taller El Rayo)",
             "items": [
@@ -356,6 +334,24 @@
             "email": "jc.depetris@yahoo.com.ar",
             "points": 10,
             "dateRegistered": "2026-04-10"
+        }
+    ],
+    "cashMovements": [
+        {
+            "id": "cm_demo_1",
+            "date": "2026-06-03T12:43:39.152Z",
+            "type": "inflow",
+            "amount": 5000,
+            "concept": "Apertura de caja - Caja Inicial",
+            "notes": "Caja chica de apertura"
+        },
+        {
+            "id": "cm_demo_2",
+            "date": "2026-06-04T12:43:39.152Z",
+            "type": "outflow",
+            "amount": 1500,
+            "concept": "Pago de flete / Envío de repuestos urgentes",
+            "notes": "Flete Moto Express"
         }
     ],
     "settings": {
