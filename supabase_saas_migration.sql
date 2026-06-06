@@ -41,7 +41,10 @@ BEGIN
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'first_name', ''),
     COALESCE(NEW.raw_user_meta_data->>'last_name', ''),
-    'usuario' -- rol por defecto, luego tú te lo cambiarás a 'saas_admin'
+    CASE 
+      WHEN NEW.email = 'francisco.r.s.w.98@gmail.com' THEN 'saas_admin'
+      ELSE 'usuario'
+    END
   );
   RETURN NEW;
 END;
@@ -64,26 +67,35 @@ ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.store_states ENABLE ROW LEVEL SECURITY;
 
 -- Políticas para Stores (Tiendas)
+DROP POLICY IF EXISTS "Permitir lectura de stores" ON public.stores;
 CREATE POLICY "Permitir lectura de stores" ON public.stores FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Permitir insercion de stores a saas_admin" ON public.stores;
 CREATE POLICY "Permitir insercion de stores a saas_admin" ON public.stores FOR INSERT TO authenticated WITH CHECK (
     EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'saas_admin')
 );
 
 -- Políticas para User Profiles
+DROP POLICY IF EXISTS "Lectura de perfiles" ON public.user_profiles;
 CREATE POLICY "Lectura de perfiles" ON public.user_profiles FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Actualizacion de perfiles" ON public.user_profiles;
 CREATE POLICY "Actualizacion de perfiles" ON public.user_profiles FOR UPDATE TO authenticated USING (
     id = auth.uid() OR EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('superadmin', 'saas_admin'))
 );
 
 -- Políticas para Store States (Estado de la aplicación)
+DROP POLICY IF EXISTS "Leer state propio" ON public.store_states;
 CREATE POLICY "Leer state propio" ON public.store_states FOR SELECT TO authenticated USING (
     store_id IN (SELECT store_id FROM public.user_profiles WHERE id = auth.uid())
 );
 
+DROP POLICY IF EXISTS "Actualizar state propio" ON public.store_states;
 CREATE POLICY "Actualizar state propio" ON public.store_states FOR UPDATE TO authenticated USING (
     store_id IN (SELECT store_id FROM public.user_profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin'))
 );
 
+DROP POLICY IF EXISTS "Insertar state propio" ON public.store_states;
 CREATE POLICY "Insertar state propio" ON public.store_states FOR INSERT TO authenticated WITH CHECK (
     store_id IN (SELECT store_id FROM public.user_profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin'))
 );
