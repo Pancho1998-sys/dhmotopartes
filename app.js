@@ -14,7 +14,8 @@ let state = {
         storeAddress: "Av. Libertador 2450, Ciudad",
         storePhone: "+54 9 11 5555-1234",
         currency: "$",
-        storeTax: 15
+        storeTax: 15,
+        categories: ['Sistema Eléctrico', 'Repuestos de Motor', 'Frenos', 'Transmisión', 'Herramientas', 'Accesorios']
     }
 };
 
@@ -321,6 +322,9 @@ function syncSettingsInputs() {
         if (phoneEl) phoneEl.value = state.settings.storePhone || "";
         if (currEl) currEl.value = state.settings.currency || "";
         if (taxEl) taxEl.value = state.settings.storeTax || 0;
+        
+        // Render categories UI in settings
+        renderCategorySettings();
     }
 }
 
@@ -1205,7 +1209,7 @@ function renderPOS() {
     // Populate Category Tabs
     const tabsContainer = document.getElementById('pos-category-tabs');
     // Extract unique categories
-    const categories = ['Todas', ...new Set(state.products.map(p => p.category))];
+    const categories = ['Todas', ...(state.settings.categories || [])];
     
     let tabsHtml = '';
     categories.forEach(cat => {
@@ -1563,7 +1567,7 @@ function renderInventory() {
     const filterCat = document.getElementById('inventory-filter-category');
     const prodCatSelect = document.getElementById('prod-category');
     
-    const categories = [...new Set(state.products.map(p => p.category))];
+    const categories = state.settings.categories || [];
     
     filterCat.innerHTML = '<option value="">Todas las categorías</option>';
     categories.forEach(cat => {
@@ -2094,6 +2098,74 @@ function saveSettings(e) {
     saveDatabase();
     playScanSound('success');
     alert("Configuración de la tienda guardada con éxito.");
+}
+
+// Category Management Functions
+function renderCategorySettings() {
+    const list = document.getElementById('settings-category-list');
+    if (!list) return;
+
+    if (!state.settings.categories) {
+        state.settings.categories = ['Sistema Eléctrico', 'Repuestos de Motor', 'Frenos', 'Transmisión', 'Herramientas', 'Accesorios'];
+    }
+
+    let html = '';
+    state.settings.categories.forEach((cat, index) => {
+        html += `
+            <div class="category-item">
+                <span>${cat}</span>
+                <button class="btn-icon" onclick="deleteCategory(${index})" title="Eliminar categoría" style="color: var(--rose-red);">
+                    <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                </button>
+            </div>
+        `;
+    });
+    list.innerHTML = html;
+    if (window.lucide) lucide.createIcons();
+}
+
+window.addCategory = function() {
+    const input = document.getElementById('new-category-name');
+    const name = input.value.trim();
+    if (!name) return;
+
+    if (!state.settings.categories) state.settings.categories = [];
+    if (state.settings.categories.includes(name)) {
+        alert("La categoría ya existe.");
+        return;
+    }
+
+    state.settings.categories.push(name);
+    input.value = '';
+    saveDatabase();
+    renderCategorySettings();
+    renderInventory();
+    
+    // Also re-render POS tabs if we are in POS view
+    if (document.getElementById('view-pos').classList.contains('active')) {
+        renderPOSProducts();
+    }
+}
+
+window.deleteCategory = function(index) {
+    if (!state.settings.categories) return;
+    
+    const catName = state.settings.categories[index];
+    const inUse = state.products.some(p => p.category === catName);
+    
+    if (inUse) {
+        const confirmDelete = confirm(`Hay productos utilizando la categoría "${catName}". ¿Estás seguro de eliminarla? Los productos conservarán el nombre de la categoría pero ya no aparecerá en el menú principal.`);
+        if (!confirmDelete) return;
+    }
+
+    state.settings.categories.splice(index, 1);
+    saveDatabase();
+    renderCategorySettings();
+    renderInventory();
+    
+    if (document.getElementById('view-pos').classList.contains('active')) {
+        renderPOSProducts();
+    }
 }
 
 // Export database as JSON file download

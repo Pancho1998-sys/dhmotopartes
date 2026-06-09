@@ -649,6 +649,28 @@
                             </div>
                         </div>
 
+                        <!-- Category Management Card -->
+                        <div class="dashboard-panel">
+                            <div class="panel-header">
+                                <h3 class="panel-title"><i data-lucide="tags" class="text-primary icon-inline"></i> Gestión de Categorías</h3>
+                            </div>
+                            <div class="panel-body">
+                                <div class="settings-form">
+                                    <div class="form-group" style="margin-bottom: 15px;">
+                                        <label for="new-category-name">Añadir Nueva Categoría</label>
+                                        <div style="display: flex; gap: 10px;">
+                                            <input type="text" id="new-category-name" placeholder="Ej: Neumáticos" style="flex: 1;">
+                                            <button type="button" class="btn btn-primary" onclick="addCategory()">Añadir</button>
+                                        </div>
+                                    </div>
+                                    <label>Categorías Actuales</label>
+                                    <div id="settings-category-list" style="display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--border-color); padding: 10px; border-radius: 8px; background-color: rgba(255, 255, 255, 0.02); max-height: 200px; overflow-y: auto;">
+                                        <!-- Generado dinámicamente -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- System Customization Card -->
                         <div class="dashboard-panel">
                             <div class="panel-header">

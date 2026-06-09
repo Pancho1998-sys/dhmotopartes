@@ -130,12 +130,15 @@ AS $$
 DECLARE
   result JSONB;
 BEGIN
-  -- Extraemos SOLO el arreglo de 'products' del JSON de estado
-  SELECT state->'products' INTO result
+  -- Extraemos el arreglo de 'products' y 'categories' del JSON de estado
+  SELECT jsonb_build_object(
+    'products', COALESCE(state->'products', '[]'::jsonb),
+    'categories', COALESCE(state->'settings'->'categories', '[]'::jsonb)
+  ) INTO result
   FROM public.store_states
   WHERE store_id = target_store_id;
 
-  -- Si no existe o es nulo, devolvemos un arreglo vacío
-  RETURN COALESCE(result, '[]'::jsonb);
+  -- Si no existe o es nulo, devolvemos un objeto por defecto
+  RETURN COALESCE(result, '{"products":[], "categories":[]}'::jsonb);
 END;
 $$;
