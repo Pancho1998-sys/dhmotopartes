@@ -1,0 +1,53 @@
+GUÍA DE ASIGNACIÓN DE ROLES
+=================================================
+Esta guía te ayudará a decidir qué palabra exacta escribir en la columna "role" de la tabla "user_profiles" en Supabase, dependiendo del cargo o función que cumpla la persona en la empresa.
+
+1. ROL: "cajero"
+-------------------------------------------------
+¿A quién se le asigna?
+- Empleados de mostrador.
+- Vendedores que solo despachan mercadería.
+- Personal eventual o temporal.
+
+¿Qué lograrás asignándole este rol?
+El empleado solo podrá abrir el sistema para facturar (Pantalla de Punto de Venta). No podrá ver si el negocio está ganando o perdiendo dinero, no podrá ver la base de datos de clientes, ni alterar los precios base del inventario. Todo está bloqueado para ellos, excepto vender.
+
+
+2. ROL: "admin" (Administrador de Tienda)
+-------------------------------------------------
+¿A quién se le asigna?
+- Encargados del local.
+- Gerentes operativos.
+- Socios del negocio (que no necesiten crear a otros empleados).
+
+¿Qué lograrás asignándole este rol?
+Tendrá acceso total al manejo de la repuestera. Podrá agregar nuevos productos al catálogo, ver el historial de ventas, anular ventas mal hechas, registrar pagos de fletes en la caja y ver el tablero de ganancias (Dashboard).
+
+
+3. ROL: "superadmin" (Superadministrador de Tienda)
+-------------------------------------------------
+¿A quién se le asigna?
+- Al dueño absoluto del local / repuestera.
+- Al gerente general.
+
+¿Qué lograrás asignándole este rol?
+Puede hacer exactamente lo mismo que el "admin" (control total sobre el negocio), pero con un permiso adicional crítico: es el único dentro de la tienda que puede habilitar, ver o auditar las cuentas de los "cajeros" de ese mismo local.
+
+
+4. ROL: "saas_admin" (Administrador Global SaaS)
+-------------------------------------------------
+¿A quién se le asigna?
+- Únicamente a ti (el creador del software DHMotopartes).
+- A un socio de IT (soporte técnico) que administre los servidores.
+
+¿Qué lograrás asignándole este rol?
+Control absoluto a nivel de sistema. Este usuario no pertenece a una repuestera en particular, sino que puede ver el listado de TODAS las repuesteras registradas en el sistema, dar de alta nuevos clientes que compren el software y gestionar la infraestructura. (Este rol se asigna por defecto al correo principal configurado en el archivo de migración SQL).
+
+
+5. ROL: "usuario" (Sin acceso)
+-------------------------------------------------
+¿A quién se le asigna?
+- Personas que se acaban de registrar pero a las que aún no les asignaste una tienda (store_id) ni aprobaste.
+
+¿Qué lograrás asignándole este rol?
+Es un estado de "espera" o "congelado". No pueden pasar de la pantalla de Login y no verán absolutamente ningún dato. Es el rol por defecto de seguridad.
