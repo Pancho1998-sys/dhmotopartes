@@ -1,0 +1,47 @@
+GUÍA PASO A PASO: CREACIÓN DE EMPRESAS, ADMINISTRADORES Y CAJEROS
+===================================================================
+
+Como el sistema DHMotopartes está construido sobre Supabase y maneja múltiples tiendas (Multi-Tenant), este es el procedimiento correcto para dar de alta a una nueva empresa y asignarle su personal.
+
+Todo este proceso se realiza principalmente desde el panel de Supabase (Table Editor) o desde el "Panel SaaS Global" si ingresas con el usuario SaaS Admin. Aquí explicaremos el método universal usando el Panel de Supabase.
+
+
+PASO 1: CREAR UNA NUEVA EMPRESA (TIENDA)
+-------------------------------------------------------------------
+1. Ingresa al panel de Supabase de tu proyecto y ve a "Table Editor" (icono de tabla a la izquierda).
+2. Selecciona la tabla "stores".
+3. Haz clic en "Insert row" (Insertar fila).
+4. Completa el campo "name" con el nombre comercial de la repuestera (Ej: "Motos El Rayo").
+5. Haz clic en "Save".
+6. Una vez guardado, copia el valor de la columna "id" (es un código largo parecido a este: 123e4567-e89b-12d3-a456-426614174000). Necesitarás este ID para el Paso 3.
+
+
+PASO 2: EL USUARIO DEBE REGISTRARSE
+-------------------------------------------------------------------
+Para poder asignarle un rol a una persona, su cuenta de usuario debe existir primero.
+1. Pídele al nuevo Administrador o Cajero que ingrese al enlace de tu aplicación.
+2. Como es la primera vez, deberá usar la opción de "Registrarse" o "Sign Up" en la pantalla de inicio de sesión (si tuvieras esa opción habilitada) o tú puedes invitarlo desde el panel de Supabase -> Authentication -> "Invite user".
+3. Una vez que la persona se registra o acepta la invitación, la base de datos detectará la creación de la cuenta y automáticamente generará una fila para él en la tabla "user_profiles" con el rol por defecto: "usuario".
+
+
+PASO 3: ASIGNAR EL ROL Y LA EMPRESA
+-------------------------------------------------------------------
+Una vez creada la cuenta del usuario, debes vincularlo a su lugar de trabajo y darle permisos.
+
+1. Ve nuevamente a "Table Editor" en Supabase.
+2. Selecciona la tabla "user_profiles".
+3. Busca la fila que corresponda al correo electrónico / nombre del usuario recién registrado.
+4. Haz clic en editar esa fila.
+5. Pega el ID que copiaste en el PASO 1 dentro de la columna "store_id". (Esto le dice al sistema que ese empleado pertenece a esa tienda en particular).
+6. En la columna "role", borra la palabra "usuario" y escribe el nivel de acceso que le quieras dar:
+   - Para un administrador escribe: admin
+   - Para un gerente escribe: superadmin
+   - Para un empleado de mostrador escribe: cajero
+7. Haz clic en "Save" (Guardar).
+
+
+¡LISTO! PRUEBA DE ACCESO
+-------------------------------------------------------------------
+La próxima vez que el usuario inicie sesión (o si recarga la página):
+- Si es "admin" o "superadmin": Podrá ver el Dashboard completo, gestionar el inventario y configurar la tienda de la empresa que le fue asignada.
+- Si es "cajero": Será enviado automáticamente al Punto de Venta (POS) de la empresa asignada, y el resto del menú desaparecerá para proteger la información del negocio.

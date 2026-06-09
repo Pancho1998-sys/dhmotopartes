@@ -99,12 +99,12 @@ CREATE POLICY "Leer state propio" ON public.store_states FOR SELECT TO authentic
 
 DROP POLICY IF EXISTS "Actualizar state propio" ON public.store_states;
 CREATE POLICY "Actualizar state propio" ON public.store_states FOR UPDATE TO authenticated USING (
-    store_id IN (SELECT store_id FROM public.user_profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin'))
+    store_id IN (SELECT store_id FROM public.user_profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin', 'cajero'))
 );
 
 DROP POLICY IF EXISTS "Insertar state propio" ON public.store_states;
 CREATE POLICY "Insertar state propio" ON public.store_states FOR INSERT TO authenticated WITH CHECK (
-    store_id IN (SELECT store_id FROM public.user_profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin'))
+    store_id IN (SELECT store_id FROM public.user_profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin', 'cajero'))
 );
 
 -- ==============================================================================

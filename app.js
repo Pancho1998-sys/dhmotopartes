@@ -154,8 +154,8 @@ function setupAuthentication() {
                 }
                 
                 // Authorize
-                if (profile.role !== 'admin' && profile.role !== 'superadmin' && profile.role !== 'saas_admin') {
-                    alert("Acceso denegado: Este panel es exclusivo para Cajeros, Superadministradores de Tienda o SaaS Admin.");
+                if (profile.role !== 'admin' && profile.role !== 'superadmin' && profile.role !== 'saas_admin' && profile.role !== 'cajero') {
+                    alert("Acceso denegado: Este panel es exclusivo para Cajeros, Administradores, Superadministradores o SaaS Admin.");
                     await supabaseClient.auth.signOut();
                     return;
                 }
@@ -185,6 +185,23 @@ function setupAuthentication() {
                     loginOverlay.style.display = 'none';
                 }
                 
+                // Show/Hide panels based on cajero role
+                const navItemsToHide = ['nav-dashboard', 'nav-inventario', 'nav-clientes', 'nav-historial', 'nav-caja', 'nav-configuracion'];
+                if (currentUserRole === 'cajero') {
+                    navItemsToHide.forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el && el.parentElement) el.parentElement.style.display = 'none';
+                    });
+                    if (window.location.hash === '#dashboard' || window.location.hash === '') {
+                        window.location.hash = '#pos';
+                    }
+                } else {
+                    navItemsToHide.forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el && el.parentElement) el.parentElement.style.display = 'block';
+                    });
+                }
+
                 // Show/Hide SaaS panel link if global admin
                 const navSaas = document.getElementById('nav-item-saas');
                 if (navSaas) {
@@ -513,9 +530,15 @@ function handleRoute() {
     const views = ['dashboard', 'pos', 'inventario', 'clientes', 'historial', 'caja', 'configuracion', 'saas'];
     
     // Parse target view
-    const targetView = hash.replace('#', '');
+    let targetView = hash.replace('#', '');
     
     if (!views.includes(targetView)) return;
+
+    // Route protection for cajero
+    if (currentUserRole === 'cajero' && targetView !== 'pos') {
+        window.location.hash = '#pos';
+        return;
+    }
 
     // Toggle active link in sidebar
     document.querySelectorAll('.sidebar-nav a').forEach(link => {

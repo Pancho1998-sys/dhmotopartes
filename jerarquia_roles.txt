@@ -1,0 +1,58 @@
+DOCUMENTACIÓN DE JERARQUÍA DE ROLES - DHMOTOPARTES
+=================================================
+
+El sistema DHMotopartes cuenta con un sistema de control de acceso basado en roles (Role-Based Access Control) que garantiza la seguridad y privacidad de la información, tanto a nivel de aplicación web (frontend) como en las reglas de seguridad de la base de datos Supabase (RLS).
+
+A continuación se detallan los 4 roles principales del sistema, organizados de menor a mayor privilegio:
+
+
+1. ROL: USUARIO (usuario)
+-------------------------------------------------
+Es el rol asignado por defecto a cualquier persona que crea una cuenta nueva en el sistema, antes de ser verificado o asignado a una tienda específica.
+- Permisos habilitados: Ninguno.
+- Vista: No puede pasar de la pantalla de inicio de sesión.
+- Seguridad DB: No tiene permisos para leer ni escribir en los estados de ninguna tienda.
+
+
+2. ROL: CAJERO (cajero)
+-------------------------------------------------
+Perfil diseñado exclusivamente para el personal de ventas del mostrador.
+- Permisos habilitados:
+  * Acceso únicamente a la pantalla de Punto de Venta (POS).
+  * Registrar ventas, escanear artículos y cobrar.
+- Funciones restringidas (Bloqueadas):
+  * No puede ver estadísticas (Dashboard).
+  * No puede modificar ni exportar el inventario de repuestos.
+  * No puede ver la base de datos de clientes (CRM).
+  * No puede ver el historial de ventas previas.
+  * No puede ver el dinero disponible en caja ni asentar ingresos/egresos manuales.
+  * No tiene acceso a la configuración del local.
+- Seguridad DB: Solo puede actualizar el estado general de su tienda para anexar las ventas que procesa.
+
+
+3. ROL: ADMINISTRADOR / SUPERADMINISTRADOR DE TIENDA (admin / superadmin)
+-------------------------------------------------
+Perfil gerencial o propietario de la repuestera. Tiene control total sobre el negocio al que fue asignado.
+- Permisos habilitados:
+  * Dashboard de estadísticas en tiempo real y gráficos de rentabilidad.
+  * Punto de Venta (POS).
+  * Control total del Inventario (crear, modificar, eliminar, importar y exportar excel).
+  * Control de clientes (CRM).
+  * Control de Caja y Movimientos (Aperturas, retiros, pagos de fletes, etc.).
+  * Historial de Ventas (Capacidad para ver todas las ventas e imprimir o anular comprobantes).
+  * Configuración del local (Datos fiscales, moneda, impuestos y temas visuales).
+  * [Exclusivo Superadmin]: Panel para ver y gestionar a los cajeros del local.
+- Seguridad DB: Puede leer y sobrescribir el estado completo de su propia tienda. No puede ver datos de otras tiendas en el sistema.
+
+
+4. ROL: ADMINISTRADOR GLOBAL SAAS (saas_admin)
+-------------------------------------------------
+Perfil exclusivo para el dueño o administrador del software DHMotopartes. Es el nivel máximo de autoridad del sistema multi-tenant.
+- Permisos habilitados:
+  * Acceso al Panel Global SaaS.
+  * Capacidad de visualizar el listado de todas las tiendas / repuesteras creadas en el sistema.
+  * Acceso de "Dios" a la base de datos.
+- Seguridad DB: Por defecto, este rol es asignado únicamente al correo principal del fundador (francisco.r.s.w.98@gmail.com).
+
+=================================================
+Nota: Los permisos son controlados activamente por el servidor (Supabase Row Level Security) y no solo ocultando la interfaz, asegurando que un rol inferior no pueda inyectar peticiones no autorizadas en la base de datos.
