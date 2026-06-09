@@ -115,3 +115,27 @@ BEGIN;
   CREATE PUBLICATION supabase_realtime;
 COMMIT;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.store_states;
+
+-- ==============================================================================
+-- FUNCIÓN PÚBLICA PARA CATÁLOGO (RPC)
+-- ==============================================================================
+-- Esta función permite a la web pública leer únicamente los productos (catálogo)
+-- sin exponer las ventas ni los datos de clientes que están en el mismo JSON.
+
+CREATE OR REPLACE FUNCTION public.get_public_catalog(target_store_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  result JSONB;
+BEGIN
+  -- Extraemos SOLO el arreglo de 'products' del JSON de estado
+  SELECT state->'products' INTO result
+  FROM public.store_states
+  WHERE store_id = target_store_id;
+
+  -- Si no existe o es nulo, devolvemos un arreglo vacío
+  RETURN COALESCE(result, '[]'::jsonb);
+END;
+$$;
