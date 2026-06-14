@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DHMotopartes - Control de Ventas e Inventario para Repuestos y Herramientas</title>
+    <title>Macutech SaaS - Control de Ventas e Inventario</title>
     <meta name="description" content="Sistema de punto de venta (POS) de alto rendimiento para tiendas de repuestos de motos y herramientas mecánicas. Gestión de inventarios, clientes y estadísticas en tiempo real.">
     <!-- Google Fonts: Outfit (headings) & Inter (body) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,17 +14,20 @@
     <!-- SheetJS for Excel import/export (local offline file) -->
     <script src="xlsx.full.min.js"></script>
     <link rel="stylesheet" href="style.css">
+    <!-- Dynamic custom styles for SaaS branding -->
+    <style id="custom-brand-styles"></style>
 </head>
 <body class="dark-theme">
     <!-- 0. LOGIN OVERLAY SCREEN -->
     <div class="login-overlay" id="login-overlay" style="display: none;">
         <div class="login-card">
             <div class="login-logo-container">
-                <div class="login-logo-icon">
-                    <i data-lucide="wrench"></i>
+                <div class="login-logo-icon" id="login-logo-container">
+                    <i data-lucide="wrench" id="login-logo-default"></i>
+                    <img id="login-logo-img" src="" style="display: none; width: 100%; height: 100%; object-fit: contain; border-radius: var(--radius-sm);" alt="Logo">
                 </div>
                 <div class="login-logo-text">
-                    <span class="login-logo-title">DH<span class="text-primary">Motopartes</span></span>
+                    <span class="login-logo-title" id="logo-title-login">Macutech</span>
                     <span class="login-logo-subtitle">Acceso Administrativo</span>
                 </div>
             </div>
@@ -62,12 +65,13 @@
         <aside class="sidebar" id="app-sidebar">
             <div class="sidebar-header">
                 <div class="logo-container">
-                    <div class="logo-icon">
-                        <i data-lucide="wrench" class="logo-svg"></i>
+                    <div class="logo-icon" id="logo-icon-container">
+                        <i data-lucide="wrench" class="logo-svg" id="logo-icon-default"></i>
+                        <img id="logo-icon-img" src="" style="display: none; width: 100%; height: 100%; object-fit: contain; border-radius: var(--radius-sm);" alt="Logo">
                     </div>
                     <div class="logo-text">
-                        <span class="logo-title">DH<span class="text-primary">Motopartes</span></span>
-                        <span class="logo-subtitle">Repuestos & Motos</span>
+                        <span class="logo-title" id="logo-title-sidebar">Macutech</span>
+                        <span class="logo-subtitle">Catálogo Digital</span>
                     </div>
                 </div>
                 <button class="btn-icon sidebar-close-btn" id="sidebar-close-btn" aria-label="Cerrar menú lateral">
@@ -621,8 +625,8 @@
                             <div class="panel-body">
                                 <form id="settings-store-form" class="settings-form">
                                     <div class="form-group">
-                                        <label for="set-store-name">Nombre de la Tienda / Repuestera</label>
-                                        <input type="text" id="set-store-name" required value="DHMotopartes">
+                                        <label for="set-store-name">Nombre del Comercio / Empresa</label>
+                                        <input type="text" id="set-store-name" required value="Macutech">
                                     </div>
                                     <div class="form-group">
                                         <label for="set-store-address">Dirección Física</label>
@@ -674,7 +678,7 @@
                         <!-- System Customization Card -->
                         <div class="dashboard-panel">
                             <div class="panel-header">
-                                <h3 class="panel-title"><i data-lucide="palette" class="text-primary icon-inline"></i> Personalización Visual</h3>
+                                <h3 class="panel-title"><i data-lucide="palette" class="text-primary icon-inline"></i> Personalización Visual & Marca</h3>
                             </div>
                             <div class="panel-body">
                                 <div class="settings-form">
@@ -700,11 +704,79 @@
                                             <button class="color-dot" data-color="amber" style="background-color: #f59e0b;" title="Ámbar/Naranja"></button>
                                         </div>
                                     </div>
-                                    
-                                    <div class="alert-info-box">
-                                        <i data-lucide="info"></i>
-                                        <p class="small">El sistema guarda tus preferencias en el navegador. La próxima vez que inicies sesión se aplicará tu configuración favorita.</p>
+
+                                    <hr style="border-top: 1px solid var(--border-color); margin: 8px 0;">
+
+                                    <!-- Logo Upload Section -->
+                                    <div class="form-group">
+                                        <label>Logo de la Empresa (PNG/JPG)</label>
+                                        <div class="brand-image-upload-zone" id="brand-logo-dropzone">
+                                            <i data-lucide="upload-cloud" style="width: 28px; height: 28px; color: var(--text-muted); margin-bottom: 6px;"></i>
+                                            <p style="font-size: 13px; font-weight: 500;">Haz clic o arrastra una imagen aquí</p>
+                                            <span style="font-size: 11px; color: var(--text-muted);">Recomendado horizontal transparente</span>
+                                            <input type="file" id="brand-logo-input" accept="image/*" style="display: none;">
+                                        </div>
+                                        <div class="brand-image-preview-container" id="brand-logo-preview-container" style="display: none;">
+                                            <img src="" id="brand-logo-preview-img" class="brand-image-preview-img" alt="Vista previa logo">
+                                            <div style="flex: 1;">
+                                                <p style="font-size: 12px; font-weight: 600;">Logo cargado</p>
+                                                <span style="font-size: 11px; color: var(--text-muted);">Se guardará al hacer clic en Guardar Cambios</span>
+                                            </div>
+                                            <button type="button" class="btn btn-icon" id="brand-logo-remove-btn" title="Quitar logo" style="color: var(--danger);">
+                                                <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                                            </button>
+                                        </div>
                                     </div>
+
+                                    <hr style="border-top: 1px solid var(--border-color); margin: 8px 0;">
+
+                                    <!-- Card Background Design Section -->
+                                    <div class="form-group">
+                                        <label for="set-card-bg-type">Diseño de Tarjetas / Cuadros</label>
+                                        <select id="set-card-bg-type" aria-label="Elegir diseño de tarjetas">
+                                            <option value="default">Gris Slate (Predeterminado)</option>
+                                            <option value="glass">Glassmorphism Traslúcido (Efecto Vidrio Blur)</option>
+                                            <option value="aurora">Degradado Aurora (Cyberpunk)</option>
+                                            <option value="carbon">Degradado Carbon (Elegante Oscuro)</option>
+                                            <option value="color">Color Sólido Personalizado</option>
+                                            <option value="image">Imagen de Fondo Personalizada</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Custom solid color options (Hidden by default) -->
+                                    <div id="card-bg-color-group" style="display: none;">
+                                        <div class="form-row">
+                                            <div class="form-group col-6">
+                                                <label for="set-card-bg-color">Color del Fondo</label>
+                                                <input type="color" id="set-card-bg-color" value="#1f2937" style="height: 38px; padding: 2px;">
+                                            </div>
+                                            <div class="form-group col-6">
+                                                <label for="set-card-bg-hover">Color en Hover</label>
+                                                <input type="color" id="set-card-bg-hover" value="#26354a" style="height: 38px; padding: 2px;">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Custom card background uploader (Hidden by default) -->
+                                    <div id="card-bg-image-group" style="display: none;" class="form-group">
+                                        <label>Imagen de Fondo de Tarjeta</label>
+                                        <div class="brand-image-upload-zone" id="card-bg-dropzone">
+                                            <i data-lucide="image" style="width: 28px; height: 28px; color: var(--text-muted); margin-bottom: 6px;"></i>
+                                            <p style="font-size: 13px; font-weight: 500;">Subir imagen de fondo</p>
+                                            <input type="file" id="card-bg-image-input" accept="image/*" style="display: none;">
+                                        </div>
+                                        <div class="brand-image-preview-container" id="card-bg-preview-container" style="display: none;">
+                                            <img src="" id="card-bg-preview-img" class="brand-image-preview-img" alt="Vista previa fondo">
+                                            <div style="flex: 1;">
+                                                <p style="font-size: 12px; font-weight: 600;">Fondo cargado</p>
+                                                <span style="font-size: 11px; color: var(--text-muted);">Se guardará al hacer clic en Guardar Cambios</span>
+                                            </div>
+                                            <button type="button" class="btn btn-icon" id="card-bg-remove-btn" title="Quitar fondo" style="color: var(--danger);">
+                                                <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
                                 </div>
                             </div>
                         </div>

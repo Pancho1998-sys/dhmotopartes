@@ -10,18 +10,27 @@ let state = {
     customers: [],
     cashMovements: [],
     settings: {
-        storeName: "DHMotopartes",
+        storeName: "Macutech",
         storeAddress: "Av. Libertador 2450, Ciudad",
         storePhone: "+54 9 11 5555-1234",
         currency: "$",
         storeTax: 15,
-        categories: ['Sistema Eléctrico', 'Repuestos de Motor', 'Frenos', 'Transmisión', 'Herramientas', 'Accesorios']
+        categories: ['Sistema Eléctrico', 'Repuestos de Motor', 'Frenos', 'Transmisión', 'Herramientas', 'Accesorios'],
+        logo: "",
+        cardBgType: "default",
+        cardBgColor: "#1f2937",
+        cardBgColorHover: "#26354a",
+        cardBgImage: ""
     }
 };
 
 // Database Key
 const STORAGE_KEY = 'dhmotopartes_db';
 let firebaseSyncActive = false;
+
+// Temporary branding variables
+let tempLogoBase64 = null;
+let tempCardBgImageBase64 = null;
 
 // Pagination state
 let inventoryPage = 1;
@@ -322,9 +331,62 @@ function syncSettingsInputs() {
         if (phoneEl) phoneEl.value = state.settings.storePhone || "";
         if (currEl) currEl.value = state.settings.currency || "";
         if (taxEl) taxEl.value = state.settings.storeTax || 0;
+
+        // Brand & Design Sync
+        const cardBgType = state.settings.cardBgType || "default";
+        const cardBgColor = state.settings.cardBgColor || "#1f2937";
+        const cardBgColorHover = state.settings.cardBgColorHover || "#26354a";
+        const logo = state.settings.logo || "";
+        const cardBgImage = state.settings.cardBgImage || "";
+
+        tempLogoBase64 = logo;
+        tempCardBgImageBase64 = cardBgImage;
+
+        const cardBgTypeSelect = document.getElementById('set-card-bg-type');
+        const cardBgColorInput = document.getElementById('set-card-bg-color');
+        const cardBgColorHoverInput = document.getElementById('set-card-bg-hover');
+        
+        if (cardBgTypeSelect) cardBgTypeSelect.value = cardBgType;
+        if (cardBgColorInput) cardBgColorInput.value = cardBgColor;
+        if (cardBgColorHoverInput) cardBgColorHoverInput.value = cardBgColorHover;
+
+        // Toggle groups visibility
+        const colorGroup = document.getElementById('card-bg-color-group');
+        const imageGroup = document.getElementById('card-bg-image-group');
+        if (colorGroup) colorGroup.style.display = (cardBgType === 'color') ? 'block' : 'none';
+        if (imageGroup) imageGroup.style.display = (cardBgType === 'image') ? 'block' : 'none';
+
+        // Logo uploader UI sync
+        const logoDropzone = document.getElementById('brand-logo-dropzone');
+        const logoPreviewContainer = document.getElementById('brand-logo-preview-container');
+        const logoPreviewImg = document.getElementById('brand-logo-preview-img');
+
+        if (logo) {
+            if (logoPreviewImg) logoPreviewImg.src = logo;
+            if (logoPreviewContainer) logoPreviewContainer.style.display = 'flex';
+            if (logoDropzone) logoDropzone.style.display = 'none';
+        } else {
+            if (logoPreviewContainer) logoPreviewContainer.style.display = 'none';
+            if (logoDropzone) logoDropzone.style.display = 'block';
+        }
+
+        // Card BG uploader UI sync
+        const cardBgDropzone = document.getElementById('card-bg-dropzone');
+        const cardBgPreviewContainer = document.getElementById('card-bg-preview-container');
+        const cardBgPreviewImg = document.getElementById('card-bg-preview-img');
+
+        if (cardBgImage) {
+            if (cardBgPreviewImg) cardBgPreviewImg.src = cardBgImage;
+            if (cardBgPreviewContainer) cardBgPreviewContainer.style.display = 'flex';
+            if (cardBgDropzone) cardBgDropzone.style.display = 'none';
+        } else {
+            if (cardBgPreviewContainer) cardBgPreviewContainer.style.display = 'none';
+            if (cardBgDropzone) cardBgDropzone.style.display = 'block';
+        }
         
         // Render categories UI in settings
         renderCategorySettings();
+        applyBrandSettings();
     }
 }
 
@@ -392,7 +454,6 @@ async function loadDatabase() {
         try {
             state = JSON.parse(localData);
             if (!state.cashMovements) state.cashMovements = [];
-            syncSettingsInputs();
         } catch (e) {
             console.error("Error parsing local database. Using empty data.", e);
             loadDemoData();
@@ -400,6 +461,7 @@ async function loadDatabase() {
     } else {
         loadDemoData();
     }
+    syncSettingsInputs();
 }
 
 // Save DB state to LocalStorage and background push to Supabase
@@ -852,6 +914,123 @@ function setupEventListeners() {
             }
         }
     });
+
+    // Select dropdown cardBgType change logic
+    const cardBgTypeSelect = document.getElementById('set-card-bg-type');
+    const colorGroup = document.getElementById('card-bg-color-group');
+    const imageGroup = document.getElementById('card-bg-image-group');
+    
+    if (cardBgTypeSelect) {
+        cardBgTypeSelect.addEventListener('change', (e) => {
+            const val = e.target.value;
+            if (colorGroup) colorGroup.style.display = (val === 'color') ? 'block' : 'none';
+            if (imageGroup) imageGroup.style.display = (val === 'image') ? 'block' : 'none';
+        });
+    }
+
+    // Logo Upload Logic
+    const logoInput = document.getElementById('brand-logo-input');
+    const logoDropzone = document.getElementById('brand-logo-dropzone');
+    const logoPreviewContainer = document.getElementById('brand-logo-preview-container');
+    const logoPreviewImg = document.getElementById('brand-logo-preview-img');
+    const logoRemoveBtn = document.getElementById('brand-logo-remove-btn');
+
+    if (logoDropzone && logoInput) {
+        logoDropzone.addEventListener('click', () => logoInput.click());
+        
+        logoDropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            logoDropzone.style.borderColor = 'var(--primary)';
+        });
+        logoDropzone.addEventListener('dragleave', () => {
+            logoDropzone.style.borderColor = '';
+        });
+        logoDropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            logoDropzone.style.borderColor = '';
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                handleLogoFile(e.dataTransfer.files[0]);
+            }
+        });
+        
+        logoInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                handleLogoFile(e.target.files[0]);
+            }
+        });
+    }
+
+    function handleLogoFile(file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            tempLogoBase64 = event.target.result;
+            if (logoPreviewImg) logoPreviewImg.src = tempLogoBase64;
+            if (logoPreviewContainer) logoPreviewContainer.style.display = 'flex';
+            if (logoDropzone) logoDropzone.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    }
+
+    if (logoRemoveBtn) {
+        logoRemoveBtn.addEventListener('click', () => {
+            tempLogoBase64 = ""; // Clear
+            if (logoInput) logoInput.value = "";
+            if (logoPreviewContainer) logoPreviewContainer.style.display = 'none';
+            if (logoDropzone) logoDropzone.style.display = 'block';
+        });
+    }
+
+    // Card BG Image Upload Logic
+    const cardBgInput = document.getElementById('card-bg-image-input');
+    const cardBgDropzone = document.getElementById('card-bg-dropzone');
+    const cardBgPreviewContainer = document.getElementById('card-bg-preview-container');
+    const cardBgPreviewImg = document.getElementById('card-bg-preview-img');
+    const cardBgRemoveBtn = document.getElementById('card-bg-remove-btn');
+
+    if (cardBgDropzone && cardBgInput) {
+        cardBgDropzone.addEventListener('click', () => cardBgInput.click());
+        
+        cardBgDropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            cardBgDropzone.style.borderColor = 'var(--primary)';
+        });
+        cardBgDropzone.addEventListener('dragleave', () => {
+            cardBgDropzone.style.borderColor = '';
+        });
+        cardBgDropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            cardBgDropzone.style.borderColor = '';
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                handleCardBgFile(e.dataTransfer.files[0]);
+            }
+        });
+        
+        cardBgInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                handleCardBgFile(e.target.files[0]);
+            }
+        });
+    }
+
+    function handleCardBgFile(file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            tempCardBgImageBase64 = event.target.result;
+            if (cardBgPreviewImg) cardBgPreviewImg.src = tempCardBgImageBase64;
+            if (cardBgPreviewContainer) cardBgPreviewContainer.style.display = 'flex';
+            if (cardBgDropzone) cardBgDropzone.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    }
+
+    if (cardBgRemoveBtn) {
+        cardBgRemoveBtn.addEventListener('click', () => {
+            tempCardBgImageBase64 = ""; // Clear
+            if (cardBgInput) cardBgInput.value = "";
+            if (cardBgPreviewContainer) cardBgPreviewContainer.style.display = 'none';
+            if (cardBgDropzone) cardBgDropzone.style.display = 'block';
+        });
+    }
 }
 
 /* ==========================================================================
@@ -981,6 +1160,15 @@ function applyAccentTheme(color) {
     if (color && color !== 'violet') {
         document.body.classList.add(`theme-${color}`);
     }
+    // Update active dot in UI
+    const dots = document.querySelectorAll('#accent-pickers-container .color-dot');
+    dots.forEach(d => {
+        if (d.dataset.color === color) {
+            d.classList.add('active');
+        } else {
+            d.classList.remove('active');
+        }
+    });
     // Re-render SVG chart to pick up color change
     if (window.location.hash === '#dashboard') {
         renderSalesChartContainer();
@@ -1569,10 +1757,19 @@ function renderInventory() {
     
     const categories = state.settings.categories || [];
     
-    filterCat.innerHTML = '<option value="">Todas las categorías</option>';
-    categories.forEach(cat => {
-        filterCat.innerHTML += `<option value="${cat}">${cat}</option>`;
-    });
+    if (filterCat) {
+        filterCat.innerHTML = '<option value="">Todas las categorías</option>';
+        categories.forEach(cat => {
+            filterCat.innerHTML += `<option value="${cat}">${cat}</option>`;
+        });
+    }
+
+    if (prodCatSelect) {
+        prodCatSelect.innerHTML = '<option value="">Seleccione una categoría</option>';
+        categories.forEach(cat => {
+            prodCatSelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+        });
+    }
 
     // Render table
     renderInventoryTable();
@@ -2083,21 +2280,177 @@ function saveSettings(e) {
     const storePhone = document.getElementById('set-store-phone').value.trim();
     const currency = document.getElementById('set-store-currency').value.trim();
     const storeTax = parseFloat(document.getElementById('set-store-tax').value) || 0;
+    
+    const cardBgType = document.getElementById('set-card-bg-type').value;
+    const cardBgColor = document.getElementById('set-card-bg-color').value;
+    const cardBgColorHover = document.getElementById('set-card-bg-hover').value;
+
+    const theme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
+    const activeDot = document.querySelector('#accent-pickers-container .color-dot.active');
+    const accentColor = activeDot ? activeDot.dataset.color : 'violet';
+
+    if (tempLogoBase64 !== null) {
+        state.settings.logo = tempLogoBase64;
+    }
+    if (tempCardBgImageBase64 !== null) {
+        state.settings.cardBgImage = tempCardBgImageBase64;
+    }
 
     state.settings = {
+        ...state.settings,
         storeName,
         storeAddress,
         storePhone,
         currency,
-        storeTax
+        storeTax,
+        cardBgType,
+        cardBgColor,
+        cardBgColorHover,
+        theme,
+        accentColor
     };
 
-    // Sync header/sidebar display
-    document.getElementById('store-name-sidebar').textContent = storeName;
+    // Apply brand settings dynamically
+    applyBrandSettings();
 
     saveDatabase();
     playScanSound('success');
-    alert("Configuración de la tienda guardada con éxito.");
+    alert("Configuración de la empresa y diseño visual guardados con éxito.");
+}
+
+function applyBrandSettings() {
+    if (!state.settings) return;
+    
+    // Apply theme & accent
+    applyThemeMode(state.settings.theme || 'dark');
+    applyAccentTheme(state.settings.accentColor || 'violet');
+    
+    const storeName = state.settings.storeName || "Macutech";
+    
+    // Update page title
+    document.title = `${storeName} - Control de Ventas e Inventario`;
+    
+    // Sync header/sidebar text displays
+    const storeNameSidebar = document.getElementById('store-name-sidebar');
+    if (storeNameSidebar) {
+        storeNameSidebar.textContent = storeName;
+    }
+    
+    const logoTitleSidebar = document.getElementById('logo-title-sidebar');
+    if (logoTitleSidebar) {
+        logoTitleSidebar.innerHTML = storeName;
+    }
+    const logoTitleLogin = document.getElementById('logo-title-login');
+    if (logoTitleLogin) {
+        logoTitleLogin.innerHTML = storeName;
+    }
+
+    // Logo handling
+    const logoUrl = state.settings.logo;
+    const sidebarLogoIcon = document.getElementById('logo-icon-container');
+    const sidebarLogoDefault = document.getElementById('logo-icon-default');
+    const sidebarLogoImg = document.getElementById('logo-icon-img');
+    
+    const loginLogoIcon = document.getElementById('login-logo-container');
+    const loginLogoDefault = document.getElementById('login-logo-default');
+    const loginLogoImg = document.getElementById('login-logo-img');
+    
+    if (logoUrl) {
+        // Display custom logo image
+        if (sidebarLogoIcon) sidebarLogoIcon.classList.add('has-custom-logo');
+        if (sidebarLogoDefault) sidebarLogoDefault.style.display = 'none';
+        if (sidebarLogoImg) {
+            sidebarLogoImg.src = logoUrl;
+            sidebarLogoImg.style.display = 'block';
+        }
+        
+        if (loginLogoIcon) loginLogoIcon.classList.add('has-custom-logo');
+        if (loginLogoDefault) loginLogoDefault.style.display = 'none';
+        if (loginLogoImg) {
+            loginLogoImg.src = logoUrl;
+            loginLogoImg.style.display = 'block';
+        }
+    } else {
+        // Default wrench icon
+        if (sidebarLogoIcon) sidebarLogoIcon.classList.remove('has-custom-logo');
+        if (sidebarLogoDefault) sidebarLogoDefault.style.display = 'block';
+        if (sidebarLogoImg) sidebarLogoImg.style.display = 'none';
+        
+        if (loginLogoIcon) loginLogoIcon.classList.remove('has-custom-logo');
+        if (loginLogoDefault) loginLogoDefault.style.display = 'block';
+        if (loginLogoImg) loginLogoImg.style.display = 'none';
+    }
+
+    // Card custom styles logic
+    const bgType = state.settings.cardBgType || 'default';
+    const bgColor = state.settings.cardBgColor || '#1f2937';
+    const bgHover = state.settings.cardBgColorHover || '#26354a';
+    const bgImage = state.settings.cardBgImage || '';
+    
+    let dynamicCss = '';
+    
+    if (bgType === 'glass') {
+        dynamicCss = `
+            :root, body.light-theme {
+                --bg-card: rgba(255, 255, 255, 0.03) !important;
+                --bg-card-hover: rgba(255, 255, 255, 0.07) !important;
+                --border-color: rgba(255, 255, 255, 0.08) !important;
+            }
+            .metric-card, .dashboard-panel, .prod-card, .data-table-card, .data-op-card, .login-card {
+                backdrop-filter: blur(14px) !important;
+                -webkit-backdrop-filter: blur(14px) !important;
+                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+            }
+        `;
+    } else if (bgType === 'aurora') {
+        dynamicCss = `
+            :root, body.light-theme {
+                --bg-card: linear-gradient(135deg, rgba(31, 41, 55, 0.9) 0%, rgba(99, 102, 241, 0.12) 100%) !important;
+                --bg-card-hover: linear-gradient(135deg, rgba(38, 53, 74, 0.9) 0%, rgba(99, 102, 241, 0.18) 100%) !important;
+                --border-color: rgba(99, 102, 241, 0.3) !important;
+                --border-hover: rgba(99, 102, 241, 0.5) !important;
+            }
+            .metric-card, .dashboard-panel, .prod-card, .data-table-card, .data-op-card, .login-card {
+                box-shadow: 0 4px 20px rgba(99, 102, 241, 0.1) !important;
+            }
+        `;
+    } else if (bgType === 'carbon') {
+        dynamicCss = `
+            :root, body.light-theme {
+                --bg-card: linear-gradient(135deg, #151a22 0%, #0a0c10 100%) !important;
+                --bg-card-hover: linear-gradient(135deg, #1b222c 0%, #101319 100%) !important;
+                --border-color: rgba(255, 255, 255, 0.04) !important;
+                --border-hover: rgba(255, 255, 255, 0.08) !important;
+            }
+            .metric-card, .dashboard-panel, .prod-card, .data-table-card, .data-op-card, .login-card {
+                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.55) !important;
+            }
+        `;
+    } else if (bgType === 'color') {
+        dynamicCss = `
+            :root, body.light-theme {
+                --bg-card: ${bgColor} !important;
+                --bg-card-hover: ${bgHover} !important;
+            }
+        `;
+    } else if (bgType === 'image') {
+        if (bgImage) {
+            dynamicCss = `
+                .metric-card, .dashboard-panel, .prod-card, .data-table-card, .data-op-card, .login-card {
+                    background-image: url('${bgImage}') !important;
+                    background-size: cover !important;
+                    background-position: center !important;
+                    background-repeat: no-repeat !important;
+                    border-color: rgba(255, 255, 255, 0.08) !important;
+                }
+            `;
+        }
+    }
+    
+    const styleTag = document.getElementById('custom-brand-styles');
+    if (styleTag) {
+        styleTag.innerHTML = dynamicCss;
+    }
 }
 
 // Category Management Functions
@@ -2143,7 +2496,7 @@ window.addCategory = function() {
     
     // Also re-render POS tabs if we are in POS view
     if (document.getElementById('view-pos').classList.contains('active')) {
-        renderPOSProducts();
+        renderPOS();
     }
 }
 
@@ -2164,7 +2517,7 @@ window.deleteCategory = function(index) {
     renderInventory();
     
     if (document.getElementById('view-pos').classList.contains('active')) {
-        renderPOSProducts();
+        renderPOS();
     }
 }
 

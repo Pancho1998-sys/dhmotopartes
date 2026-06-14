@@ -218,6 +218,13 @@ function createPOSProductCard(product, currency = '$') {
 function renderReceipt(sale, settings) {
     const currency = settings.currency || '$';
     
+    // Render custom logo if set
+    const logoHtml = settings.logo ? `
+        <div style="text-align: center; margin-bottom: 10px;">
+            <img src="${settings.logo}" style="max-height: 50px; max-width: 150px; object-fit: contain;" alt="Logo">
+        </div>
+    ` : '';
+    
     let itemsRows = '';
     sale.items.forEach(item => {
         const itemTotal = item.price * item.quantity;
@@ -249,6 +256,7 @@ function renderReceipt(sale, settings) {
         <div class="ticket-wrapper">
             ${voidedHeader}
             <div class="ticket-header">
+                ${logoHtml}
                 <div class="ticket-title">${settings.storeName}</div>
                 <div style="font-size: 11px;">${settings.storeAddress}</div>
                 <div style="font-size: 11px;">Tel: ${settings.storePhone}</div>
@@ -299,7 +307,7 @@ function renderReceipt(sale, settings) {
             <div class="ticket-footer">
                 <p style="font-weight: bold; margin-bottom: 6px;">¡Gracias por su compra!</p>
                 <p>Conserve este ticket para cambios o garantías de repuestos eléctricos.</p>
-                <div style="margin-top: 12px; font-size: 10px; color: #555;">Sistema DHMotopartes v1.0.0</div>
+                <div style="margin-top: 12px; font-size: 10px; color: #555;">Desarrollado por Macutech v1.0.0</div>
             </div>
         </div>
     `;
