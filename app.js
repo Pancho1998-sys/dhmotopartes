@@ -3622,61 +3622,7 @@ function setupCajeroRegistration() {
             return;
         }
         
-        const firstName = document.getElementById('cajero-first-name').value.trim();
-        const lastName = document.getElementById('cajero-last-name').value.trim();
-        const dni = document.getElementById('cajero-dni').value.trim();
-        const email = document.getElementById('cajero-email').value.trim();
-        const password = document.getElementById('cajero-password').value;
-        
-        if (password.length < 6) {
-            alert("La contraseña debe tener al menos 6 caracteres.");
-            return;
-        }
-        
-        const submitBtn = form.querySelector('button[type="submit"]');
-        const origHtml = submitBtn.innerHTML;
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = `<i data-lucide="loader" class="animate-spin" style="animation: spin 1s linear infinite;"></i> Registrando...`;
-        if (window.lucide) lucide.createIcons();
-        
-        try {
-            if (!supabaseAdmin) {
-                throw new Error("Cliente administrador de Supabase no inicializado (verifica la Service Role Key).");
-            }
-            
-            const { data, error } = await supabaseAdmin.auth.admin.createUser({
-                email: email,
-                password: password,
-                email_confirm: true,
-                user_metadata: {
-                    first_name: firstName,
-                    last_name: lastName,
-                    dni: dni
-                }
-            });
-            
-            if (error) throw error;
-            
-            const newUserId = data.user.id;
-            const { error: profileError } = await supabaseClient
-                .from('user_profiles')
-                .update({ role: 'admin', store_id: myStoreId })
-                .eq('id', newUserId);
-                
-            if (profileError) throw profileError;
-            
-            playScanSound('success');
-            alert(`Cajero ${firstName} ${lastName} registrado con éxito.`);
-            form.reset();
-            renderCajerosList();
-        } catch (err) {
-            console.error("Error creating cashier:", err);
-            alert("Error al registrar cajero: " + err.message);
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = origHtml;
-            if (window.lucide) lucide.createIcons();
-        }
+        alert("🔒 REGISTRO SEGURO ACTIVO:\n\nPara registrar un nuevo cajero en producción de forma segura (sin exponer claves secretas ni de administración en el navegador):\n\n1. Invita al usuario a tu proyecto desde el panel de Supabase (Authentication -> Users -> Invite User) enviándole un correo de acceso.\n2. Una vez que el usuario cree su cuenta, aparecerá en el listado inferior automáticamente y podrás cambiar su rol a 'Cajero' y asignarle la tienda.");
     });
 }
 

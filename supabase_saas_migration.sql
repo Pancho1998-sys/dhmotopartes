@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     first_name TEXT,
     last_name TEXT,
+    email TEXT,
     dni TEXT,
     role TEXT DEFAULT 'usuario'::text NOT NULL,
     store_id UUID REFERENCES public.stores(id) ON DELETE SET NULL,
@@ -43,11 +44,12 @@ CREATE TABLE IF NOT EXISTS public.store_states (
 CREATE OR REPLACE FUNCTION public.handle_new_user() 
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.user_profiles (id, first_name, last_name, role)
+  INSERT INTO public.user_profiles (id, first_name, last_name, email, role)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'first_name', ''),
     COALESCE(NEW.raw_user_meta_data->>'last_name', ''),
+    NEW.email,
     CASE 
       WHEN NEW.email = 'francisco.r.s.w.98@gmail.com' THEN 'saas_admin'
       ELSE 'usuario'
