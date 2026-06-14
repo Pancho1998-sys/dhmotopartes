@@ -638,6 +638,20 @@
                                     </div>
                                     <div class="form-row">
                                         <div class="form-group col-6">
+                                            <label for="set-store-whatsapp">WhatsApp (Número/Link)</label>
+                                            <input type="text" id="set-store-whatsapp" placeholder="Ej: +5491155551234">
+                                        </div>
+                                        <div class="form-group col-6">
+                                            <label for="set-store-instagram">Instagram (Usuario/Link)</label>
+                                            <input type="text" id="set-store-instagram" placeholder="Ej: @dhmotopartes">
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="set-store-description">Descripción de Marca para Clientes</label>
+                                        <textarea id="set-store-description" placeholder="Escribe una breve descripción de tu marca o tienda que verán los clientes..." rows="3"></textarea>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group col-6">
                                             <label for="set-store-currency">Moneda (Símbolo)</label>
                                             <input type="text" id="set-store-currency" required value="$">
                                         </div>
@@ -777,6 +791,12 @@
                                         </div>
                                     </div>
                                     
+                                    <hr style="border-top: 1px solid var(--border-color); margin: 8px 0;">
+                                    <div class="form-group">
+                                        <button type="button" class="btn btn-secondary w-full" id="btn-view-public-catalog">
+                                            <i data-lucide="eye"></i> Ver Catálogo de Clientes (Vista Previa)
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -931,6 +951,63 @@
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 8. PUBLIC CATALOG VIEW -->
+                <section id="view-catalogo" class="app-view">
+                    <!-- Preview top bar (only visible when admin is previewing) -->
+                    <div class="catalog-preview-banner" id="catalog-preview-banner" style="display: none;">
+                        <span class="flex-align-center"><i data-lucide="eye" style="color: var(--primary);"></i> Vista previa de clientes: Estás viendo cómo se muestra tu catálogo en la web.</span>
+                        <button type="button" class="btn btn-primary btn-outline small" onclick="window.location.hash='#configuracion'">
+                            <i data-lucide="arrow-left" style="width: 14px; height: 14px;"></i> Volver a Configuración
+                        </button>
+                    </div>
+
+                    <!-- Public Catalog Header -->
+                    <div class="catalog-public-header">
+                        <div class="catalog-brand">
+                            <div class="logo-icon" id="catalog-logo-container" style="width: auto; height: 42px; display: flex; align-items: center; justify-content: center;">
+                                <i data-lucide="wrench" id="catalog-logo-default" style="width: 24px; height: 24px; color: var(--primary);"></i>
+                                <img id="catalog-logo-img" src="" style="display: none; height: 38px; width: auto; object-fit: contain; border-radius: var(--radius-sm);" alt="Logo">
+                            </div>
+                            <h2 id="catalog-store-name">DHMotopartes</h2>
+                        </div>
+                        <div class="catalog-search">
+                            <div class="search-box">
+                                <i data-lucide="search" class="search-icon"></i>
+                                <input type="text" id="catalog-search-input" placeholder="Buscar repuestos o herramientas..." aria-label="Buscar producto">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Catalog Brand Information Card (Description & Socials) -->
+                    <div class="catalog-info-card" id="catalog-info-card" style="display: none;">
+                        <div class="catalog-info-content">
+                            <p class="catalog-description" id="catalog-description-text"></p>
+                        </div>
+                        <div class="catalog-social-links" id="catalog-social-links">
+                            <a id="catalog-whatsapp-link" href="#" target="_blank" class="social-btn whatsapp-btn" style="display: none;">
+                                <i data-lucide="phone"></i>
+                                <span>Escríbenos por WhatsApp</span>
+                            </a>
+                            <a id="catalog-instagram-link" href="#" target="_blank" class="social-btn instagram-btn" style="display: none;">
+                                <i data-lucide="instagram"></i>
+                                <span>Síguenos en Instagram</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Category Tabs -->
+                    <div class="catalog-categories scrollable-x" id="catalog-categories-container">
+                        <!-- Categorías dinámicas -->
+                    </div>
+
+                    <!-- Products Grid -->
+                    <div class="catalog-products-wrapper">
+                        <div class="pos-products-grid" id="catalog-products-grid">
+                            <!-- Productos del catálogo -->
                         </div>
                     </div>
                 </section>

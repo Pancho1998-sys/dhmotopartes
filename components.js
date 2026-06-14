@@ -321,3 +321,50 @@ function getPaymentMethodLabel(method) {
         default: return 'Otro';
     }
 }
+
+/**
+ * Creates HTML for a product card inside the public catalog grid.
+ * @param {Object} product - The product object
+ * @param {string} currency - Store currency symbol
+ * @returns {string} HTML string
+ */
+function createCatalogProductCard(product, currency = '$') {
+    const isOutOfStock = product.stock <= 0;
+    const cardClass = isOutOfStock ? 'prod-card out-of-stock' : 'prod-card';
+    
+    let stockClass = 'stock-badge-ok';
+    let stockText = `${product.stock} disp.`;
+    
+    if (product.stock <= 0) {
+        stockClass = 'stock-badge-out';
+        stockText = 'Agotado';
+    } else if (product.stock <= product.stockMin) {
+        stockClass = 'stock-badge-low';
+        stockText = 'Stock Bajo';
+    }
+
+    const imagePlaceholder = product.image ? 
+        `<img src="${product.image}" alt="${product.name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius-md);" onerror="this.innerHTML='<i data-lucide=\\'image\\'></i>'; this.style.display='none'; this.nextElementSibling.style.display='block';">` : '';
+    
+    const iconStyle = product.image ? 'display: none;' : '';
+
+    return `
+        <div class="${cardClass}" data-id="${product.id}">
+            <span class="prod-card-sku">${product.sku}</span>
+            <div class="prod-card-image">
+                ${imagePlaceholder}
+                <div class="fallback-icon" style="${iconStyle}">
+                    <i data-lucide="${product.category === 'Herramientas' ? 'wrench' : 'package'}"></i>
+                </div>
+            </div>
+            <div class="prod-card-info">
+                <span class="prod-card-cat">${product.category}</span>
+                <h4 class="prod-card-title" title="${product.name}">${product.name}</h4>
+                <div class="prod-card-footer">
+                    <span class="prod-card-price">${currency}${product.price.toFixed(2)}</span>
+                    <span class="prod-card-stock ${stockClass}">${stockText}</span>
+                </div>
+            </div>
+        </div>
+    `;
+}

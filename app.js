@@ -31,6 +31,7 @@ let firebaseSyncActive = false;
 // Temporary branding variables
 let tempLogoBase64 = null;
 let tempCardBgImageBase64 = null;
+let activeCatalogCategory = '';
 
 // Pagination state
 let inventoryPage = 1;
@@ -323,12 +324,18 @@ function syncSettingsInputs() {
         const nameEl = document.getElementById('set-store-name');
         const addrEl = document.getElementById('set-store-address');
         const phoneEl = document.getElementById('set-store-phone');
+        const whatsappEl = document.getElementById('set-store-whatsapp');
+        const instagramEl = document.getElementById('set-store-instagram');
+        const descEl = document.getElementById('set-store-description');
         const currEl = document.getElementById('set-store-currency');
         const taxEl = document.getElementById('set-store-tax');
         
         if (nameEl) nameEl.value = state.settings.storeName || "";
         if (addrEl) addrEl.value = state.settings.storeAddress || "";
         if (phoneEl) phoneEl.value = state.settings.storePhone || "";
+        if (whatsappEl) whatsappEl.value = state.settings.whatsapp || "";
+        if (instagramEl) instagramEl.value = state.settings.instagram || "";
+        if (descEl) descEl.value = state.settings.brandDescription || "";
         if (currEl) currEl.value = state.settings.currency || "";
         if (taxEl) taxEl.value = state.settings.storeTax || 0;
 
@@ -593,15 +600,25 @@ function initRouter() {
 
 function handleRoute() {
     const hash = window.location.hash || '#dashboard';
-    const views = ['dashboard', 'pos', 'inventario', 'clientes', 'historial', 'caja', 'configuracion', 'saas'];
+    const views = ['dashboard', 'pos', 'inventario', 'clientes', 'historial', 'caja', 'configuracion', 'saas', 'catalogo'];
     
     // Parse target view
     let targetView = hash.replace('#', '');
     
     if (!views.includes(targetView)) return;
 
+    // Fullscreen and Preview Banner handling for Catalog
+    const banner = document.getElementById('catalog-preview-banner');
+    if (targetView === 'catalogo') {
+        document.body.classList.add('catalog-fullscreen');
+        if (banner) banner.style.display = 'flex';
+    } else {
+        document.body.classList.remove('catalog-fullscreen');
+        if (banner) banner.style.display = 'none';
+    }
+
     // Route protection for cajero
-    if (currentUserRole === 'cajero' && targetView !== 'pos') {
+    if (currentUserRole === 'cajero' && targetView !== 'pos' && targetView !== 'catalogo') {
         window.location.hash = '#pos';
         return;
     }
@@ -631,7 +648,8 @@ function handleRoute() {
         'historial': 'Historial de Ventas',
         'caja': 'Control de Caja y Movimientos',
         'configuracion': 'Configuración del Sistema',
-        'saas': 'Panel SaaS Global'
+        'saas': 'Panel SaaS Global',
+        'catalogo': 'Catálogo de Clientes'
     };
     
     document.getElementById('page-title').textContent = titleMap[targetView] || 'DHMotopartes';
@@ -652,6 +670,8 @@ function handleRoute() {
         renderHistory();
     } else if (targetView === 'caja') {
         renderCaja();
+    } else if (targetView === 'catalogo') {
+        renderCatalog();
     } else if (targetView === 'saas') {
         if (currentUserRole === 'saas_admin') {
             loadSaasStores();
@@ -1030,6 +1050,19 @@ function setupEventListeners() {
             if (cardBgPreviewContainer) cardBgPreviewContainer.style.display = 'none';
             if (cardBgDropzone) cardBgDropzone.style.display = 'block';
         });
+    }
+
+    // Public Catalog Listeners
+    const btnViewCatalog = document.getElementById('btn-view-public-catalog');
+    if (btnViewCatalog) {
+        btnViewCatalog.addEventListener('click', () => {
+            window.location.hash = '#catalogo';
+        });
+    }
+
+    const catalogSearchInput = document.getElementById('catalog-search-input');
+    if (catalogSearchInput) {
+        catalogSearchInput.addEventListener('input', renderCatalogProductGrid);
     }
 }
 
@@ -2278,6 +2311,9 @@ function saveSettings(e) {
     const storeName = document.getElementById('set-store-name').value.trim();
     const storeAddress = document.getElementById('set-store-address').value.trim();
     const storePhone = document.getElementById('set-store-phone').value.trim();
+    const whatsapp = document.getElementById('set-store-whatsapp').value.trim();
+    const instagram = document.getElementById('set-store-instagram').value.trim();
+    const brandDescription = document.getElementById('set-store-description').value.trim();
     const currency = document.getElementById('set-store-currency').value.trim();
     const storeTax = parseFloat(document.getElementById('set-store-tax').value) || 0;
     
@@ -2307,7 +2343,10 @@ function saveSettings(e) {
         cardBgColor,
         cardBgColorHover,
         theme,
-        accentColor
+        accentColor,
+        whatsapp,
+        instagram,
+        brandDescription
     };
 
     // Apply brand settings dynamically
@@ -2325,7 +2364,7 @@ function applyBrandSettings() {
     applyThemeMode(state.settings.theme || 'dark');
     applyAccentTheme(state.settings.accentColor || 'violet');
     
-    const storeName = state.settings.storeName || "Macutech";
+        const storeName = state.settings.storeName || "Macutech";
     
     // Update page title
     document.title = `${storeName} - Control de Ventas e Inventario`;
@@ -2344,6 +2383,71 @@ function applyBrandSettings() {
     if (logoTitleLogin) {
         logoTitleLogin.innerHTML = storeName;
     }
+    const catalogStoreName = document.getElementById('catalog-store-name');
+    if (catalogStoreName) {
+        catalogStoreName.textContent = storeName;
+    }
+
+    // Render description, whatsapp and instagram in public catalog
+    const catalogDescText = document.getElementById('catalog-description-text');
+    const catalogWhatsappLink = document.getElementById('catalog-whatsapp-link');
+    const catalogInstagramLink = document.getElementById('catalog-instagram-link');
+    const catalogInfoCard = document.getElementById('catalog-info-card');
+
+    let hasInfo = false;
+
+    if (catalogDescText) {
+        const desc = state.settings.brandDescription || "";
+        if (desc) {
+            catalogDescText.textContent = desc;
+            catalogDescText.style.display = 'block';
+            hasInfo = true;
+        } else {
+            catalogDescText.style.display = 'none';
+        }
+    }
+
+    if (catalogWhatsappLink) {
+        let wa = state.settings.whatsapp || "";
+        if (wa) {
+            wa = wa.trim();
+            let waUrl = wa;
+            if (!wa.startsWith('http://') && !wa.startsWith('https://')) {
+                const digits = wa.replace(/[^\d+]/g, '');
+                waUrl = `https://wa.me/${digits.replace('+', '')}`;
+            }
+            catalogWhatsappLink.href = waUrl;
+            catalogWhatsappLink.style.display = 'inline-flex';
+            hasInfo = true;
+        } else {
+            catalogWhatsappLink.style.display = 'none';
+        }
+    }
+
+    if (catalogInstagramLink) {
+        let ig = state.settings.instagram || "";
+        if (ig) {
+            ig = ig.trim();
+            let igUrl = ig;
+            if (!ig.startsWith('http://') && !ig.startsWith('https://')) {
+                const username = ig.replace('@', '');
+                igUrl = `https://instagram.com/${username}`;
+            }
+            catalogInstagramLink.href = igUrl;
+            catalogInstagramLink.style.display = 'inline-flex';
+            hasInfo = true;
+        } else {
+            catalogInstagramLink.style.display = 'none';
+        }
+    }
+
+    if (catalogInfoCard) {
+        catalogInfoCard.style.display = hasInfo ? 'flex' : 'none';
+    }
+
+    if (window.lucide && hasInfo) {
+        lucide.createIcons();
+    }
 
     // Logo handling
     const logoUrl = state.settings.logo;
@@ -2354,6 +2458,10 @@ function applyBrandSettings() {
     const loginLogoIcon = document.getElementById('login-logo-container');
     const loginLogoDefault = document.getElementById('login-logo-default');
     const loginLogoImg = document.getElementById('login-logo-img');
+
+    const catalogLogoIcon = document.getElementById('catalog-logo-container');
+    const catalogLogoDefault = document.getElementById('catalog-logo-default');
+    const catalogLogoImg = document.getElementById('catalog-logo-img');
     
     if (logoUrl) {
         // Display custom logo image
@@ -2370,6 +2478,13 @@ function applyBrandSettings() {
             loginLogoImg.src = logoUrl;
             loginLogoImg.style.display = 'block';
         }
+
+        if (catalogLogoIcon) catalogLogoIcon.classList.add('has-custom-logo');
+        if (catalogLogoDefault) catalogLogoDefault.style.display = 'none';
+        if (catalogLogoImg) {
+            catalogLogoImg.src = logoUrl;
+            catalogLogoImg.style.display = 'block';
+        }
     } else {
         // Default wrench icon
         if (sidebarLogoIcon) sidebarLogoIcon.classList.remove('has-custom-logo');
@@ -2379,6 +2494,10 @@ function applyBrandSettings() {
         if (loginLogoIcon) loginLogoIcon.classList.remove('has-custom-logo');
         if (loginLogoDefault) loginLogoDefault.style.display = 'block';
         if (loginLogoImg) loginLogoImg.style.display = 'none';
+
+        if (catalogLogoIcon) catalogLogoIcon.classList.remove('has-custom-logo');
+        if (catalogLogoDefault) catalogLogoDefault.style.display = 'block';
+        if (catalogLogoImg) catalogLogoImg.style.display = 'none';
     }
 
     // Card custom styles logic
@@ -2519,6 +2638,88 @@ window.deleteCategory = function(index) {
     if (document.getElementById('view-pos').classList.contains('active')) {
         renderPOS();
     }
+}
+
+/* ==========================================================================
+   Public Customer Catalog Controller
+   ========================================================================== */
+function renderCatalog() {
+    const storeName = state.settings.storeName || "Macutech";
+    const logoUrl = state.settings.logo;
+    
+    // Sync store name and logo preview elements
+    const catalogStoreName = document.getElementById('catalog-store-name');
+    if (catalogStoreName) catalogStoreName.textContent = storeName;
+
+    const catalogLogoDefault = document.getElementById('catalog-logo-default');
+    const catalogLogoImg = document.getElementById('catalog-logo-img');
+    const catalogLogoIcon = document.getElementById('catalog-logo-container');
+    if (logoUrl) {
+        if (catalogLogoIcon) catalogLogoIcon.classList.add('has-custom-logo');
+        if (catalogLogoDefault) catalogLogoDefault.style.display = 'none';
+        if (catalogLogoImg) {
+            catalogLogoImg.src = logoUrl;
+            catalogLogoImg.style.display = 'block';
+        }
+    } else {
+        if (catalogLogoIcon) catalogLogoIcon.classList.remove('has-custom-logo');
+        if (catalogLogoDefault) catalogLogoDefault.style.display = 'block';
+        if (catalogLogoImg) catalogLogoImg.style.display = 'none';
+    }
+
+    // Populate Category Tabs
+    const tabsContainer = document.getElementById('catalog-categories-container');
+    if (tabsContainer) {
+        const categories = ['Todas', ...(state.settings.categories || [])];
+        let tabsHtml = '';
+        categories.forEach(cat => {
+            const displayCat = cat === 'Todas' ? '' : cat;
+            const activeClass = activeCatalogCategory === displayCat ? 'active' : '';
+            tabsHtml += `
+                <button class="category-tab ${activeClass}" onclick="setCatalogCategory('${displayCat}')">
+                    ${cat}
+                </button>
+            `;
+        });
+        tabsContainer.innerHTML = tabsHtml;
+    }
+
+    renderCatalogProductGrid();
+}
+
+window.setCatalogCategory = function(cat) {
+    activeCatalogCategory = cat;
+    renderCatalog();
+};
+
+function renderCatalogProductGrid() {
+    const searchVal = document.getElementById('catalog-search-input').value.toLowerCase();
+    const grid = document.getElementById('catalog-products-grid');
+    if (!grid) return;
+    
+    const filtered = state.products.filter(p => {
+        const matchesCategory = !activeCatalogCategory || p.category === activeCatalogCategory;
+        const matchesSearch = p.name.toLowerCase().includes(searchVal) || 
+                              p.sku.toLowerCase().includes(searchVal);
+        return matchesCategory && matchesSearch;
+    });
+
+    if (filtered.length === 0) {
+        grid.innerHTML = `
+            <div class="empty-state-small" style="grid-column: 1 / -1;">
+                <i data-lucide="package-x" style="width: 48px; height: 48px; opacity: 0.3;"></i>
+                <p>No se encontraron repuestos o herramientas en este catálogo.</p>
+            </div>
+        `;
+    } else {
+        let cardsHtml = '';
+        filtered.forEach(p => {
+            cardsHtml += createCatalogProductCard(p, state.settings.currency);
+        });
+        grid.innerHTML = cardsHtml;
+    }
+    
+    if (window.lucide) lucide.createIcons();
 }
 
 // Export database as JSON file download
