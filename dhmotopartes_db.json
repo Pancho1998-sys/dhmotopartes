@@ -115,7 +115,7 @@
     "sales": [
         {
             "id": "V-1006",
-            "date": "2026-06-08T03:40:57.880Z",
+            "date": "2026-06-09T16:41:15.297Z",
             "customerId": "c1",
             "customerName": "Martín Gómez (Taller El Rayo)",
             "items": [
@@ -143,7 +143,7 @@
         },
         {
             "id": "V-1005",
-            "date": "2026-06-09T03:40:57.880Z",
+            "date": "2026-06-10T16:41:15.297Z",
             "customerId": "c1",
             "customerName": "Martín Gómez (Taller El Rayo)",
             "items": [
@@ -171,7 +171,7 @@
         },
         {
             "id": "V-1004",
-            "date": "2026-06-10T03:40:57.880Z",
+            "date": "2026-06-11T16:41:15.297Z",
             "customerId": "c1",
             "customerName": "Martín Gómez (Taller El Rayo)",
             "items": [
@@ -199,7 +199,7 @@
         },
         {
             "id": "V-1003",
-            "date": "2026-06-11T03:40:57.880Z",
+            "date": "2026-06-12T16:41:15.297Z",
             "customerId": "c1",
             "customerName": "Martín Gómez (Taller El Rayo)",
             "items": [
@@ -227,7 +227,7 @@
         },
         {
             "id": "V-1002",
-            "date": "2026-06-12T03:40:57.880Z",
+            "date": "2026-06-13T16:41:15.297Z",
             "customerId": "c1",
             "customerName": "Martín Gómez (Taller El Rayo)",
             "items": [
@@ -255,7 +255,7 @@
         },
         {
             "id": "V-1001",
-            "date": "2026-06-13T03:40:57.880Z",
+            "date": "2026-06-14T16:41:15.297Z",
             "customerId": "c1",
             "customerName": "Martín Gómez (Taller El Rayo)",
             "items": [
@@ -283,7 +283,7 @@
         },
         {
             "id": "V-1000",
-            "date": "2026-06-14T03:40:57.880Z",
+            "date": "2026-06-15T16:41:15.297Z",
             "customerId": "c1",
             "customerName": "Martín Gómez (Taller El Rayo)",
             "items": [
@@ -339,7 +339,7 @@
     "cashMovements": [
         {
             "id": "cm_demo_1",
-            "date": "2026-06-11T03:40:57.880Z",
+            "date": "2026-06-12T16:41:15.297Z",
             "type": "inflow",
             "amount": 5000,
             "concept": "Apertura de caja - Caja Inicial",
@@ -347,7 +347,7 @@
         },
         {
             "id": "cm_demo_2",
-            "date": "2026-06-12T03:40:57.880Z",
+            "date": "2026-06-13T16:41:15.297Z",
             "type": "outflow",
             "amount": 1500,
             "concept": "Pago de flete / Envío de repuestos urgentes",
@@ -355,7 +355,7 @@
         }
     ],
     "settings": {
-        "storeName": "Macutech Test Shop",
+        "storeName": "Macutech",
         "storeAddress": "Av. Libertador 2450, Ciudad",
         "storePhone": "+54 9 11 5555-1234",
         "currency": "$",
@@ -366,16 +366,12 @@
             "Frenos",
             "Transmisión",
             "Herramientas",
-            "Accesorios",
-            "Neum",
-            "Neumaticos"
+            "Accesorios"
         ],
         "logo": "",
-        "cardBgType": "aurora",
+        "cardBgType": "default",
         "cardBgColor": "#1f2937",
         "cardBgColorHover": "#26354a",
-        "cardBgImage": "",
-        "theme": "light",
-        "accentColor": "emerald"
+        "cardBgImage": ""
     }
 }
