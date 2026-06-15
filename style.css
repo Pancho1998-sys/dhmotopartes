@@ -2299,11 +2299,11 @@ body.catalog-fullscreen .content-container {
     justify-content: space-between;
     align-items: center;
     background-color: var(--bg-card);
-    border: 1px solid var(--border-color);
+    border: 1.5px solid var(--border-color);
     border-radius: 12px;
-    padding: 16px 24px;
+    padding: 20px 28px;
     margin-bottom: 24px;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-md);
     gap: 16px;
     flex-wrap: wrap;
 }
@@ -2311,34 +2311,34 @@ body.catalog-fullscreen .content-container {
 .saas-dash-selector-label {
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: 16px;
-    font-weight: 600;
+    gap: 12px;
+    font-size: 18px;
+    font-weight: 700;
     color: var(--text-main);
 }
 
 .saas-dash-selector-label i {
     color: var(--primary);
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
 }
 
 .saas-dash-select-wrapper {
     position: relative;
-    min-width: 280px;
-    flex: 1;
-    max-width: 400px;
+    min-width: 320px;
+    flex: 1.5;
+    max-width: 500px;
 }
 
 .saas-dash-select-wrapper select {
     width: 100%;
     background-color: var(--bg-body);
-    border: 1px solid var(--border-color);
+    border: 2px solid var(--border-color);
     color: var(--text-main);
-    padding: 10px 16px;
+    padding: 12px 18px;
     border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
+    font-size: 16px;
+    font-weight: 600;
     outline: none;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
     cursor: pointer;
@@ -2352,10 +2352,10 @@ body.catalog-fullscreen .content-container {
 
 .saas-dash-select-wrapper::after {
     content: "▼";
-    font-size: 10px;
+    font-size: 11px;
     color: var(--text-muted);
     position: absolute;
-    right: 16px;
+    right: 18px;
     top: 50%;
     transform: translateY(-50%);
     pointer-events: none;
@@ -2363,4 +2363,6 @@ body.catalog-fullscreen .content-container {
 .saas-dash-select-wrapper select option {
     color: #111111;
     background-color: #ffffff;
+    font-size: 16px;
+    padding: 10px;
 }
