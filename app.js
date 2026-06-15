@@ -75,6 +75,7 @@ function updateSidebarStatus(online, text) {
 let currentUserRole = 'usuario';
 let currentUserProfile = null;
 let myStoreId = null;
+let isExecutable = false;
 
 // Setup Supabase Auth & Login UI flow
 async function setupAuthentication() {
@@ -89,6 +90,10 @@ async function setupAuthentication() {
 
     if (loginBtnLocal) {
         loginBtnLocal.onclick = () => {
+            if (isExecutable) {
+                alert("Acceso denegado: El modo local no está permitido en esta aplicación compilada.");
+                return;
+            }
             if (loginOverlay) {
                 loginOverlay.classList.remove('active');
                 loginOverlay.style.display = 'none';
@@ -105,7 +110,6 @@ async function setupAuthentication() {
     }
 
     // Detectar si estamos en el ejecutable compilado (.exe)
-    let isExecutable = false;
     try {
         if (window.location.protocol !== 'file:') {
             const res = await fetch('/api/info');
@@ -168,10 +172,14 @@ async function setupAuthentication() {
         loginStatus.textContent = "Ingresa tus credenciales para acceder a la base de datos remota.";
     }
 
-    // Ocultar siempre el botón de modo local cuando Supabase está configurado.
+    // Ocultar siempre el botón de modo local cuando Supabase está configurado o si es el ejecutable (.exe).
     // Solo tiene sentido en entorno de desarrollo sin Supabase.
     if (loginBtnLocal) {
-        loginBtnLocal.style.display = 'block';
+        if (isExecutable || supabaseInitialized) {
+            loginBtnLocal.style.display = 'none';
+        } else {
+            loginBtnLocal.style.display = 'block';
+        }
     }
 
     // Set up Supabase auth state listener
