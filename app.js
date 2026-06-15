@@ -26,7 +26,7 @@ let state = {
 
 // Database Key
 const STORAGE_KEY = 'dhmotopartes_db';
-let firebaseSyncActive = false;
+let supabaseSyncActive = false;
 
 // Temporary branding variables
 let tempLogoBase64 = null;
@@ -306,7 +306,7 @@ async function setupAuthentication() {
             if (btnLogout) btnLogout.style.display = 'none';
 
             // Clean active sync state if logging out
-            firebaseSyncActive = false;
+            supabaseSyncActive = false;
             // Clear realtime channel
             try {
                 supabaseClient.channel('public:store_states').unsubscribe();
@@ -451,7 +451,7 @@ async function loadDatabase() {
     const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
     if (supabaseInitialized && session && session.user) {
         try {
-            if (!firebaseSyncActive && myStoreId) {
+            if (!supabaseSyncActive && myStoreId) {
                 // Load current global state
                 const { data, error } = await supabaseClient
                     .from('store_states')
@@ -495,7 +495,7 @@ async function loadDatabase() {
                     )
                     .subscribe();
 
-                firebaseSyncActive = true;
+                supabaseSyncActive = true;
             }
             updateSidebarStatus(true, "Conectado Nube");
             return;
