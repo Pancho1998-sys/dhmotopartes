@@ -16,3 +16,7 @@ Thumbs.db
 
 # Supabase configuration (contains private credentials/keys)
 supabase-config.js
+
+# PyInstaller build directories
+build/
+dist/
