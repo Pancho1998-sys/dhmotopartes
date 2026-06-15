@@ -81,13 +81,18 @@ CREATE POLICY "Permitir lectura de stores" ON public.stores FOR SELECT TO authen
 
 DROP POLICY IF EXISTS "Permitir insercion de stores a saas_admin" ON public.stores;
 CREATE POLICY "Permitir insercion de stores a saas_admin" ON public.stores FOR INSERT TO authenticated WITH CHECK (
-    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'saas_admin')
+    public.get_my_role() = 'saas_admin'
 );
 
 -- Funciones auxiliares para seguridad y RLS
 CREATE OR REPLACE FUNCTION public.get_my_store_id()
 RETURNS UUID AS $$
   SELECT store_id FROM public.user_profiles WHERE id = auth.uid();
+$$ LANGUAGE sql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.get_my_role()
+RETURNS TEXT AS $$
+  SELECT role FROM public.user_profiles WHERE id = auth.uid();
 $$ LANGUAGE sql SECURITY DEFINER;
 
 -- Trigger para evitar la escalada de privilegios y saltos de tienda (cross-tenant)
@@ -97,6 +102,11 @@ DECLARE
   caller_role TEXT;
   caller_store UUID;
 BEGIN
+  -- Si es una modificación directa en la base de datos (SQL Editor, Table Editor, Dashboard)
+  IF auth.uid() IS NULL THEN
+    RETURN NEW;
+  END IF;
+
   -- Obtener el rol y tienda del usuario que está ejecutando la acción (auth.uid())
   SELECT role, store_id INTO caller_role, caller_store
   FROM public.user_profiles
@@ -133,49 +143,34 @@ CREATE TRIGGER check_profiles_before_update
   BEFORE UPDATE ON public.user_profiles
   FOR EACH ROW EXECUTE PROCEDURE public.check_user_profile_update();
 
--- Políticas para Stores (Tiendas)
-DROP POLICY IF EXISTS "Permitir lectura de stores" ON public.stores;
-CREATE POLICY "Permitir lectura de stores" ON public.stores FOR SELECT TO authenticated USING (true);
-
-DROP POLICY IF EXISTS "Permitir insercion de stores a saas_admin" ON public.stores;
-CREATE POLICY "Permitir insercion de stores a saas_admin" ON public.stores FOR INSERT TO authenticated WITH CHECK (
-    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'saas_admin')
-);
-
 -- Políticas para User Profiles
 DROP POLICY IF EXISTS "Lectura de perfiles" ON public.user_profiles;
 CREATE POLICY "Lectura de perfiles" ON public.user_profiles FOR SELECT TO authenticated USING (
     id = auth.uid()
     OR store_id = public.get_my_store_id()
-    OR EXISTS (SELECT 1 FROM public.user_profiles WHERE id = auth.uid() AND role = 'saas_admin')
+    OR public.get_my_role() = 'saas_admin'
 );
 
 DROP POLICY IF EXISTS "Actualizacion de perfiles" ON public.user_profiles;
 CREATE POLICY "Actualizacion de perfiles" ON public.user_profiles FOR UPDATE TO authenticated USING (
-    id = auth.uid() OR EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('superadmin', 'saas_admin'))
+    id = auth.uid() OR public.get_my_role() IN ('superadmin', 'saas_admin')
 );
 
 -- Políticas para Store States (Estado de la aplicación)
 DROP POLICY IF EXISTS "Leer state propio" ON public.store_states;
 CREATE POLICY "Leer state propio" ON public.store_states FOR SELECT TO authenticated USING (
     store_id = public.get_my_store_id()
-    OR EXISTS (SELECT 1 FROM public.user_profiles WHERE id = auth.uid() AND role = 'saas_admin')
+    OR public.get_my_role() = 'saas_admin'
 );
 
 DROP POLICY IF EXISTS "Actualizar state propio" ON public.store_states;
 CREATE POLICY "Actualizar state propio" ON public.store_states FOR UPDATE TO authenticated USING (
-    store_id = public.get_my_store_id() AND EXISTS (
-        SELECT 1 FROM public.user_profiles 
-        WHERE id = auth.uid() AND role IN ('admin', 'superadmin', 'cajero')
-    )
+    store_id = public.get_my_store_id() AND public.get_my_role() IN ('admin', 'superadmin', 'cajero')
 );
 
 DROP POLICY IF EXISTS "Insertar state propio" ON public.store_states;
 CREATE POLICY "Insertar state propio" ON public.store_states FOR INSERT TO authenticated WITH CHECK (
-    store_id = public.get_my_store_id() AND EXISTS (
-        SELECT 1 FROM public.user_profiles 
-        WHERE id = auth.uid() AND role IN ('admin', 'superadmin', 'cajero')
-    )
+    store_id = public.get_my_store_id() AND public.get_my_role() IN ('admin', 'superadmin', 'cajero')
 );
 
 -- ==============================================================================
