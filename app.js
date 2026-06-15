@@ -159,21 +159,10 @@ async function setupAuthentication() {
         loginStatus.textContent = "Ingresa tus credenciales para acceder a la base de datos remota.";
     }
 
-    // Habilitar/deshabilitar botón de modo local según el entorno
+    // Ocultar siempre el botón de modo local cuando Supabase está configurado.
+    // Solo tiene sentido en entorno de desarrollo sin Supabase.
     if (loginBtnLocal) {
-        if (isExecutable) {
-            loginBtnLocal.style.display = 'none';
-        } else {
-            loginBtnLocal.style.display = 'block';
-            loginBtnLocal.onclick = () => {
-                if (loginOverlay) {
-                    loginOverlay.classList.remove('active');
-                    loginOverlay.style.display = 'none';
-                }
-                loadDatabase(); // Loads local/demo data
-                renderApp();
-            };
-        }
+        loginBtnLocal.style.display = 'none';
     }
 
     // Set up Supabase auth state listener
