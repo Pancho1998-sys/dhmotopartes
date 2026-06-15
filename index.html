@@ -293,35 +293,43 @@
                         <!-- SaaS Metrics Row (shown after selecting a store) -->
                         <div class="metrics-grid" id="saas-metrics-grid" style="display:none;">
                             <div class="metric-card card-gradient-primary">
-                                <div class="metric-icon"><i data-lucide="trending-up"></i></div>
+                                <div class="metric-icon">
+                                    <i data-lucide="dollar-sign"></i>
+                                </div>
                                 <div class="metric-details">
-                                    <span class="metric-label">Ventas (7 días)</span>
-                                    <h3 class="metric-value" id="saas-metric-total">$0.00</h3>
-                                    <span class="metric-trend text-success" id="saas-metric-count">0 transacciones</span>
+                                    <span class="metric-label">Ventas del Día</span>
+                                    <h3 class="metric-value" id="saas-metric-today-sales">$0.00</h3>
+                                    <span class="metric-trend text-success" id="saas-metric-sales-count"><i data-lucide="trending-up"></i> 0 transacciones</span>
                                 </div>
                             </div>
                             <div class="metric-card">
-                                <div class="metric-icon bg-emerald"><i data-lucide="receipt"></i></div>
+                                <div class="metric-icon bg-violet">
+                                    <i data-lucide="package-search"></i>
+                                </div>
                                 <div class="metric-details">
-                                    <span class="metric-label">Ticket Promedio</span>
-                                    <h3 class="metric-value text-emerald" id="saas-metric-avg">$0.00</h3>
-                                    <span class="metric-subtext">Por transacción</span>
+                                    <span class="metric-label">Total en Inventario</span>
+                                    <h3 class="metric-value" id="saas-metric-total-products">0</h3>
+                                    <span class="metric-subtext" id="saas-metric-total-stock">0 unidades físicas</span>
                                 </div>
                             </div>
                             <div class="metric-card">
-                                <div class="metric-icon bg-violet"><i data-lucide="calendar-check"></i></div>
+                                <div class="metric-icon bg-amber" id="saas-metric-stock-alert-icon">
+                                    <i data-lucide="alert-triangle"></i>
+                                </div>
                                 <div class="metric-details">
-                                    <span class="metric-label">Ventas Hoy</span>
-                                    <h3 class="metric-value" id="saas-metric-today">$0.00</h3>
-                                    <span class="metric-subtext" id="saas-metric-today-count">0 transacciones hoy</span>
+                                    <span class="metric-label">Alertas de Stock Bajo</span>
+                                    <h3 class="metric-value text-amber" id="saas-metric-low-stock-count">0</h3>
+                                    <span class="metric-subtext">Requieren reabastecimiento</span>
                                 </div>
                             </div>
                             <div class="metric-card">
-                                <div class="metric-icon bg-amber"><i data-lucide="package"></i></div>
+                                <div class="metric-icon bg-emerald">
+                                    <i data-lucide="percent"></i>
+                                </div>
                                 <div class="metric-details">
-                                    <span class="metric-label">Artículos en Stock</span>
-                                    <h3 class="metric-value" id="saas-metric-products">0</h3>
-                                    <span class="metric-subtext" id="saas-metric-stock">0 unidades físicas</span>
+                                    <span class="metric-label">Ganancia del Día</span>
+                                    <h3 class="metric-value text-emerald" id="saas-metric-today-profit">$0.00</h3>
+                                    <span class="metric-trend text-emerald" id="saas-metric-profit-margin">0% Margen prom.</span>
                                 </div>
                             </div>
                         </div>
@@ -330,7 +338,7 @@
                         <div class="dashboard-layout" id="saas-chart-layout" style="display:none;">
                             <div class="dashboard-panel chart-panel">
                                 <div class="panel-header">
-                                    <h3 class="panel-title" id="saas-chart-title">Rendimiento de Ventas</h3>
+                                    <h3 class="panel-title" id="saas-chart-title">Rendimiento de Ventas Recientes</h3>
                                     <div class="panel-actions">
                                         <span class="badge badge-primary">Últimos 7 Días</span>
                                     </div>
@@ -338,14 +346,28 @@
                                 <div class="panel-body chart-container-wrapper" id="saas-sales-chart-container"></div>
                             </div>
                             <div class="dashboard-side-panels">
+                                <!-- Low Stock Alerts -->
                                 <div class="dashboard-panel side-panel">
                                     <div class="panel-header">
-                                        <h3 class="panel-title">Últimas Ventas del Negocio</h3>
+                                        <h3 class="panel-title text-amber"><i data-lucide="alert-circle" class="icon-inline"></i> Repuestos Críticos</h3>
+                                    </div>
+                                    <div class="panel-body scrollable-y list-feed" id="saas-dashboard-low-stock-list">
+                                        <div class="empty-state-small">
+                                            <i data-lucide="check-circle" class="text-success"></i>
+                                            <p>Stock óptimo en todos los repuestos.</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Recent Transactions -->
+                                <div class="dashboard-panel side-panel">
+                                    <div class="panel-header">
+                                        <h3 class="panel-title">Últimas Ventas</h3>
                                     </div>
                                     <div class="panel-body scrollable-y list-feed" id="saas-recent-sales-list">
                                         <div class="empty-state-small">
                                             <i data-lucide="info"></i>
-                                            <p>Selecciona un negocio para ver sus ventas.</p>
+                                            <p>No se registran ventas hoy.</p>
                                         </div>
                                     </div>
                                 </div>

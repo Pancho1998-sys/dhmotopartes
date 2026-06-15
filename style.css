@@ -761,7 +761,7 @@ textarea:focus {
 }
 
 .chart-container-wrapper {
-    min-height: 280px;
+    min-height: 400px;
     display: flex;
     align-items: center;
     justify-content: center;

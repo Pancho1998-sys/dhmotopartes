@@ -87,6 +87,23 @@ async function setupAuthentication() {
     const loginBtnLocal = document.getElementById('login-btn-local');
     const btnLogout = document.getElementById('btn-logout');
 
+    if (loginBtnLocal) {
+        loginBtnLocal.onclick = () => {
+            if (loginOverlay) {
+                loginOverlay.classList.remove('active');
+                loginOverlay.style.display = 'none';
+            }
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('t') === 'saas_admin') {
+                currentUserRole = 'saas_admin';
+            } else {
+                currentUserRole = 'superadmin';
+            }
+            loadDatabase(); // Loads local/demo data
+            renderApp();
+        };
+    }
+
     // Detectar si estamos en el ejecutable compilado (.exe)
     let isExecutable = false;
     try {
@@ -134,14 +151,6 @@ async function setupAuthentication() {
             }
             if (loginBtnLocal) {
                 loginBtnLocal.style.display = 'block';
-                loginBtnLocal.onclick = () => {
-                    if (loginOverlay) {
-                        loginOverlay.classList.remove('active');
-                        loginOverlay.style.display = 'none';
-                    }
-                    loadDatabase(); // Loads local/demo data
-                    renderApp();
-                };
             }
         }
         // Disable submit button since there is no Supabase to authenticate against
@@ -162,7 +171,7 @@ async function setupAuthentication() {
     // Ocultar siempre el botón de modo local cuando Supabase está configurado.
     // Solo tiene sentido en entorno de desarrollo sin Supabase.
     if (loginBtnLocal) {
-        loginBtnLocal.style.display = 'none';
+        loginBtnLocal.style.display = 'block';
     }
 
     // Set up Supabase auth state listener
@@ -1651,12 +1660,23 @@ async function renderSaasDashboard() {
     select.innerHTML = '<option value="">— Cargando negocios... —</option>';
 
     try {
-        const { data: stores, error } = await supabaseClient
-            .from('stores')
-            .select('id, name')
-            .order('name', { ascending: true });
+        let stores = [];
+        const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
+        if (supabaseInitialized && session) {
+            const { data, error } = await supabaseClient
+                .from('stores')
+                .select('id, name')
+                .order('name', { ascending: true });
 
-        if (error) throw error;
+            if (error) throw error;
+            stores = data;
+        } else {
+            // Local mode fallback
+            stores = [
+                { id: "demo-local-1", name: "DHMotopartes (Casa Central)" },
+                { id: "demo-local-2", name: "Repuestos El Rayo (Sucursal)" }
+            ];
+        }
 
         select.innerHTML = '<option value="">— Seleccionar Negocio —</option>';
         if (stores && stores.length > 0) {
@@ -1675,6 +1695,8 @@ async function renderSaasDashboard() {
     }
 }
 
+
+
 async function onSaasStoreSelected(storeId) {
     const metricsGrid = document.getElementById('saas-metrics-grid');
     const chartLayout = document.getElementById('saas-chart-layout');
@@ -1690,63 +1712,125 @@ async function onSaasStoreSelected(storeId) {
     if (emptyState) emptyState.style.display = 'none';
     
     try {
-        // Fetch the selected store's state
-        const { data, error } = await supabaseClient
-            .from('store_states')
-            .select('state')
-            .eq('store_id', storeId)
-            .single();
+        let storeState = {};
+        const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
+        if (supabaseInitialized && session && !storeId.startsWith('demo-local')) {
+            // Fetch the selected store's state from Supabase
+            const { data, error } = await supabaseClient
+                .from('store_states')
+                .select('state')
+                .eq('store_id', storeId)
+                .single();
 
-        if (error) throw error;
+            if (error) throw error;
+            storeState = (data && data.state) ? data.state : {};
+        } else {
+            // Local mode / demo fallback
+            storeState = JSON.parse(JSON.stringify(state)); // deep copy of local state
+            if (storeId === "demo-local-2") {
+                // Tweak it slightly so it looks different for the other store
+                storeState.sales = storeState.sales.map(s => {
+                    const newS = {...s};
+                    newS.total = s.total * 1.5;
+                    return newS;
+                });
+            }
+        }
 
-        const storeState = (data && data.state) ? data.state : {};
         const sales = Array.isArray(storeState.sales) ? storeState.sales : [];
         const products = Array.isArray(storeState.products) ? storeState.products : [];
         const settings = storeState.settings || {};
         const currency = settings.currency || '$';
 
-        // 1. Calculate SaaS Dashboard statistics for last 7 days
-        const today = new Date();
-        const todayStr = today.toDateString();
-        const daysWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-        
-        // Filter completed sales
-        const completedSales = sales.filter(s => s.status === 'completed');
+        // Calculate statistics (identical to standard dashboard)
+        const today = new Date().toDateString();
 
-        // Ventas Hoy
-        const salesToday = completedSales.filter(s => new Date(s.date).toDateString() === todayStr);
-        const totalToday = salesToday.reduce((sum, s) => sum + s.total, 0);
+        // Filter completed sales today
+        const salesToday = sales.filter(s => s.status === 'completed' && new Date(s.date).toDateString() === today);
+        const totalTodaySales = salesToday.reduce((sum, s) => sum + s.total, 0);
+        const profitToday = salesToday.reduce((sum, s) => {
+            let costOfSale = 0;
+            s.items.forEach(item => {
+                const prod = products.find(p => p.id === item.id);
+                const cost = prod ? prod.cost : 0;
+                costOfSale += cost * item.quantity;
+            });
+            return sum + (s.total - costOfSale - s.tax);
+        }, 0);
 
-        // Ventas 7 días
-        const dateLimit = new Date();
-        dateLimit.setDate(today.getDate() - 7);
-        const sales7Days = completedSales.filter(s => new Date(s.date) >= dateLimit);
-        const total7Days = sales7Days.reduce((sum, s) => sum + s.total, 0);
+        document.getElementById('saas-metric-today-sales').textContent = `${currency}${totalTodaySales.toFixed(2)}`;
+        document.getElementById('saas-metric-sales-count').innerHTML = `<i data-lucide="trending-up"></i> ${salesToday.length} transacciones`;
+        document.getElementById('saas-metric-today-profit').textContent = `${currency}${Math.max(0, profitToday).toFixed(2)}`;
 
-        // Ticket Promedio (7 días)
-        const avgTicket = sales7Days.length > 0 ? (total7Days / sales7Days.length) : 0;
+        const profitMargin = totalTodaySales > 0 ? (profitToday / totalTodaySales) * 100 : 0;
+        document.getElementById('saas-metric-profit-margin').textContent = `${profitMargin.toFixed(0)}% Margen prom.`;
 
-        // Artículos en stock
+        // Total products and stocks
         const totalProducts = products.length;
         const totalStockQty = products.reduce((sum, p) => sum + p.stock, 0);
+        document.getElementById('saas-metric-total-products').textContent = totalProducts;
+        document.getElementById('saas-metric-total-stock').textContent = `${totalStockQty} unidades físicas`;
 
-        // Update elements
-        document.getElementById('saas-metric-total').textContent = `${currency}${total7Days.toFixed(2)}`;
-        document.getElementById('saas-metric-count').innerHTML = `<i data-lucide="trending-up"></i> ${sales7Days.length} transacciones`;
-        document.getElementById('saas-metric-avg').textContent = `${currency}${avgTicket.toFixed(2)}`;
-        document.getElementById('saas-metric-today').textContent = `${currency}${totalToday.toFixed(2)}`;
-        document.getElementById('saas-metric-today-count').textContent = `${salesToday.length} transacciones hoy`;
-        document.getElementById('saas-metric-products').textContent = totalProducts;
-        document.getElementById('saas-metric-stock').textContent = `${totalStockQty} unidades físicas`;
+        // Low stock warnings
+        const lowStockList = products.filter(p => p.stock <= p.stockMin);
+        const lowStockCount = lowStockList.length;
+        document.getElementById('saas-metric-low-stock-count').textContent = lowStockCount;
 
-        // 2. Generate Chart Data (last 7 days, today back to 6 days ago)
+        const alertIconEl = document.getElementById('saas-metric-stock-alert-icon');
+        if (alertIconEl) {
+            if (lowStockCount > 0) {
+                alertIconEl.className = "metric-icon bg-amber status-dot pulse";
+            } else {
+                alertIconEl.className = "metric-icon bg-amber";
+            }
+        }
+
+        // Render Low Stock Alert List
+        const lowStockContainer = document.getElementById('saas-dashboard-low-stock-list');
+        if (lowStockContainer) {
+            if (lowStockCount === 0) {
+                lowStockContainer.innerHTML = `
+                    <div class="empty-state-small">
+                        <i data-lucide="check-circle" class="text-success"></i>
+                        <p>Stock óptimo en todos los repuestos.</p>
+                    </div>
+                `;
+            } else {
+                let listHtml = '';
+                lowStockList.slice(0, 4).forEach(p => {
+                    const stockColor = p.stock === 0 ? 'text-danger' : 'text-warning';
+                    listHtml += `
+                        <div class="feed-item">
+                            <div class="feed-item-left">
+                                <div class="feed-item-icon bg-amber" style="color: #f59e0b;">
+                                    <i data-lucide="alert-circle" style="width:14px; height:14px;"></i>
+                                </div>
+                                <div>
+                                    <p class="feed-item-title">${p.name}</p>
+                                    <p class="feed-item-subtext">SKU: ${p.sku}</p>
+                                </div>
+                            </div>
+                            <div class="feed-item-right">
+                                <span class="feed-item-value ${stockColor}">${p.stock} unidades</span>
+                                <p class="feed-item-subtext">Mín: ${p.stockMin}</p>
+                            </div>
+                        </div>
+                    `;
+                });
+                lowStockContainer.innerHTML = listHtml;
+            }
+        }
+
+        // Render Chart Data (last 7 days)
         const chartData = [];
+        const daysWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+        const dateToday = new Date();
         for (let i = 6; i >= 0; i--) {
-            const d = new Date(today);
-            d.setDate(today.getDate() - i);
+            const d = new Date(dateToday);
+            d.setDate(dateToday.getDate() - i);
             const dateStr = d.toDateString();
-            const dailyTotal = completedSales
-                .filter(s => new Date(s.date).toDateString() === dateStr)
+            const dailyTotal = sales
+                .filter(s => s.status === 'completed' && new Date(s.date).toDateString() === dateStr)
                 .reduce((sum, s) => sum + s.total, 0);
 
             chartData.push({
@@ -1762,22 +1846,24 @@ async function onSaasStoreSelected(storeId) {
             renderSalesChart('saas-sales-chart-container', chartData, currency);
         }
 
-        // 3. Render Recent Sales (top 5) for this business
+        // Render Recent Sales (top 4 completed)
         const recentSalesContainer = document.getElementById('saas-recent-sales-list');
         if (recentSalesContainer) {
-            const sortedSales = [...completedSales].sort((a, b) => new Date(b.date) - new Date(a.date));
-            if (sortedSales.length === 0) {
+            const completedSales = sales.filter(s => s.status === 'completed')
+                .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            if (completedSales.length === 0) {
                 recentSalesContainer.innerHTML = `
                     <div class="empty-state-small">
                         <i data-lucide="info"></i>
-                        <p>No se registran ventas en este negocio.</p>
+                        <p>No se registran ventas realizadas.</p>
                     </div>
                 `;
             } else {
-                let html = '';
-                sortedSales.slice(0, 5).forEach(s => {
-                    const timeStr = new Date(s.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-                    html += `
+                let listHtml = '';
+                completedSales.slice(0, 4).forEach(s => {
+                    const itemsCount = s.items.reduce((sum, item) => sum + item.quantity, 0);
+                    listHtml += `
                         <div class="feed-item">
                             <div class="feed-item-left">
                                 <div class="feed-item-icon bg-success" style="color: var(--text-success);">
@@ -1785,17 +1871,17 @@ async function onSaasStoreSelected(storeId) {
                                 </div>
                                 <div>
                                     <p class="feed-item-title">Venta #${s.id.toString().slice(-6)}</p>
-                                    <p class="feed-item-subtext">${timeStr} • ${s.items.length} items</p>
+                                    <p class="feed-item-subtext">${s.customerName || 'Consumidor Final'} | ${itemsCount} art.</p>
                                 </div>
                             </div>
                             <div class="feed-item-right">
                                 <span class="feed-item-value text-success">+${currency}${s.total.toFixed(2)}</span>
-                                <p class="feed-item-subtext">${s.paymentMethod === 'cash' ? 'Efectivo' : s.paymentMethod === 'card' ? 'Tarjeta' : 'Transferencia'}</p>
+                                <p class="feed-item-subtext">${new Date(s.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</p>
                             </div>
                         </div>
                     `;
                 });
-                recentSalesContainer.innerHTML = html;
+                recentSalesContainer.innerHTML = listHtml;
             }
         }
 
@@ -1803,7 +1889,7 @@ async function onSaasStoreSelected(storeId) {
 
         // Show layouts
         if (metricsGrid) metricsGrid.style.display = 'grid';
-        if (chartLayout) chartLayout.style.display = 'flex';
+        if (chartLayout) chartLayout.style.display = 'grid';
 
     } catch (err) {
         console.error("Error al cargar detalles de negocio:", err);

@@ -23,8 +23,8 @@ function renderSalesChart(containerId, data, currency = '$') {
         return;
     }
 
-    const width = 600;
-    const height = 240;
+    const width = 800;
+    const height = 360;
     const paddingLeft = 60;
     const paddingRight = 30;
     const paddingTop = 30;
