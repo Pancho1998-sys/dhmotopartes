@@ -541,26 +541,97 @@ async function loadDatabase() {
 }
 
 // Save DB state to LocalStorage and background push to Supabase
-async function saveDatabase() {
+async function saveDatabase(retryCount = 0) {
     if (currentUserRole === 'saas_admin') return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (retryCount > 3) {
+        console.error("Demasiadas colisiones de red, abortando guardado.");
+        return;
+    }
 
     const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
     if (supabaseInitialized && session && session.user && myStoreId) {
         try {
-            const { error } = await supabaseClient
-                .from('store_states')
-                .upsert({ store_id: myStoreId, state: state, updated_at: new Date().toISOString() });
+            let oldVersion = state.version || 0;
+            state.version = oldVersion + 1;
 
-            if (error) {
-                console.error("Error syncing state to Supabase:", error);
+            if (oldVersion === 0) {
+                // Primera vez que se guarda (creacion)
+                const { error } = await supabaseClient
+                    .from('store_states')
+                    .upsert({ store_id: myStoreId, state: state, updated_at: new Date().toISOString() });
+                if (error) throw error;
             } else {
-                console.log("Database synchronized to Supabase successfully.");
+                // Actualización con Bloqueo Optimista (Optimistic Locking)
+                const { data, error } = await supabaseClient
+                    .from('store_states')
+                    .update({ state: state, updated_at: new Date().toISOString() })
+                    .eq('store_id', myStoreId)
+                    .eq('state->>version', oldVersion.toString())
+                    .select();
+
+                if (error) throw error;
+
+                if (!data || data.length === 0) {
+                    // COLISION DETECTADA: Otra computadora guardó antes.
+                    console.warn("Colisión detectada. Fusionando datos automáticamente...");
+                    state.version = oldVersion; // Revertir versión local
+
+                    // 1. Obtener estado más reciente de la nube
+                    const dbRes = await supabaseClient.from('store_states').select('state').eq('store_id', myStoreId).single();
+                    if (dbRes.error) throw dbRes.error;
+                    let dbState = dbRes.data.state || { products: [], sales: [], cashMovements: [], customers: [] };
+
+                    // 2. Fusionar los datos locales nuevos en el dbState
+                    const dbSaleIds = new Set((dbState.sales || []).map(s => s.id));
+                    const newLocalSales = (state.sales || []).filter(s => !dbSaleIds.has(s.id));
+                    
+                    const dbCashIds = new Set((dbState.cashMovements || []).map(m => m.id));
+                    const newLocalCash = (state.cashMovements || []).filter(m => !dbCashIds.has(m.id));
+
+                    const dbCustIds = new Set((dbState.customers || []).map(c => c.id));
+                    const newLocalCust = (state.customers || []).filter(c => !dbCustIds.has(c.id));
+
+                    // Clonamos dbState para que sea nuestro nuevo state base
+                    let mergedState = JSON.parse(JSON.stringify(dbState));
+                    if (!mergedState.sales) mergedState.sales = [];
+                    if (!mergedState.cashMovements) mergedState.cashMovements = [];
+                    if (!mergedState.customers) mergedState.customers = [];
+
+                    // Añadimos lo nuestro
+                    mergedState.sales.push(...newLocalSales);
+                    mergedState.cashMovements.push(...newLocalCash);
+                    mergedState.customers.push(...newLocalCust);
+
+                    // Ajustamos el stock en base a nuestras ventas nuevas que no estaban en la BD
+                    for (let sale of newLocalSales) {
+                        if(sale.items) {
+                            for (let item of sale.items) {
+                                let prod = mergedState.products.find(p => p.id === item.id);
+                                if (prod) prod.stock -= item.quantity;
+                            }
+                        }
+                    }
+
+                    // 3. Asumimos el nuevo estado y reintentamos guardar
+                    state = mergedState;
+                    syncSettingsInputs();
+                    renderApp();
+                    
+                    return saveDatabase(retryCount + 1);
+                }
             }
+
+            // Si llegamos acá, se guardó bien en la nube. Actualizamos localStorage.
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            console.log("Database synchronized to Supabase successfully.");
         } catch (err) {
             console.error("Could not sync to Supabase:", err);
+            // Revertir versión si hubo error de red
+            if (state.version) state.version -= 1;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         }
     } else {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         fetch('/api/db', {
             method: 'POST',
             headers: {
