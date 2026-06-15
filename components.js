@@ -348,8 +348,12 @@ function createCatalogProductCard(product, currency = '$') {
     
     const iconStyle = product.image ? 'display: none;' : '';
 
+    const addBtnHtml = isOutOfStock ? 
+        `<button class="btn btn-secondary small w-full" style="margin-top: 8px; cursor: not-allowed;" disabled>Sin Stock</button>` :
+        `<button class="btn btn-primary small w-full" style="margin-top: 8px;" onclick="event.stopPropagation(); addCatalogCartItem('${product.id}')"><i data-lucide="plus" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:4px;"></i>Agregar</button>`;
+
     return `
-        <div class="${cardClass}" data-id="${product.id}">
+        <div class="${cardClass}" data-id="${product.id}" onclick="${isOutOfStock ? '' : `addCatalogCartItem('${product.id}')`}">
             <span class="prod-card-sku">${product.sku}</span>
             <div class="prod-card-image">
                 ${imagePlaceholder}
@@ -360,10 +364,11 @@ function createCatalogProductCard(product, currency = '$') {
             <div class="prod-card-info">
                 <span class="prod-card-cat">${product.category}</span>
                 <h4 class="prod-card-title" title="${product.name}">${product.name}</h4>
-                <div class="prod-card-footer">
+                <div class="prod-card-footer" style="margin-bottom: 4px;">
                     <span class="prod-card-price">${currency}${product.price.toFixed(2)}</span>
                     <span class="prod-card-stock ${stockClass}">${stockText}</span>
                 </div>
+                ${addBtnHtml}
             </div>
         </div>
     `;

@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
     setupBarcodeListener();
     // setupCajeroRegistration();
-    
+
     // Listen for custom hash changes
     window.addEventListener('hashchange', handleRoute);
 });
@@ -86,7 +86,7 @@ function setupAuthentication() {
     const loginStatus = document.getElementById('login-status-notice');
     const loginBtnLocal = document.getElementById('login-btn-local');
     const btnLogout = document.getElementById('btn-logout');
-    
+
     // Set up logout button click listener
     if (btnLogout) {
         btnLogout.addEventListener('click', async () => {
@@ -140,7 +140,7 @@ function setupAuthentication() {
         if (session && session.user) {
             const user = session.user;
             console.log("Usuario autenticado en Supabase:", user.email);
-            
+
             try {
                 // Fetch profile and check role
                 let { data: profile, error } = await supabaseClient
@@ -148,7 +148,7 @@ function setupAuthentication() {
                     .select('first_name, last_name, dni, role, store_id')
                     .eq('id', user.id)
                     .single();
-                
+
                 if (error || !profile) {
                     console.error("Error al obtener perfil, reintentando...", error);
                     await new Promise(r => setTimeout(r, 800));
@@ -164,39 +164,39 @@ function setupAuthentication() {
                     }
                     profile = retryProfile;
                 }
-                
+
                 // Authorize
                 if (profile.role !== 'admin' && profile.role !== 'superadmin' && profile.role !== 'saas_admin' && profile.role !== 'cajero') {
                     alert("Acceso denegado: Este panel es exclusivo para Cajeros, Administradores, Superadministradores o SaaS Admin.");
                     await supabaseClient.auth.signOut();
                     return;
                 }
-                
+
                 if (profile.role !== 'saas_admin' && !profile.store_id) {
                     alert("Error: Tu cuenta no está vinculada a ninguna tienda (store_id nulo). Contacta al administrador.");
                     await supabaseClient.auth.signOut();
                     return;
                 }
-                
+
                 currentUserRole = profile.role;
                 currentUserProfile = profile;
                 myStoreId = profile.store_id;
-                
+
                 const initials = ((profile.first_name || '')[0] || '') + ((profile.last_name || '')[0] || '');
                 const emailInitials = initials.toUpperCase() || user.email.slice(0, 2).toUpperCase();
-                
+
                 const avatarEl = document.getElementById('user-avatar');
                 const nameEl = document.getElementById('user-name-display');
-                
+
                 if (avatarEl) avatarEl.textContent = emailInitials;
                 if (nameEl) nameEl.textContent = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || user.email.split('@')[0];
                 if (btnLogout) btnLogout.style.display = 'inline-flex';
-                
+
                 if (loginOverlay) {
                     loginOverlay.classList.remove('active');
                     loginOverlay.style.display = 'none';
                 }
-                
+
                 // Show/Hide panels based on cajero role
                 const navItemsToHide = ['nav-dashboard', 'nav-inventario', 'nav-clientes', 'nav-historial', 'nav-caja', 'nav-configuracion'];
                 if (currentUserRole === 'cajero') {
@@ -225,7 +225,7 @@ function setupAuthentication() {
                         navSaas.style.display = 'none';
                     }
                 }
-                
+
                 // Show/Hide cashier management if superadmin
                 const cajerosPanel = document.getElementById('superadmin-cajeros-panel');
                 if (cajerosPanel) {
@@ -236,12 +236,12 @@ function setupAuthentication() {
                         cajerosPanel.style.display = 'none';
                     }
                 }
-                
+
                 // Load DB from Supabase (Skip loading store DB if saas_admin)
                 if (currentUserRole !== 'saas_admin') {
                     await loadDatabase();
                 }
-                
+
             } catch (err) {
                 console.error("Auth state processing failed:", err);
             }
@@ -250,19 +250,19 @@ function setupAuthentication() {
             currentUserRole = 'usuario';
             currentUserProfile = null;
             myStoreId = null;
-            
+
             if (loginOverlay) {
                 loginOverlay.classList.add('active');
                 loginOverlay.style.display = 'flex';
             }
             if (btnLogout) btnLogout.style.display = 'none';
-            
+
             // Clean active sync state if logging out
             firebaseSyncActive = false;
             // Clear realtime channel
             try {
                 supabaseClient.channel('public:store_states').unsubscribe();
-            } catch(e){}
+            } catch (e) { }
         }
     });
 
@@ -272,7 +272,7 @@ function setupAuthentication() {
             e.preventDefault();
             const email = loginEmail.value.trim();
             const password = loginPassword.value;
-            
+
             if (loginError) loginError.style.display = 'none';
             const btnSubmit = document.getElementById('login-btn-submit');
             if (btnSubmit) {
@@ -280,13 +280,13 @@ function setupAuthentication() {
                 btnSubmit.innerHTML = `<i data-lucide="loader" class="animate-spin" style="animation: spin 1s linear infinite;"></i> Cargando...`;
                 if (window.lucide) lucide.createIcons();
             }
-            
+
             try {
                 const { data, error } = await supabaseClient.auth.signInWithPassword({
                     email,
                     password
                 });
-                
+
                 if (error) throw error;
                 playScanSound('success');
             } catch (error) {
@@ -330,7 +330,7 @@ function syncSettingsInputs() {
         const descEl = document.getElementById('set-store-description');
         const currEl = document.getElementById('set-store-currency');
         const taxEl = document.getElementById('set-store-tax');
-        
+
         if (nameEl) nameEl.value = state.settings.storeName || "";
         if (addrEl) addrEl.value = state.settings.storeAddress || "";
         if (phoneEl) phoneEl.value = state.settings.storePhone || "";
@@ -353,7 +353,7 @@ function syncSettingsInputs() {
         const cardBgTypeSelect = document.getElementById('set-card-bg-type');
         const cardBgColorInput = document.getElementById('set-card-bg-color');
         const cardBgColorHoverInput = document.getElementById('set-card-bg-hover');
-        
+
         if (cardBgTypeSelect) cardBgTypeSelect.value = cardBgType;
         if (cardBgColorInput) cardBgColorInput.value = cardBgColor;
         if (cardBgColorHoverInput) cardBgColorHoverInput.value = cardBgColorHover;
@@ -391,7 +391,7 @@ function syncSettingsInputs() {
             if (cardBgPreviewContainer) cardBgPreviewContainer.style.display = 'none';
             if (cardBgDropzone) cardBgDropzone.style.display = 'block';
         }
-        
+
         // Render categories UI in settings
         renderCategorySettings();
         applyBrandSettings();
@@ -410,7 +410,7 @@ async function loadDatabase() {
                     .select('state')
                     .eq('store_id', myStoreId)
                     .single();
-                
+
                 if (error) {
                     console.error("Error loading state from Supabase:", error);
                     if (error.code === 'PGRST116') {
@@ -446,7 +446,7 @@ async function loadDatabase() {
                         }
                     )
                     .subscribe();
-                
+
                 firebaseSyncActive = true;
             }
             updateSidebarStatus(true, "Conectado Nube");
@@ -475,14 +475,14 @@ async function loadDatabase() {
 // Save DB state to LocalStorage and background push to Supabase
 async function saveDatabase() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    
+
     const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
     if (supabaseInitialized && session && session.user && myStoreId) {
         try {
             const { error } = await supabaseClient
                 .from('store_states')
                 .upsert({ store_id: myStoreId, state: state, updated_at: new Date().toISOString() });
-            
+
             if (error) {
                 console.error("Error syncing state to Supabase:", error);
             } else {
@@ -541,7 +541,7 @@ function loadDemoData() {
     daysData.forEach(day => {
         const saleDate = new Date(today);
         saleDate.setDate(today.getDate() - day.daysAgo);
-        
+
         state.sales.push({
             id: `V-100${day.daysAgo}`,
             date: saleDate.toISOString(),
@@ -560,7 +560,7 @@ function loadDemoData() {
             changeReturned: 0,
             status: "completed"
         });
-        
+
         // Adjust the total sum for demo purposes
         state.sales[state.sales.length - 1].total = day.total;
     });
@@ -602,10 +602,10 @@ function initRouter() {
 function handleRoute() {
     const hash = window.location.hash || '#dashboard';
     const views = ['dashboard', 'pos', 'inventario', 'clientes', 'historial', 'caja', 'configuracion', 'saas', 'catalogo'];
-    
+
     // Parse target view
     let targetView = hash.replace('#', '');
-    
+
     if (!views.includes(targetView)) return;
 
     // Fullscreen and Preview Banner handling for Catalog
@@ -652,9 +652,9 @@ function handleRoute() {
         'saas': 'Panel SaaS Global',
         'catalogo': 'Catálogo de Clientes'
     };
-    
+
     document.getElementById('page-title').textContent = titleMap[targetView] || 'DHMotopartes';
-    
+
     // Close sidebar on mobile after choosing a link
     document.getElementById('app-sidebar').classList.remove('mobile-open');
 
@@ -693,7 +693,7 @@ function playScanSound(type = 'success') {
         const gain = ctx.createGain();
         osc.connect(gain);
         gain.connect(ctx.destination);
-        
+
         if (type === 'success') {
             osc.frequency.setValueAtTime(1000, ctx.currentTime); // High pitched beep
             gain.gain.setValueAtTime(0.08, ctx.currentTime);
@@ -726,16 +726,16 @@ function setupEventListeners() {
     document.getElementById('sidebar-toggle-btn').addEventListener('click', () => {
         document.getElementById('app-sidebar').classList.add('mobile-open');
     });
-    
+
     document.getElementById('sidebar-close-btn').addEventListener('click', () => {
         document.getElementById('app-sidebar').classList.remove('mobile-open');
     });
-    
+
     // Theme Toggle
     document.getElementById('theme-toggle-btn').addEventListener('click', toggleTheme);
     document.getElementById('theme-btn-dark').addEventListener('click', () => applyThemeMode('dark'));
     document.getElementById('theme-btn-light').addEventListener('click', () => applyThemeMode('light'));
-    
+
     // Theme Accent Pickers
     document.getElementById('accent-pickers-container').addEventListener('click', (e) => {
         if (e.target.classList.contains('color-dot')) {
@@ -775,7 +775,7 @@ function setupEventListeners() {
     document.getElementById('cart-clear-btn').addEventListener('click', clearCart);
     document.getElementById('cart-apply-discount-btn').addEventListener('click', () => openModal('modal-discount'));
     document.getElementById('cart-checkout-btn').addEventListener('click', openCheckoutModal);
-    
+
     // Discount Save
     document.getElementById('discount-save-btn').addEventListener('click', applyCartDiscount);
 
@@ -793,7 +793,7 @@ function setupEventListeners() {
     // Checkout Processing Listeners
     document.getElementById('checkout-confirm-btn').addEventListener('click', processCheckout);
     document.getElementById('checkout-cash-received').addEventListener('input', calculateChange);
-    
+
     // Quick Cash container
     document.getElementById('quick-cash-container').addEventListener('click', (e) => {
         if (e.target.classList.contains('quick-cash-btn')) {
@@ -809,7 +809,7 @@ function setupEventListeners() {
         if (btn) {
             document.querySelectorAll('.method-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            
+
             const cashSection = document.getElementById('checkout-cash-inputs');
             if (btn.dataset.method === 'cash') {
                 cashSection.style.display = 'block';
@@ -827,7 +827,7 @@ function setupEventListeners() {
         document.getElementById('product-id-field').value = "";
         document.getElementById('product-form').reset();
         document.getElementById('prod-sku').readOnly = false;
-        
+
         // Reset image selector UI
         tempProductImageBase64 = "";
         const fileRadio = document.getElementById('prod-image-src-file');
@@ -840,10 +840,10 @@ function setupEventListeners() {
         if (previewContainer) previewContainer.style.display = 'none';
         const fileInput = document.getElementById('prod-image-file-input');
         if (fileInput) fileInput.value = "";
-        
+
         openModal('modal-product');
     });
-    
+
     document.getElementById('product-form').addEventListener('submit', saveProduct);
     document.getElementById('inventory-search').addEventListener('input', renderInventoryTable);
     document.getElementById('inventory-filter-category').addEventListener('change', renderInventoryTable);
@@ -863,7 +863,7 @@ function setupEventListeners() {
     document.getElementById('history-filter-start').addEventListener('change', renderHistoryTable);
     document.getElementById('history-filter-end').addEventListener('change', renderHistoryTable);
     document.getElementById('history-filter-status').addEventListener('change', renderHistoryTable);
-    
+
     // Receipt Actions
     document.getElementById('receipt-print-btn').addEventListener('click', () => {
         window.print();
@@ -954,7 +954,7 @@ function setupEventListeners() {
     const cardBgTypeSelect = document.getElementById('set-card-bg-type');
     const colorGroup = document.getElementById('card-bg-color-group');
     const imageGroup = document.getElementById('card-bg-image-group');
-    
+
     if (cardBgTypeSelect) {
         cardBgTypeSelect.addEventListener('change', (e) => {
             const val = e.target.value;
@@ -972,7 +972,7 @@ function setupEventListeners() {
 
     if (logoDropzone && logoInput) {
         logoDropzone.addEventListener('click', () => logoInput.click());
-        
+
         logoDropzone.addEventListener('dragover', (e) => {
             e.preventDefault();
             logoDropzone.style.borderColor = 'var(--primary)';
@@ -987,7 +987,7 @@ function setupEventListeners() {
                 handleLogoFile(e.dataTransfer.files[0]);
             }
         });
-        
+
         logoInput.addEventListener('change', (e) => {
             if (e.target.files && e.target.files[0]) {
                 handleLogoFile(e.target.files[0]);
@@ -1024,7 +1024,7 @@ function setupEventListeners() {
 
     if (cardBgDropzone && cardBgInput) {
         cardBgDropzone.addEventListener('click', () => cardBgInput.click());
-        
+
         cardBgDropzone.addEventListener('dragover', (e) => {
             e.preventDefault();
             cardBgDropzone.style.borderColor = 'var(--primary)';
@@ -1039,7 +1039,7 @@ function setupEventListeners() {
                 handleCardBgFile(e.dataTransfer.files[0]);
             }
         });
-        
+
         cardBgInput.addEventListener('change', (e) => {
             if (e.target.files && e.target.files[0]) {
                 handleCardBgFile(e.target.files[0]);
@@ -1115,7 +1115,7 @@ function setupEventListeners() {
     // Dropzone events for product image
     if (prodImgDropzone && prodImgFileInput) {
         prodImgDropzone.addEventListener('click', () => prodImgFileInput.click());
-        
+
         prodImgDropzone.addEventListener('dragover', (e) => {
             e.preventDefault();
             prodImgDropzone.style.borderColor = 'var(--primary)';
@@ -1130,7 +1130,7 @@ function setupEventListeners() {
                 handleProductImageFile(e.dataTransfer.files[0]);
             }
         });
-        
+
         prodImgFileInput.addEventListener('change', (e) => {
             if (e.target.files && e.target.files[0]) {
                 handleProductImageFile(e.target.files[0]);
@@ -1144,9 +1144,9 @@ function setupEventListeners() {
             if (prodImgPreviewImg) prodImgPreviewImg.src = tempProductImageBase64;
             if (prodImgPreviewContainer) prodImgPreviewContainer.style.display = 'flex';
             if (prodImgDropzone) prodImgDropzone.style.display = 'none';
-            
+
             // Show file size information
-            const sizeInKb = Math.round((compressedBase64.length * 3/4) / 1024);
+            const sizeInKb = Math.round((compressedBase64.length * 3 / 4) / 1024);
             const sizeInfo = document.getElementById('prod-image-size-info');
             if (sizeInfo) sizeInfo.textContent = `Optimizado: ~${sizeInKb} KB`;
         });
@@ -1214,12 +1214,12 @@ function setupBarcodeListener() {
         }
 
         const currentTime = Date.now();
-        
+
         // Fast typing speed validation (< 50ms interval)
         if (currentTime - lastKeyTime > 50) {
             barcodeBuffer = '';
         }
-        
+
         lastKeyTime = currentTime;
 
         // Skip modifiers
@@ -1244,10 +1244,10 @@ function setupBarcodeListener() {
 
 function processBarcodeScan(code) {
     console.log("Barcode scanned:", code);
-    
+
     // Look for product by SKU or unique barcode
     const product = state.products.find(p => p.sku.toUpperCase() === code.toUpperCase());
-    
+
     if (product) {
         if (product.stock <= 0) {
             playScanSound('fail');
@@ -1257,30 +1257,30 @@ function processBarcodeScan(code) {
 
         // Add to cart!
         addCartItem(product.id);
-        
+
         // Flash barcode status indicator in UI
         const badge = document.getElementById('pos-barcode-badge');
         if (badge) {
             badge.style.borderColor = 'var(--primary)';
             badge.style.boxShadow = '0 0 10px rgba(var(--primary-rgb), 0.5)';
             badge.style.backgroundColor = 'var(--primary-light)';
-            
+
             setTimeout(() => {
                 badge.style.borderColor = '';
                 badge.style.boxShadow = '';
                 badge.style.backgroundColor = '';
             }, 300);
         }
-        
+
         // Redirect to POS hash if on another view so the user can visually see the cart updating!
         if (window.location.hash !== '#pos') {
             window.location.hash = '#pos';
         }
-        
+
     } else {
         // Not found
         playScanSound('warning');
-        
+
         // If in inventory view, autofill barcode to New Product SKU field
         if (window.location.hash === '#inventario') {
             document.getElementById('product-modal-title').textContent = "Registrar Nuevo Repuesto";
@@ -1307,7 +1307,7 @@ function toggleTheme() {
 function applyThemeMode(mode) {
     const darkBtn = document.getElementById('theme-btn-dark');
     const lightBtn = document.getElementById('theme-btn-light');
-    
+
     if (mode === 'dark') {
         document.body.classList.remove('light-theme');
         document.body.classList.add('dark-theme');
@@ -1354,7 +1354,7 @@ function openModal(modalId) {
             const cashInput = document.getElementById('checkout-cash-received');
             cashInput.value = '';
             document.getElementById('checkout-change-display').textContent = "$0.00";
-            
+
             // Auto focus cash input if method is cash
             const activeMethod = document.querySelector('#checkout-method-selector .method-btn.active');
             if (activeMethod.dataset.method === 'cash') {
@@ -1405,7 +1405,7 @@ function renderApp() {
 function renderDashboard() {
     // Calculate dashboard statistics
     const today = new Date().toDateString();
-    
+
     // Filter completed sales today
     const salesToday = state.sales.filter(s => s.status === 'completed' && new Date(s.date).toDateString() === today);
     const totalTodaySales = salesToday.reduce((sum, s) => sum + s.total, 0);
@@ -1419,11 +1419,11 @@ function renderDashboard() {
         });
         return sum + (s.total - costOfSale - s.tax); // profit equals total minus cost minus tax
     }, 0);
-    
+
     document.getElementById('metric-today-sales').textContent = `${state.settings.currency}${totalTodaySales.toFixed(2)}`;
     document.getElementById('metric-sales-count').innerHTML = `<i data-lucide="trending-up"></i> ${salesToday.length} transacciones`;
     document.getElementById('metric-today-profit').textContent = `${state.settings.currency}${Math.max(0, profitToday).toFixed(2)}`;
-    
+
     const profitMargin = totalTodaySales > 0 ? (profitToday / totalTodaySales) * 100 : 0;
     document.getElementById('metric-profit-margin').textContent = `${profitMargin.toFixed(0)}% Margen prom.`;
 
@@ -1437,7 +1437,7 @@ function renderDashboard() {
     const lowStockList = state.products.filter(p => p.stock <= p.stockMin);
     const lowStockCount = lowStockList.length;
     document.getElementById('metric-low-stock-count').textContent = lowStockCount;
-    
+
     const alertIconEl = document.getElementById('metric-stock-alert-icon');
     if (lowStockCount > 0) {
         alertIconEl.className = "metric-icon bg-amber status-dot pulse";
@@ -1484,8 +1484,8 @@ function renderDashboard() {
     const recentSalesContainer = document.getElementById('dashboard-recent-sales');
     // completed sales, sorted desc by date
     const completedSales = state.sales.filter(s => s.status === 'completed')
-                                       .sort((a, b) => new Date(b.date) - new Date(a.date));
-                                       
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+
     if (completedSales.length === 0) {
         recentSalesContainer.innerHTML = `
             <div class="empty-state-small">
@@ -1519,7 +1519,7 @@ function renderDashboard() {
     }
 
     renderSalesChartContainer();
-    
+
     if (window.lucide) lucide.createIcons();
 }
 
@@ -1528,23 +1528,23 @@ function renderSalesChartContainer() {
     const today = new Date();
     const daysWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
     const chartData = [];
-    
+
     for (let i = 6; i >= 0; i--) {
         const d = new Date(today);
         d.setDate(today.getDate() - i);
-        
+
         // Sum completed sales for this date
         const dateStr = d.toDateString();
         const dailyTotal = state.sales
             .filter(s => s.status === 'completed' && new Date(s.date).toDateString() === dateStr)
             .reduce((sum, s) => sum + s.total, 0);
-            
+
         chartData.push({
             date: daysWeek[d.getDay()],
             total: dailyTotal
         });
     }
-    
+
     renderSalesChart('sales-chart-container', chartData, state.settings.currency);
 }
 
@@ -1565,7 +1565,7 @@ function renderPOS() {
     const tabsContainer = document.getElementById('pos-category-tabs');
     // Extract unique categories
     const categories = ['Todas', ...(state.settings.categories || [])];
-    
+
     let tabsHtml = '';
     categories.forEach(cat => {
         const displayCat = cat === 'Todas' ? '' : cat;
@@ -1582,7 +1582,7 @@ function renderPOS() {
     renderCart();
 }
 
-window.setPOSCategory = function(cat) {
+window.setPOSCategory = function (cat) {
     activePOSCategory = cat;
     renderPOS();
 };
@@ -1590,12 +1590,12 @@ window.setPOSCategory = function(cat) {
 function renderPOSProductGrid() {
     const searchVal = document.getElementById('pos-search-input').value.toLowerCase();
     const grid = document.getElementById('pos-products-grid');
-    
+
     // Filter catalog products
     const filtered = state.products.filter(p => {
         const matchesCategory = !activePOSCategory || p.category === activePOSCategory;
-        const matchesSearch = p.name.toLowerCase().includes(searchVal) || 
-                              p.sku.toLowerCase().includes(searchVal);
+        const matchesSearch = p.name.toLowerCase().includes(searchVal) ||
+            p.sku.toLowerCase().includes(searchVal);
         return matchesCategory && matchesSearch;
     });
 
@@ -1613,19 +1613,19 @@ function renderPOSProductGrid() {
         });
         grid.innerHTML = cardsHtml;
     }
-    
+
     if (window.lucide) lucide.createIcons();
 }
 
 // Shopping Cart Actions
-window.addCartItem = function(prodId) {
+window.addCartItem = function (prodId) {
     const product = state.products.find(p => p.id === prodId);
     if (!product) return;
 
     // Check stock availability
     const existingInCart = state.cart.find(item => item.id === prodId);
     const cartQty = existingInCart ? existingInCart.quantity : 0;
-    
+
     if (cartQty >= product.stock) {
         playScanSound('fail');
         alert(`No hay más stock disponible de "${product.name}".`);
@@ -1648,10 +1648,10 @@ window.addCartItem = function(prodId) {
     renderCart();
 };
 
-window.modifyCartItemQty = function(prodId, delta) {
+window.modifyCartItemQty = function (prodId, delta) {
     const cartItem = state.cart.find(item => item.id === prodId);
     if (!cartItem) return;
-    
+
     const product = state.products.find(p => p.id === prodId);
     if (!product) return;
 
@@ -1665,7 +1665,7 @@ window.modifyCartItemQty = function(prodId, delta) {
     if (cartItem.quantity <= 0) {
         state.cart = state.cart.filter(item => item.id !== prodId);
     }
-    
+
     renderCart();
 };
 
@@ -1683,7 +1683,7 @@ let cartDiscount = { type: 'amount', value: 0 };
 
 function renderCart() {
     const list = document.getElementById('cart-items-list');
-    
+
     if (state.cart.length === 0) {
         list.innerHTML = `
             <div class="cart-empty-state">
@@ -1697,7 +1697,7 @@ function renderCart() {
         document.getElementById('cart-summary-tax').textContent = "$0.00";
         document.getElementById('cart-summary-total').textContent = "$0.00";
         document.getElementById('cart-checkout-btn').disabled = true;
-        
+
         if (window.lucide) lucide.createIcons();
         return;
     }
@@ -1725,7 +1725,7 @@ function renderCart() {
 
     // Totals Math
     const subtotal = state.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    
+
     // Apply Discount
     let discountAmt = 0;
     if (cartDiscount.type === 'amount') {
@@ -1753,12 +1753,12 @@ function renderCart() {
 function applyCartDiscount() {
     const type = document.getElementById('discount-type').value;
     const value = parseFloat(document.getElementById('discount-value').value) || 0;
-    
+
     if (value < 0) {
         alert("El valor del descuento no puede ser menor a 0.");
         return;
     }
-    
+
     cartDiscount = { type, value };
     closeModal('modal-discount');
     renderCart();
@@ -1782,7 +1782,7 @@ function openCheckoutModal() {
     checkoutTotalVal = taxableAmount + tax;
 
     document.getElementById('checkout-total-display').textContent = `${state.settings.currency}${checkoutTotalVal.toFixed(2)}`;
-    
+
     // Render Quick Cash buttons (rounding bills in cash)
     const quickContainer = document.getElementById('quick-cash-container');
     const exactOption = Math.ceil(checkoutTotalVal);
@@ -1793,8 +1793,8 @@ function openCheckoutModal() {
         Math.ceil(exactOption / 1000) * 1000 // round next 1000
     ];
     // Remove duplicates
-    const uniqueOptions = [...new Set(options)].sort((a,b)=>a-b);
-    
+    const uniqueOptions = [...new Set(options)].sort((a, b) => a - b);
+
     let cashBtns = '';
     uniqueOptions.forEach(opt => {
         cashBtns += `
@@ -1817,12 +1817,12 @@ function calculateChange() {
     const receivedInput = document.getElementById('checkout-cash-received');
     const received = parseFloat(receivedInput.value) || 0;
     const confirmBtn = document.getElementById('checkout-confirm-btn');
-    
+
     const change = received - checkoutTotalVal;
-    
+
     const changeDisplay = document.getElementById('checkout-change-display');
     changeDisplay.textContent = `${state.settings.currency}${Math.max(0, change).toFixed(2)}`;
-    
+
     if (change >= -0.01) { // allow fractional rounding
         confirmBtn.disabled = false;
         changeDisplay.className = "change-value text-success";
@@ -1837,7 +1837,7 @@ function processCheckout() {
     const selectedCustomerId = document.getElementById('cart-customer-select').value;
     let customerName = "Consumidor Final";
     let customer = null;
-    
+
     if (selectedCustomerId !== "0") {
         customer = state.customers.find(c => c.id === selectedCustomerId);
         if (customer) {
@@ -1898,7 +1898,7 @@ function processCheckout() {
     };
 
     state.sales.push(saleRecord);
-    
+
     // Persist to local DB
     saveDatabase();
 
@@ -1907,7 +1907,7 @@ function processCheckout() {
     state.cart = [];
     cartDiscount = { type: 'amount', value: 0 };
     renderCart();
-    
+
     // Render and print receipt
     renderPOS(); // update POS view
     playScanSound('success');
@@ -1921,9 +1921,9 @@ function renderInventory() {
     // Populate category filters
     const filterCat = document.getElementById('inventory-filter-category');
     const prodCatSelect = document.getElementById('prod-category');
-    
+
     const categories = state.settings.categories || [];
-    
+
     if (filterCat) {
         filterCat.innerHTML = '<option value="">Todas las categorías</option>';
         categories.forEach(cat => {
@@ -1947,14 +1947,14 @@ function renderInventoryTable() {
     const catVal = document.getElementById('inventory-filter-category').value;
     const stockVal = document.getElementById('inventory-filter-stock').value;
     const tbody = document.getElementById('inventory-table-body');
-    
+
     // Apply filters
     const filtered = state.products.filter(p => {
-        const matchesSearch = p.name.toLowerCase().includes(searchVal) || 
-                              p.sku.toLowerCase().includes(searchVal);
-                              
+        const matchesSearch = p.name.toLowerCase().includes(searchVal) ||
+            p.sku.toLowerCase().includes(searchVal);
+
         const matchesCategory = !catVal || p.category === catVal;
-        
+
         let matchesStock = true;
         if (stockVal === 'low') {
             matchesStock = p.stock > 0 && p.stock <= p.stockMin;
@@ -1963,7 +1963,7 @@ function renderInventoryTable() {
         } else if (stockVal === 'ok') {
             matchesStock = p.stock > p.stockMin;
         }
-        
+
         return matchesSearch && matchesCategory && matchesStock;
     });
 
@@ -1971,7 +1971,7 @@ function renderInventoryTable() {
     const totalItems = filtered.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
     if (inventoryPage > totalPages) inventoryPage = totalPages;
-    
+
     const startIdx = (inventoryPage - 1) * itemsPerPage;
     const endIdx = startIdx + itemsPerPage;
     const pageItems = filtered.slice(startIdx, endIdx);
@@ -1992,7 +1992,7 @@ function renderInventoryTable() {
     let rowsHtml = '';
     pageItems.forEach(p => {
         const margin = p.price > 0 ? ((p.price - p.cost) / p.price) * 100 : 0;
-        
+
         let stockBadge = 'ok';
         let stockText = `${p.stock} U.`;
         if (p.stock <= 0) {
@@ -2039,7 +2039,7 @@ function renderInventoryTable() {
     if (window.lucide) lucide.createIcons();
 }
 
-window.changeInventoryPage = function(delta) {
+window.changeInventoryPage = function (delta) {
     inventoryPage += delta;
     renderInventoryTable();
 };
@@ -2047,7 +2047,7 @@ window.changeInventoryPage = function(delta) {
 // Create or edit product in DB
 function saveProduct(e) {
     e.preventDefault();
-    
+
     const id = document.getElementById('product-id-field').value;
     const sku = document.getElementById('prod-sku').value.trim().toUpperCase();
     const name = document.getElementById('prod-name').value.trim();
@@ -2056,7 +2056,7 @@ function saveProduct(e) {
     const price = parseFloat(document.getElementById('prod-price').value) || 0;
     const stock = parseInt(document.getElementById('prod-stock').value) || 0;
     const stockMin = parseInt(document.getElementById('prod-stock-min').value) || 5;
-    
+
     const isFileMode = document.getElementById('prod-image-src-file').checked;
     const image = isFileMode ? tempProductImageBase64 : document.getElementById('prod-image').value.trim();
 
@@ -2067,7 +2067,7 @@ function saveProduct(e) {
             alert(`Ya existe un repuesto con el SKU: ${sku}`);
             return;
         }
-        
+
         state.products.push({
             id: `p_${Date.now()}`,
             sku, name, category, cost, price, stock, stockMin, image
@@ -2092,7 +2092,7 @@ function saveProduct(e) {
     playScanSound('success');
 }
 
-window.editProduct = function(id) {
+window.editProduct = function (id) {
     const p = state.products.find(prod => prod.id === id);
     if (!p) return;
 
@@ -2106,51 +2106,51 @@ window.editProduct = function(id) {
     document.getElementById('prod-price').value = p.price;
     document.getElementById('prod-stock').value = p.stock;
     document.getElementById('prod-stock-min').value = p.stockMin;
-    
+
     // Reset image uploader UI first
     tempProductImageBase64 = "";
     const fileInput = document.getElementById('prod-image-file-input');
     if (fileInput) fileInput.value = "";
 
     const hasBase64Image = p.image && p.image.startsWith('data:image/');
-    
+
     if (hasBase64Image) {
         const fileRadio = document.getElementById('prod-image-src-file');
         if (fileRadio) fileRadio.checked = true;
-        
+
         tempProductImageBase64 = p.image;
         const previewImg = document.getElementById('prod-image-preview-img');
         if (previewImg) previewImg.src = p.image;
-        
+
         const previewContainer = document.getElementById('prod-image-preview-container');
         if (previewContainer) previewContainer.style.display = 'flex';
-        
+
         const dropzone = document.getElementById('prod-image-dropzone');
         if (dropzone) dropzone.style.display = 'none';
-        
+
         const urlGroup = document.getElementById('prod-image-url-group');
         if (urlGroup) urlGroup.style.display = 'none';
-        
+
         const urlInput = document.getElementById('prod-image');
         if (urlInput) urlInput.value = '';
-        
+
         // Show file size information
-        const sizeInKb = Math.round((p.image.length * 3/4) / 1024);
+        const sizeInKb = Math.round((p.image.length * 3 / 4) / 1024);
         const sizeInfo = document.getElementById('prod-image-size-info');
         if (sizeInfo) sizeInfo.textContent = `Optimizado: ~${sizeInKb} KB`;
     } else {
         const urlRadio = document.getElementById('prod-image-src-url');
         if (urlRadio) urlRadio.checked = true;
-        
+
         const urlInput = document.getElementById('prod-image');
         if (urlInput) urlInput.value = p.image || '';
-        
+
         const previewContainer = document.getElementById('prod-image-preview-container');
         if (previewContainer) previewContainer.style.display = 'none';
-        
+
         const dropzone = document.getElementById('prod-image-dropzone');
         if (dropzone) dropzone.style.display = 'none';
-        
+
         const urlGroup = document.getElementById('prod-image-url-group');
         if (urlGroup) urlGroup.style.display = 'block';
     }
@@ -2158,7 +2158,7 @@ window.editProduct = function(id) {
     openModal('modal-product');
 };
 
-window.deleteProduct = function(id) {
+window.deleteProduct = function (id) {
     if (confirm("¿Estás seguro de que deseas eliminar este producto del catálogo?")) {
         state.products = state.products.filter(p => p.id !== id);
         saveDatabase();
@@ -2180,15 +2180,15 @@ function renderCustomersTable() {
 
     const filtered = state.customers.filter(c => {
         return c.name.toLowerCase().includes(searchVal) ||
-               (c.phone && c.phone.includes(searchVal)) ||
-               (c.email && c.email.toLowerCase().includes(searchVal)) ||
-               (c.dni && c.dni.includes(searchVal));
+            (c.phone && c.phone.includes(searchVal)) ||
+            (c.email && c.email.toLowerCase().includes(searchVal)) ||
+            (c.dni && c.dni.includes(searchVal));
     });
 
     const totalItems = filtered.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
     if (customersPage > totalPages) customersPage = totalPages;
-    
+
     const startIdx = (customersPage - 1) * itemsPerPage;
     const endIdx = startIdx + itemsPerPage;
     const pageItems = filtered.slice(startIdx, endIdx);
@@ -2241,14 +2241,14 @@ function renderCustomersTable() {
     if (window.lucide) lucide.createIcons();
 }
 
-window.changeCustomersPage = function(delta) {
+window.changeCustomersPage = function (delta) {
     customersPage += delta;
     renderCustomersTable();
 };
 
 function saveCustomer(e) {
     e.preventDefault();
-    
+
     const id = document.getElementById('customer-id-field').value;
     const firstName = document.getElementById('cust-first-name').value.trim();
     const lastName = document.getElementById('cust-last-name').value.trim();
@@ -2256,7 +2256,7 @@ function saveCustomer(e) {
     const phone = document.getElementById('cust-phone').value.trim();
     const email = document.getElementById('cust-email').value.trim();
     const points = parseInt(document.getElementById('cust-points').value) || 0;
-    
+
     const compiledName = `${firstName} ${lastName}`;
 
     if (!id) {
@@ -2288,18 +2288,18 @@ function saveCustomer(e) {
 
     saveDatabase();
     closeModal('modal-customer');
-    
+
     // Refresh current view (POS or CRM)
     if (window.location.hash === '#pos') {
         renderPOS();
     } else {
         renderCustomers();
     }
-    
+
     playScanSound('success');
 }
 
-window.editCustomer = function(id) {
+window.editCustomer = function (id) {
     const c = state.customers.find(cust => cust.id === id);
     if (!c) return;
 
@@ -2315,7 +2315,7 @@ window.editCustomer = function(id) {
     openModal('modal-customer');
 };
 
-window.deleteCustomer = function(id) {
+window.deleteCustomer = function (id) {
     if (confirm("¿Deseas eliminar a este cliente de la base de datos? Sus puntos acumulados se perderán.")) {
         state.customers = state.customers.filter(c => c.id !== id);
         saveDatabase();
@@ -2342,29 +2342,29 @@ function renderHistoryTable() {
 
     const filtered = state.sales.filter(s => {
         const matchesSearch = s.id.toLowerCase().includes(searchVal) ||
-                              s.customerName.toLowerCase().includes(searchVal);
-                              
+            s.customerName.toLowerCase().includes(searchVal);
+
         const matchesStatus = !statusVal || s.status === statusVal;
-        
+
         let matchesDates = true;
         if (startVal) {
             const startDate = new Date(startVal);
-            startDate.setHours(0,0,0,0);
+            startDate.setHours(0, 0, 0, 0);
             matchesDates = matchesDates && (new Date(s.date) >= startDate);
         }
         if (endVal) {
             const endDate = new Date(endVal);
-            endDate.setHours(23,59,59,999);
+            endDate.setHours(23, 59, 59, 999);
             matchesDates = matchesDates && (new Date(s.date) <= endDate);
         }
 
         return matchesSearch && matchesStatus && matchesDates;
-    }).sort((a,b) => new Date(b.date) - new Date(a.date)); // Sort desc (recent first)
+    }).sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort desc (recent first)
 
     const totalItems = filtered.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
     if (historyPage > totalPages) historyPage = totalPages;
-    
+
     const startIdx = (historyPage - 1) * itemsPerPage;
     const endIdx = startIdx + itemsPerPage;
     const pageItems = filtered.slice(startIdx, endIdx);
@@ -2384,7 +2384,7 @@ function renderHistoryTable() {
     let rowsHtml = '';
     pageItems.forEach(s => {
         const itemsCount = s.items.reduce((sum, item) => sum + item.quantity, 0);
-        
+
         let statusBadge = 'success';
         let statusText = 'Completada';
         if (s.status === 'voided') {
@@ -2425,17 +2425,17 @@ function renderHistoryTable() {
     if (window.lucide) lucide.createIcons();
 }
 
-window.changeHistoryPage = function(delta) {
+window.changeHistoryPage = function (delta) {
     historyPage += delta;
     renderHistoryTable();
 };
 
-window.viewSaleDetail = function(saleId) {
+window.viewSaleDetail = function (saleId) {
     const sale = state.sales.find(s => s.id === saleId);
     if (!sale) return;
 
     activeReceiptId = saleId;
-    
+
     // Hide/show refund button depending on status
     const voidBtn = document.getElementById('receipt-void-btn');
     if (sale.status === 'voided') {
@@ -2446,14 +2446,14 @@ window.viewSaleDetail = function(saleId) {
 
     const container = document.getElementById('receipt-modal-content');
     container.innerHTML = renderReceipt(sale, state.settings);
-    
+
     openModal('modal-receipt');
 };
 
 // Void a sale (returns products back to stock)
 function voidSale() {
     if (!activeReceiptId) return;
-    
+
     const sale = state.sales.find(s => s.id === activeReceiptId);
     if (!sale || sale.status === 'voided') return;
 
@@ -2476,7 +2476,7 @@ function voidSale() {
         }
 
         sale.status = 'voided';
-        
+
         saveDatabase();
         closeModal('modal-receipt');
         renderHistory();
@@ -2490,7 +2490,7 @@ function voidSale() {
    ========================================================================== */
 function saveSettings(e) {
     e.preventDefault();
-    
+
     const storeName = document.getElementById('set-store-name').value.trim();
     const storeAddress = document.getElementById('set-store-address').value.trim();
     const storePhone = document.getElementById('set-store-phone').value.trim();
@@ -2499,7 +2499,7 @@ function saveSettings(e) {
     const brandDescription = document.getElementById('set-store-description').value.trim();
     const currency = document.getElementById('set-store-currency').value.trim();
     const storeTax = parseFloat(document.getElementById('set-store-tax').value) || 0;
-    
+
     const cardBgType = document.getElementById('set-card-bg-type').value;
     const cardBgColor = document.getElementById('set-card-bg-color').value;
     const cardBgColorHover = document.getElementById('set-card-bg-hover').value;
@@ -2542,22 +2542,22 @@ function saveSettings(e) {
 
 function applyBrandSettings() {
     if (!state.settings) return;
-    
+
     // Apply theme & accent
     applyThemeMode(state.settings.theme || 'dark');
     applyAccentTheme(state.settings.accentColor || 'violet');
-    
-        const storeName = state.settings.storeName || "Macutech";
-    
+
+    const storeName = state.settings.storeName || "Macutech";
+
     // Update page title
     document.title = `${storeName} - Control de Ventas e Inventario`;
-    
+
     // Sync header/sidebar text displays
     const storeNameSidebar = document.getElementById('store-name-sidebar');
     if (storeNameSidebar) {
         storeNameSidebar.textContent = storeName;
     }
-    
+
     const logoTitleSidebar = document.getElementById('logo-title-sidebar');
     if (logoTitleSidebar) {
         logoTitleSidebar.innerHTML = storeName;
@@ -2637,7 +2637,7 @@ function applyBrandSettings() {
     const sidebarLogoIcon = document.getElementById('logo-icon-container');
     const sidebarLogoDefault = document.getElementById('logo-icon-default');
     const sidebarLogoImg = document.getElementById('logo-icon-img');
-    
+
     const loginLogoIcon = document.getElementById('login-logo-container');
     const loginLogoDefault = document.getElementById('login-logo-default');
     const loginLogoImg = document.getElementById('login-logo-img');
@@ -2645,7 +2645,7 @@ function applyBrandSettings() {
     const catalogLogoIcon = document.getElementById('catalog-logo-container');
     const catalogLogoDefault = document.getElementById('catalog-logo-default');
     const catalogLogoImg = document.getElementById('catalog-logo-img');
-    
+
     if (logoUrl) {
         // Display custom logo image
         if (sidebarLogoIcon) sidebarLogoIcon.classList.add('has-custom-logo');
@@ -2654,7 +2654,7 @@ function applyBrandSettings() {
             sidebarLogoImg.src = logoUrl;
             sidebarLogoImg.style.display = 'block';
         }
-        
+
         if (loginLogoIcon) loginLogoIcon.classList.add('has-custom-logo');
         if (loginLogoDefault) loginLogoDefault.style.display = 'none';
         if (loginLogoImg) {
@@ -2673,7 +2673,7 @@ function applyBrandSettings() {
         if (sidebarLogoIcon) sidebarLogoIcon.classList.remove('has-custom-logo');
         if (sidebarLogoDefault) sidebarLogoDefault.style.display = 'block';
         if (sidebarLogoImg) sidebarLogoImg.style.display = 'none';
-        
+
         if (loginLogoIcon) loginLogoIcon.classList.remove('has-custom-logo');
         if (loginLogoDefault) loginLogoDefault.style.display = 'block';
         if (loginLogoImg) loginLogoImg.style.display = 'none';
@@ -2688,9 +2688,9 @@ function applyBrandSettings() {
     const bgColor = state.settings.cardBgColor || '#1f2937';
     const bgHover = state.settings.cardBgColorHover || '#26354a';
     const bgImage = state.settings.cardBgImage || '';
-    
+
     let dynamicCss = '';
-    
+
     if (bgType === 'glass') {
         dynamicCss = `
             :root, body.light-theme {
@@ -2748,7 +2748,7 @@ function applyBrandSettings() {
             `;
         }
     }
-    
+
     const styleTag = document.getElementById('custom-brand-styles');
     if (styleTag) {
         styleTag.innerHTML = dynamicCss;
@@ -2779,7 +2779,7 @@ function renderCategorySettings() {
     if (window.lucide) lucide.createIcons();
 }
 
-window.addCategory = function() {
+window.addCategory = function () {
     const input = document.getElementById('new-category-name');
     const name = input.value.trim();
     if (!name) return;
@@ -2795,19 +2795,19 @@ window.addCategory = function() {
     saveDatabase();
     renderCategorySettings();
     renderInventory();
-    
+
     // Also re-render POS tabs if we are in POS view
     if (document.getElementById('view-pos').classList.contains('active')) {
         renderPOS();
     }
 }
 
-window.deleteCategory = function(index) {
+window.deleteCategory = function (index) {
     if (!state.settings.categories) return;
-    
+
     const catName = state.settings.categories[index];
     const inUse = state.products.some(p => p.category === catName);
-    
+
     if (inUse) {
         const confirmDelete = confirm(`Hay productos utilizando la categoría "${catName}". ¿Estás seguro de eliminarla? Los productos conservarán el nombre de la categoría pero ya no aparecerá en el menú principal.`);
         if (!confirmDelete) return;
@@ -2817,7 +2817,7 @@ window.deleteCategory = function(index) {
     saveDatabase();
     renderCategorySettings();
     renderInventory();
-    
+
     if (document.getElementById('view-pos').classList.contains('active')) {
         renderPOS();
     }
@@ -2829,7 +2829,7 @@ window.deleteCategory = function(index) {
 function renderCatalog() {
     const storeName = state.settings.storeName || "Macutech";
     const logoUrl = state.settings.logo;
-    
+
     // Sync store name and logo preview elements
     const catalogStoreName = document.getElementById('catalog-store-name');
     if (catalogStoreName) catalogStoreName.textContent = storeName;
@@ -2870,7 +2870,7 @@ function renderCatalog() {
     renderCatalogProductGrid();
 }
 
-window.setCatalogCategory = function(cat) {
+window.setCatalogCategory = function (cat) {
     activeCatalogCategory = cat;
     renderCatalog();
 };
@@ -2879,11 +2879,11 @@ function renderCatalogProductGrid() {
     const searchVal = document.getElementById('catalog-search-input').value.toLowerCase();
     const grid = document.getElementById('catalog-products-grid');
     if (!grid) return;
-    
+
     const filtered = state.products.filter(p => {
         const matchesCategory = !activeCatalogCategory || p.category === activeCatalogCategory;
-        const matchesSearch = p.name.toLowerCase().includes(searchVal) || 
-                              p.sku.toLowerCase().includes(searchVal);
+        const matchesSearch = p.name.toLowerCase().includes(searchVal) ||
+            p.sku.toLowerCase().includes(searchVal);
         return matchesCategory && matchesSearch;
     });
 
@@ -2901,7 +2901,7 @@ function renderCatalogProductGrid() {
         });
         grid.innerHTML = cardsHtml;
     }
-    
+
     if (window.lucide) lucide.createIcons();
 }
 
@@ -2910,7 +2910,7 @@ function exportJSONBackup() {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `aurapos_backup_${new Date().toISOString().slice(0,10)}.json`);
+    downloadAnchor.setAttribute("download", `aurapos_backup_${new Date().toISOString().slice(0, 10)}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -2920,10 +2920,10 @@ function exportJSONBackup() {
 // Restore database from JSON backup upload
 function importJSONBackup(e) {
     const fileReader = new FileReader();
-    fileReader.onload = function(event) {
+    fileReader.onload = function (event) {
         try {
             const parsedData = JSON.parse(event.target.result);
-            
+
             // Validate schema
             if (parsedData.products && parsedData.sales && parsedData.customers && parsedData.settings) {
                 state = parsedData;
@@ -2974,7 +2974,7 @@ function exportSalesCSV() {
     const encodedUri = encodeURI(csvContent);
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", encodedUri);
-    downloadAnchor.setAttribute("download", `reporte_ventas_${new Date().toISOString().slice(0,10)}.csv`);
+    downloadAnchor.setAttribute("download", `reporte_ventas_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -2997,26 +2997,26 @@ function getPaymentMethodLabel(method) {
 function renderCaja() {
     // 1. Calculate Metrics
     const currency = state.settings.currency || '$';
-    
+
     // Cash Sales metrics
     const cashSales = state.sales.filter(s => s.paymentMethod === 'cash');
     const salesTotal = cashSales.filter(s => s.status === 'completed').reduce((sum, s) => sum + s.total, 0);
     const salesCount = cashSales.filter(s => s.status === 'completed').length;
-    
+
     // Voided Sales metrics (cash)
     const voidsTotal = cashSales.filter(s => s.status === 'voided').reduce((sum, s) => sum + s.total, 0);
-    
+
     // Manual inflows
     const inflowsTotal = state.cashMovements.filter(m => m.type === 'inflow').reduce((sum, m) => sum + m.amount, 0);
     const inflowsCount = state.cashMovements.filter(m => m.type === 'inflow').length;
-    
+
     // Manual outflows
     const outflowsTotal = state.cashMovements.filter(m => m.type === 'outflow').reduce((sum, m) => sum + m.amount, 0);
     const outflowsCount = state.cashMovements.filter(m => m.type === 'outflow').length;
-    
+
     // Balance
     const balance = salesTotal - voidsTotal + inflowsTotal - outflowsTotal;
-    
+
     // Update metric displays
     document.getElementById('caja-metric-balance').textContent = `${currency}${balance.toFixed(2)}`;
     document.getElementById('caja-metric-sales').textContent = `${currency}${salesTotal.toFixed(2)}`;
@@ -3038,9 +3038,9 @@ function renderCaja() {
     const searchVal = document.getElementById('caja-search').value.toLowerCase();
     const typeVal = document.getElementById('caja-filter-type').value;
     const tbody = document.getElementById('caja-table-body');
-    
+
     const allMovements = compileAllCashMovements();
-    
+
     // Filter
     const filtered = allMovements.filter(m => {
         const matchesSearch = m.concept.toLowerCase().includes(searchVal) || m.notes.toLowerCase().includes(searchVal);
@@ -3052,7 +3052,7 @@ function renderCaja() {
     const totalItems = filtered.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
     if (cajaPage > totalPages) cajaPage = totalPages;
-    
+
     const startIdx = (cajaPage - 1) * itemsPerPage;
     const endIdx = startIdx + itemsPerPage;
     const pageItems = filtered.slice(startIdx, endIdx);
@@ -3075,7 +3075,7 @@ function renderCaja() {
         let typeText = 'Venta';
         let amountPrefix = '+';
         let amountClass = 'text-success';
-        
+
         if (m.type === 'inflow') {
             typeBadgeClass = 'badge-success';
             typeText = 'Ingreso Manual';
@@ -3125,24 +3125,24 @@ function renderCaja() {
     if (window.lucide) lucide.createIcons();
 }
 
-window.changeCajaPage = function(delta) {
+window.changeCajaPage = function (delta) {
     cajaPage += delta;
     renderCaja();
 };
 
 function saveCajaMovement(e) {
     e.preventDefault();
-    
+
     const type = document.getElementById('caja-movement-type-field').value;
     const amount = parseFloat(document.getElementById('caja-movement-amount').value) || 0;
     const concept = document.getElementById('caja-movement-concept').value.trim();
     const notes = document.getElementById('caja-movement-notes').value.trim();
-    
+
     if (amount <= 0) {
         alert("El monto debe ser mayor a 0.");
         return;
     }
-    
+
     const movement = {
         id: `cm_${Date.now()}`,
         date: new Date().toISOString(),
@@ -3151,13 +3151,13 @@ function saveCajaMovement(e) {
         concept,
         notes
     };
-    
+
     state.cashMovements.push(movement);
     saveDatabase();
-    
+
     closeModal('modal-caja-movement');
     document.getElementById('caja-movement-form').reset();
-    
+
     renderCaja();
     playScanSound('success');
 }
@@ -3226,27 +3226,27 @@ function findExcelColumnIndex(headers, targets) {
 function handleExcelImport(e) {
     const file = e.target.files[0];
     if (!file) return;
-    
+
     const reader = new FileReader();
-    reader.onload = function(evt) {
+    reader.onload = function (evt) {
         try {
             const data = new Uint8Array(evt.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
-            
+
             // Read first sheet
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
-            
+
             // Convert to 2D array (header: 1 forces array of arrays)
             const jsonRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            
+
             if (jsonRows.length < 2) {
                 alert("El archivo Excel no tiene suficientes filas. Debe contener los encabezados y al menos un producto.");
                 return;
             }
-            
+
             const headers = jsonRows[0];
-            
+
             // Mappings (variations in spanish/english)
             const skuIdx = findExcelColumnIndex(headers, ['sku', 'codigo', 'code', 'referencia', 'id']);
             const nameIdx = findExcelColumnIndex(headers, ['nombre', 'name', 'descripcion', 'producto', 'articulo', 'detalle']);
@@ -3255,68 +3255,68 @@ function handleExcelImport(e) {
             const priceIdx = findExcelColumnIndex(headers, ['precio', 'price', 'venta', 'precio venta']);
             const stockIdx = findExcelColumnIndex(headers, ['stock', 'cantidad', 'cant']);
             const minIdx = findExcelColumnIndex(headers, ['stockmin', 'stock minimo', 'minimo', 'alerta']);
-            
+
             if (skuIdx === -1) {
                 alert("No se pudo detectar la columna 'SKU' o 'Código'. Por favor, asegúrate de que el archivo Excel tenga una columna con uno de estos nombres.");
                 return;
             }
-            
+
             tempExcelProducts = [];
             let duplicates = new Set();
-            
+
             for (let i = 1; i < jsonRows.length; i++) {
                 const row = jsonRows[i];
                 if (!row || row.length === 0) continue;
-                
+
                 const rawSku = row[skuIdx];
                 if (rawSku === undefined || rawSku === null || rawSku.toString().trim() === '') continue;
-                
+
                 const sku = rawSku.toString().trim().toUpperCase();
                 if (duplicates.has(sku)) continue; // skip duplicates in the spreadsheet
                 duplicates.add(sku);
-                
+
                 // Lookup in current database
                 const exists = state.products.find(p => p.sku === sku);
-                
+
                 // Read values with fallbacks
-                const name = nameIdx !== -1 && row[nameIdx] !== undefined && row[nameIdx] !== null 
-                    ? row[nameIdx].toString().trim() 
+                const name = nameIdx !== -1 && row[nameIdx] !== undefined && row[nameIdx] !== null
+                    ? row[nameIdx].toString().trim()
                     : (exists ? exists.name : `Repuesto SKU ${sku}`);
-                
-                const category = catIdx !== -1 && row[catIdx] !== undefined && row[catIdx] !== null 
-                    ? row[catIdx].toString().trim() 
+
+                const category = catIdx !== -1 && row[catIdx] !== undefined && row[catIdx] !== null
+                    ? row[catIdx].toString().trim()
                     : (exists ? exists.category : 'Repuestos de Motor');
-                
-                const cost = costIdx !== -1 && row[costIdx] !== undefined && row[costIdx] !== null 
-                    ? parseFloat(row[costIdx]) || 0 
+
+                const cost = costIdx !== -1 && row[costIdx] !== undefined && row[costIdx] !== null
+                    ? parseFloat(row[costIdx]) || 0
                     : (exists ? exists.cost : 0);
-                
-                const price = priceIdx !== -1 && row[priceIdx] !== undefined && row[priceIdx] !== null 
-                    ? parseFloat(row[priceIdx]) || 0 
+
+                const price = priceIdx !== -1 && row[priceIdx] !== undefined && row[priceIdx] !== null
+                    ? parseFloat(row[priceIdx]) || 0
                     : (exists ? exists.price : 0);
-                
-                const stock = stockIdx !== -1 && row[stockIdx] !== undefined && row[stockIdx] !== null 
-                    ? parseInt(row[stockIdx]) || 0 
+
+                const stock = stockIdx !== -1 && row[stockIdx] !== undefined && row[stockIdx] !== null
+                    ? parseInt(row[stockIdx]) || 0
                     : (exists ? exists.stock : 0);
-                
-                const stockMin = minIdx !== -1 && row[minIdx] !== undefined && row[minIdx] !== null 
-                    ? parseInt(row[minIdx]) || 5 
+
+                const stockMin = minIdx !== -1 && row[minIdx] !== undefined && row[minIdx] !== null
+                    ? parseInt(row[minIdx]) || 5
                     : (exists ? exists.stockMin : 5);
-                
+
                 tempExcelProducts.push({
                     sku, name, category, cost, price, stock, stockMin,
                     isNew: !exists,
                     existingProduct: exists || null
                 });
             }
-            
+
             if (tempExcelProducts.length === 0) {
                 alert("No se encontraron registros de productos procesables en el archivo Excel.");
                 return;
             }
-            
+
             showExcelImportPreview();
-            
+
         } catch (error) {
             console.error("Excel processing failed:", error);
             alert("Ocurrió un error al procesar el archivo Excel: " + error.message);
@@ -3331,21 +3331,21 @@ function showExcelImportPreview() {
     const totalCount = tempExcelProducts.length;
     const newCount = tempExcelProducts.filter(p => p.isNew).length;
     const updateCount = totalCount - newCount;
-    
+
     document.getElementById('excel-total-count').textContent = totalCount;
     document.getElementById('excel-new-count').textContent = newCount;
     document.getElementById('excel-update-count').textContent = updateCount;
-    
+
     const tbody = document.getElementById('excel-preview-table-body');
     let rowsHtml = '';
     const currency = state.settings.currency || '$';
-    
+
     // Show first 5 items to keep modal lightweight
     const previewItems = tempExcelProducts.slice(0, 5);
     previewItems.forEach(p => {
         const badgeClass = p.isNew ? 'badge-success' : 'badge-warning';
         const badgeText = p.isNew ? 'Nuevo' : 'Actualizar';
-        
+
         rowsHtml += `
             <tr>
                 <td style="font-weight: 700;">${p.sku}</td>
@@ -3358,7 +3358,7 @@ function showExcelImportPreview() {
             </tr>
         `;
     });
-    
+
     if (totalCount > 5) {
         rowsHtml += `
             <tr>
@@ -3368,19 +3368,19 @@ function showExcelImportPreview() {
             </tr>
         `;
     }
-    
+
     tbody.innerHTML = rowsHtml;
-    
+
     if (window.lucide) lucide.createIcons();
     openModal('modal-excel-preview');
 }
 
 function confirmExcelImport() {
     if (tempExcelProducts.length === 0) return;
-    
+
     let created = 0;
     let updated = 0;
-    
+
     tempExcelProducts.forEach(p => {
         if (p.isNew) {
             state.products.push({
@@ -3408,15 +3408,15 @@ function confirmExcelImport() {
             }
         }
     });
-    
+
     saveDatabase();
     closeModal('modal-excel-preview');
-    
+
     // Refresh view
     inventoryPage = 1;
     renderInventory();
     playScanSound('success');
-    
+
     alert(`Importación Masiva Completada:\n- ${created} productos nuevos creados.\n- ${updated} productos existentes actualizados.`);
     tempExcelProducts = [];
 }
@@ -3424,21 +3424,21 @@ function confirmExcelImport() {
 function downloadExcelTemplate() {
     // Columns
     const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio', 'Stock', 'Stock Minimo'];
-    
+
     // Sample items for motorcycle spare parts store
     const rows = [
         ['REP-FIL-NAF', 'Filtro de Nafta Universal Motocicleta', 'Repuestos de Motor', 150.00, 320.00, 50, 10],
         ['REP-BUJ-NGK-D8EA', 'Bujía NGK D8EA (Motos 110cc-150cc)', 'Sistema Eléctrico', 420.00, 800.00, 100, 15],
         ['REP-TRA-CAD-DID', 'Cadena DID 428H-118L Reforzada', 'Transmisión', 3500.00, 5900.00, 15, 5]
     ];
-    
+
     const data = [headers, ...rows];
-    
+
     try {
         const worksheet = XLSX.utils.aoa_to_sheet(data);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Plantilla de Inventario');
-        
+
         // Write file binary
         XLSX.writeFile(workbook, 'plantilla_inventario_dhmotopartes.xlsx');
         playScanSound('success');
@@ -3453,10 +3453,10 @@ function exportInventoryExcel() {
         alert("No hay productos en el inventario para exportar.");
         return;
     }
-    
+
     // Headers
     const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio', 'Stock', 'Stock Minimo'];
-    
+
     // Data Rows
     const rows = state.products.map(p => [
         p.sku,
@@ -3467,14 +3467,14 @@ function exportInventoryExcel() {
         p.stock,
         p.stockMin
     ]);
-    
+
     const data = [headers, ...rows];
-    
+
     try {
         const worksheet = XLSX.utils.aoa_to_sheet(data);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventario DHMotopartes');
-        
+
         XLSX.writeFile(workbook, 'inventario_completo.xlsx');
         playScanSound('success');
     } catch (err) {
@@ -3488,10 +3488,10 @@ function exportInventoryExcel() {
    ========================================================================== */
 async function renderCajerosList() {
     if (!supabaseInitialized || currentUserRole !== 'superadmin') return;
-    
+
     const tbody = document.getElementById('cajeros-table-body');
     if (!tbody) return;
-    
+
     tbody.innerHTML = `
         <tr>
             <td colspan="5" class="text-center text-muted" style="padding: 20px;">
@@ -3500,15 +3500,15 @@ async function renderCajerosList() {
         </tr>
     `;
     if (window.lucide) lucide.createIcons();
-    
+
     try {
         const { data: profiles, error } = await supabaseClient
             .from('user_profiles')
             .select('*')
             .order('email', { ascending: true });
-            
+
         if (error) throw error;
-        
+
         if (!profiles || profiles.length === 0) {
             tbody.innerHTML = `
                 <tr>
@@ -3519,15 +3519,15 @@ async function renderCajerosList() {
             `;
             return;
         }
-        
+
         const session = (await supabaseClient.auth.getSession()).data.session;
         const currentUid = session ? session.user.id : null;
-        
+
         let rowsHtml = '';
         profiles.forEach(p => {
             const isSelf = p.id === currentUid;
             const selectDisabled = isSelf ? 'disabled' : '';
-            
+
             rowsHtml += `
                 <tr>
                     <td style="font-weight: 600;">${p.email}</td>
@@ -3562,17 +3562,17 @@ async function renderCajerosList() {
     }
 }
 
-window.updateCajeroRole = async function(userId, newRole) {
+window.updateCajeroRole = async function (userId, newRole) {
     if (!supabaseInitialized || currentUserRole !== 'superadmin') return;
-    
+
     try {
         const { error } = await supabaseClient
             .from('user_profiles')
             .update({ role: newRole })
             .eq('id', userId);
-            
+
         if (error) throw error;
-        
+
         playScanSound('success');
         alert("Rol de usuario actualizado correctamente.");
         renderCajerosList();
@@ -3583,9 +3583,9 @@ window.updateCajeroRole = async function(userId, newRole) {
     }
 };
 
-window.deleteCajero = async function(userId) {
+window.deleteCajero = async function (userId) {
     if (!supabaseInitialized || currentUserRole !== 'superadmin') return;
-    
+
     if (confirm("¿Estás seguro de que deseas eliminar este usuario del sistema? Se eliminará de la base de datos y de la autenticación.")) {
         try {
             if (supabaseAdmin) {
@@ -3598,7 +3598,7 @@ window.deleteCajero = async function(userId) {
                     .eq('id', userId);
                 if (dbError) throw dbError;
             }
-            
+
             playScanSound('fail');
             alert("Usuario eliminado correctamente.");
             renderCajerosList();
@@ -3613,15 +3613,15 @@ window.deleteCajero = async function(userId) {
 function setupCajeroRegistration() {
     const form = document.getElementById('new-cajero-form');
     if (!form) return;
-    
+
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         if (!supabaseInitialized || currentUserRole !== 'superadmin') {
             alert("Acción no permitida.");
             return;
         }
-        
+
         alert("🔒 REGISTRO SEGURO ACTIVO:\n\nPara registrar un nuevo cajero en producción de forma segura (sin exponer claves secretas ni de administración en el navegador):\n\n1. Invita al usuario a tu proyecto desde el panel de Supabase (Authentication -> Users -> Invite User) enviándole un correo de acceso.\n2. Una vez que el usuario cree su cuenta, aparecerá en el listado inferior automáticamente y podrás cambiar su rol a 'Cajero' y asignarle la tienda.");
     });
 }
@@ -3692,7 +3692,7 @@ async function loadSaasStores() {
     }
 }
 
-window.createNewSaasStore = async function() {
+window.createNewSaasStore = async function () {
     if (!supabaseInitialized || currentUserRole !== 'saas_admin') return;
 
     const storeName = document.getElementById('saas-store-name').value.trim();
@@ -3718,4 +3718,227 @@ window.createNewSaasStore = async function() {
         console.error("Error creating store:", err);
         alert("Error al crear empresa: " + err.message);
     }
+};
+
+/* ==========================================================================
+   Catalog Shopping Cart Logic
+   ========================================================================== */
+let catalogCart = [];
+
+window.addCatalogCartItem = function (productId) {
+    const product = state.products.find(p => p.id === productId);
+    if (!product) return;
+
+    if (product.stock <= 0) {
+        playScanSound('fail');
+        alert(`El artículo "${product.name}" no tiene stock disponible.`);
+        return;
+    }
+
+    const existing = catalogCart.find(item => item.id === productId);
+    if (existing) {
+        if (existing.quantity >= product.stock) {
+            playScanSound('warning');
+            alert(`No puedes agregar más unidades. Stock máximo disponible: ${product.stock}`);
+            return;
+        }
+        existing.quantity += 1;
+    } else {
+        catalogCart.push({
+            id: product.id,
+            sku: product.sku,
+            name: product.name,
+            price: product.price,
+            quantity: 1
+        });
+    }
+
+    playScanSound('success');
+    renderCatalogCart();
+
+    // Add pulse animation feedback to cart button
+    const fabBtn = document.getElementById('catalog-cart-btn');
+    if (fabBtn) {
+        fabBtn.classList.add('pulse-animation');
+        setTimeout(() => fabBtn.classList.remove('pulse-animation'), 500);
+    }
+};
+
+window.updateCatalogCartItemQty = function (productId, delta) {
+    const item = catalogCart.find(i => i.id === productId);
+    if (!item) return;
+
+    const product = state.products.find(p => p.id === productId);
+    if (!product) return;
+
+    const newQty = item.quantity + delta;
+    if (newQty <= 0) {
+        window.removeCatalogCartItem(productId);
+        return;
+    }
+
+    if (newQty > product.stock) {
+        playScanSound('warning');
+        alert(`Stock máximo disponible: ${product.stock}`);
+        return;
+    }
+
+    item.quantity = newQty;
+    playScanSound('success');
+    renderCatalogCart();
+};
+
+window.removeCatalogCartItem = function (productId) {
+    catalogCart = catalogCart.filter(i => i.id !== productId);
+    playScanSound('warning');
+    renderCatalogCart();
+};
+
+window.renderCatalogCart = function () {
+    const container = document.getElementById('catalog-cart-items-container');
+    const badge = document.getElementById('catalog-cart-badge');
+    const totalDisplay = document.getElementById('catalog-cart-total');
+    const checkoutBtn = document.getElementById('catalog-cart-checkout-btn');
+    const currency = state.settings.currency || '$';
+
+    if (!container) return;
+
+    const totalItems = catalogCart.reduce((sum, item) => sum + item.quantity, 0);
+    const totalPrice = catalogCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+    if (badge) {
+        if (totalItems > 0) {
+            badge.textContent = totalItems;
+            badge.style.display = 'block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    if (totalDisplay) {
+        totalDisplay.textContent = `${currency}${totalPrice.toFixed(2)}`;
+    }
+
+    if (catalogCart.length === 0) {
+        container.innerHTML = `
+            <div class="cart-empty-state">
+                <i data-lucide="shopping-cart" class="cart-empty-icon" style="width: 48px; height: 48px; opacity: 0.3; margin-bottom: 10px;"></i>
+                <p>Tu carrito está vacío.</p>
+                <span style="font-size: 12px; color: var(--text-muted);">Agrega productos del catálogo para comenzar.</span>
+            </div>
+        `;
+        if (checkoutBtn) checkoutBtn.disabled = true;
+    } else {
+        if (checkoutBtn) checkoutBtn.disabled = false;
+        let itemsHtml = '';
+        catalogCart.forEach(item => {
+            itemsHtml += `
+                <div class="catalog-cart-item">
+                    <div class="catalog-cart-item-details">
+                        <div class="catalog-cart-item-title">${item.name}</div>
+                        <div class="catalog-cart-item-price">${currency}${item.price.toFixed(2)}</div>
+                    </div>
+                    <div class="catalog-cart-item-qty-actions">
+                        <button class="qty-btn" onclick="updateCatalogCartItemQty('${item.id}', -1)">-</button>
+                        <span class="qty-val">${item.quantity}</span>
+                        <button class="qty-btn" onclick="updateCatalogCartItemQty('${item.id}', 1)">+</button>
+                    </div>
+                    <div class="catalog-cart-item-total">
+                        ${currency}${(item.price * item.quantity).toFixed(2)}
+                    </div>
+                    <button class="btn btn-icon" onclick="removeCatalogCartItem('${item.id}')" style="color: var(--danger); margin-left: 10px;" title="Eliminar del carrito">
+                        <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                    </button>
+                </div>
+            `;
+        });
+        container.innerHTML = itemsHtml;
+    }
+
+    if (window.lucide) lucide.createIcons();
+};
+
+window.openCatalogCartModal = function () {
+    renderCatalogCart();
+    openModal('modal-catalog-cart');
+};
+
+window.openCatalogCheckoutModal = function () {
+    closeModal('modal-catalog-cart');
+
+    const summaryContainer = document.getElementById('cat-checkout-items-summary');
+    const totalDisplay = document.getElementById('cat-checkout-total-display');
+    const currency = state.settings.currency || '$';
+
+    if (summaryContainer) {
+        let summaryHtml = '';
+        catalogCart.forEach(item => {
+            summaryHtml += `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span>${item.quantity}x ${item.name}</span>
+                    <span>${currency}${(item.price * item.quantity).toFixed(2)}</span>
+                </div>
+            `;
+        });
+        summaryContainer.innerHTML = summaryHtml;
+    }
+
+    const totalPrice = catalogCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    if (totalDisplay) {
+        totalDisplay.textContent = `${currency}${totalPrice.toFixed(2)}`;
+    }
+
+    openModal('modal-catalog-checkout');
+};
+
+window.backToCatalogCart = function () {
+    closeModal('modal-catalog-checkout');
+    openModal('modal-catalog-cart');
+};
+
+window.sendCatalogOrder = function (e) {
+    if (e) e.preventDefault();
+
+    const name = document.getElementById('cat-cust-name').value.trim();
+    const phone = document.getElementById('cat-cust-phone').value.trim();
+    const address = document.getElementById('cat-cust-address').value.trim();
+    const payment = document.getElementById('cat-cust-payment').value;
+
+    if (!name || !phone || !address || !payment) {
+        alert("Por favor completa todos los campos obligatorios.");
+        return;
+    }
+
+    const currency = state.settings.currency || '$';
+    const totalPrice = catalogCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const storeName = state.settings.storeName || "Brinde Estilo";
+
+    let message = `*¡Hola ${storeName}!* Me gustaría realizar el siguiente pedido:\n\n`;
+    message += `*🛒 DETALLE DEL PEDIDO:*\n`;
+    catalogCart.forEach(item => {
+        message += `- ${item.quantity}x _${item.name}_ (${currency}${item.price.toFixed(2)} c/u) -> *Total: ${currency}${(item.price * item.quantity).toFixed(2)}*\n`;
+    });
+    message += `\n*💰 TOTAL A PAGAR:* *${currency}${totalPrice.toFixed(2)}*\n\n`;
+
+    message += `*👤 DATOS DEL CLIENTE:*\n`;
+    message += `- *Nombre:* ${name}\n`;
+    message += `- *WhatsApp/Teléfono:* ${phone}\n`;
+    message += `- *Dirección / Notas:* ${address}\n`;
+    message += `- *Método de Pago:* ${payment}\n\n`;
+
+    message += `Quedo atento/a para coordinar la entrega y el pago. ¡Muchas gracias!`;
+
+    let waNumber = state.settings.whatsapp || "+5491155551234";
+    waNumber = waNumber.replace(/[^\d]/g, '');
+
+    const waUrl = `https://api.whatsapp.com/send?phone=${waNumber}&text=${encodeURIComponent(message)}`;
+
+    window.open(waUrl, '_blank');
+
+    catalogCart = [];
+    renderCatalogCart();
+    closeModal('modal-catalog-checkout');
+    document.getElementById('catalog-checkout-form').reset();
+
+    alert("¡Pedido generado con éxito! Se ha abierto una pestaña para enviar el mensaje por WhatsApp.");
 };

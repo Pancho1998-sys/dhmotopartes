@@ -1010,6 +1010,12 @@
                             <!-- Productos del catálogo -->
                         </div>
                     </div>
+
+                    <!-- Catalog Floating Cart Button -->
+                    <button class="catalog-cart-fab" id="catalog-cart-btn" onclick="openCatalogCartModal()" title="Ver Carrito">
+                        <i data-lucide="shopping-cart" style="width: 24px; height: 24px;"></i>
+                        <span class="catalog-cart-badge" id="catalog-cart-badge" style="display: none;">0</span>
+                    </button>
                 </section>
 
             </main>
@@ -1391,6 +1397,87 @@
                 <button type="button" class="btn btn-primary" id="excel-confirm-import-btn">
                     <i data-lucide="check-circle-2"></i> Confirmar e Importar
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CATALOG CART MODAL -->
+    <div class="modal-backdrop" id="modal-catalog-cart">
+        <div class="modal-box modal-medium">
+            <div class="modal-header">
+                <h3 class="modal-title"><i data-lucide="shopping-cart" class="text-primary icon-inline"></i> Mi Carrito de Compras</h3>
+                <button class="btn-icon modal-close-btn" data-close-modal="modal-catalog-cart"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 0; display: flex; flex-direction: column; max-height: 70vh;">
+                <!-- Cart Items List -->
+                <div class="catalog-cart-items" id="catalog-cart-items-container" style="overflow-y: auto; flex: 1; min-height: 150px;">
+                    <!-- Rendered dynamically -->
+                </div>
+                
+                <!-- Cart Summary -->
+                <div class="cart-summary-section" style="border-top: 1px solid var(--border-color); background-color: rgba(0, 0, 0, 0.15); padding: 16px 20px;">
+                    <div class="summary-row total-row" style="margin-bottom: 0; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">TOTAL DEL PEDIDO:</span>
+                        <span id="catalog-cart-total" style="color: var(--primary); font-size: 22px; font-weight: 800; font-family: var(--font-title);">$0.00</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-outline" data-close-modal="modal-catalog-cart">Seguir Comprando</button>
+                <button class="btn btn-primary" id="catalog-cart-checkout-btn" onclick="openCatalogCheckoutModal()">
+                    <i data-lucide="arrow-right"></i> Proceder al Checkout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CATALOG CHECKOUT MODAL -->
+    <div class="modal-backdrop" id="modal-catalog-checkout">
+        <div class="modal-box modal-medium">
+            <div class="modal-header">
+                <h3 class="modal-title"><i data-lucide="shopping-bag" class="text-primary icon-inline"></i> Datos de Entrega y Pago</h3>
+                <button class="btn-icon modal-close-btn" data-close-modal="modal-catalog-checkout"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="catalog-checkout-form" onsubmit="sendCatalogOrder(event)">
+                    <div class="form-group">
+                        <label for="cat-cust-name">Nombre y Apellido *</label>
+                        <input type="text" id="cat-cust-name" required placeholder="Ej: Juan Pérez">
+                    </div>
+                    <div class="form-group">
+                        <label for="cat-cust-phone">WhatsApp / Teléfono *</label>
+                        <input type="text" id="cat-cust-phone" required placeholder="Ej: +54 9 11 5555-6666">
+                    </div>
+                    <div class="form-group">
+                        <label for="cat-cust-address">Dirección de Entrega / Notas *</label>
+                        <textarea id="cat-cust-address" required placeholder="Ej: Av. Siempreviva 742, Depto 3B. Entregar por la tarde." rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="cat-cust-payment">Método de Pago Preferido *</label>
+                        <select id="cat-cust-payment" required>
+                            <option value="">Seleccione una opción</option>
+                            <option value="Efectivo al recibir">Efectivo al recibir</option>
+                            <option value="Transferencia Bancaria / CVU">Transferencia Bancaria / CVU</option>
+                            <option value="Mercado Pago / Enlace de pago">Mercado Pago / Enlace de pago</option>
+                        </select>
+                    </div>
+                    
+                    <div class="checkout-summary-box" style="margin-top: 15px; margin-bottom: 0;">
+                        <span class="lbl">RESUMEN DEL PEDIDO</span>
+                        <div id="cat-checkout-items-summary" style="font-size: 13px; color: var(--text-muted); margin: 8px 0; border-top: 1px dashed var(--border-color); border-bottom: 1px dashed var(--border-color); padding: 8px 0; max-height: 100px; overflow-y: auto;">
+                            <!-- Resumen corto del pedido -->
+                        </div>
+                        <span class="lbl" style="margin-top: 8px;">TOTAL A PAGAR</span>
+                        <h2 class="val" id="cat-checkout-total-display" style="color: var(--primary); font-family: var(--font-title); font-size: 24px; font-weight: 800; margin-top: 4px;">$0.00</h2>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                        <button type="button" class="btn btn-secondary btn-outline" onclick="backToCatalogCart()">Volver al Carrito</button>
+                        <button type="submit" class="btn btn-primary btn-large" id="cat-confirm-checkout-btn">
+                            <i data-lucide="phone"></i> Enviar Pedido por WhatsApp
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
