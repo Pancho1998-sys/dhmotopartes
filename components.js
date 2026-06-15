@@ -307,7 +307,7 @@ function renderReceipt(sale, settings) {
             <div class="ticket-footer">
                 <p style="font-weight: bold; margin-bottom: 6px;">¡Gracias por su compra!</p>
                 <p>Conserve este ticket para cambios o garantías de repuestos eléctricos.</p>
-                <div style="margin-top: 12px; font-size: 10px; color: #555;">Desarrollado por Bigthech v1.0.0</div>
+                <div style="margin-top: 12px; font-size: 10px; color: #555;">Desarrollado por Bigtech v1.0.0</div>
             </div>
         </div>
     `;

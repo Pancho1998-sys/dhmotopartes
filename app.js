@@ -10,7 +10,7 @@ let state = {
     customers: [],
     cashMovements: [],
     settings: {
-        storeName: "Bigthech",
+        storeName: "Bigtech",
         storeAddress: "Av. Libertador 2450, Ciudad",
         storePhone: "+54 9 11 5555-1234",
         currency: "$",
@@ -2813,7 +2813,7 @@ async function renderHistory() {
             if (statesList) {
                 statesList.forEach(item => {
                     const storeId = item.store_id;
-                    const storeName = storeMap[storeId] || (item.state && item.state.settings && item.state.settings.storeName) || 'Bigthech';
+                    const storeName = storeMap[storeId] || (item.state && item.state.settings && item.state.settings.storeName) || 'Bigtech';
                     if (item.state && Array.isArray(item.state.sales)) {
                         item.state.sales.forEach(sale => {
                             allSales.push({
@@ -2914,7 +2914,7 @@ function renderHistoryTable() {
             <tr>
                 <td style="font-weight: 700; color: var(--primary);">${s.id}</td>
                 <td>${new Date(s.date).toLocaleString('es-ES')}</td>
-                ${showNegocio ? `<td>${s.storeName || (state.settings && state.settings.storeName) || 'Bigthech'}</td>` : ''}
+                ${showNegocio ? `<td>${s.storeName || (state.settings && state.settings.storeName) || 'Bigtech'}</td>` : ''}
                 <td style="font-weight: 500;">${s.customerName}</td>
                 <td>${itemsCount} artículos</td>
                 <td class="text-right" style="font-weight: 700;">${state.settings.currency}${s.total.toFixed(2)}</td>
@@ -3066,9 +3066,9 @@ function applyBrandSettings() {
     applyThemeMode(state.settings.theme || 'dark');
     applyAccentTheme(state.settings.accentColor || 'violet');
 
-    let storeName = state.settings.storeName || "Bigthech";
+    let storeName = state.settings.storeName || "Bigtech";
     if (currentUserRole === 'saas_admin') {
-        storeName = "Bigthech";
+        storeName = "Bigtech";
     }
 
     // Update page title
@@ -3349,7 +3349,7 @@ window.deleteCategory = function (index) {
    Public Customer Catalog Controller
    ========================================================================== */
 function renderCatalog() {
-    const storeName = state.settings.storeName || "Bigthech";
+    const storeName = state.settings.storeName || "Bigtech";
     const logoUrl = state.settings.logo;
 
     // Sync store name and logo preview elements
@@ -3489,7 +3489,7 @@ function exportSalesCSV() {
             new Date(s.date).toISOString().replace('T', ' ').slice(0, 19)
         ];
         if (showNegocio) {
-            row.push(`"${s.storeName || (state.settings && state.settings.storeName) || 'Bigthech'}"`);
+            row.push(`"${s.storeName || (state.settings && state.settings.storeName) || 'Bigtech'}"`);
         }
         row.push(
             `"${s.customerName}"`,
