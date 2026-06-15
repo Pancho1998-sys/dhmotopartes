@@ -246,6 +246,9 @@ async function setupAuthentication() {
                     }
                 } else if (currentUserRole === 'superadmin' || currentUserRole === 'saas_admin') {
                     const navItemsToHide = ['nav-pos', 'nav-inventario', 'nav-clientes', 'nav-caja'];
+                    if (currentUserRole === 'saas_admin') {
+                        navItemsToHide.push('nav-configuracion');
+                    }
                     navItemsToHide.forEach(id => {
                         const el = document.getElementById(id);
                         if (el && el.parentElement) el.parentElement.style.display = 'none';
@@ -253,13 +256,10 @@ async function setupAuthentication() {
                     const targetView = window.location.hash.replace('#', '');
                     const forbiddenViewsForAdmins = ['pos', 'inventario', 'clientes', 'caja'];
                     if (currentUserRole === 'saas_admin') {
-                        if (window.location.hash === '' || window.location.hash === '#dashboard' || forbiddenViewsForAdmins.includes(targetView)) {
-                            window.location.hash = '#saas';
-                        }
-                    } else {
-                        if (window.location.hash === '' || forbiddenViewsForAdmins.includes(targetView)) {
-                            window.location.hash = '#dashboard';
-                        }
+                        forbiddenViewsForAdmins.push('configuracion');
+                    }
+                    if (window.location.hash === '' || forbiddenViewsForAdmins.includes(targetView)) {
+                        window.location.hash = '#dashboard';
                     }
                 }
 
@@ -288,7 +288,10 @@ async function setupAuthentication() {
                 // Load DB from Supabase (Skip loading store DB if saas_admin)
                 if (currentUserRole !== 'saas_admin') {
                     await loadDatabase();
+                } else {
+                    applyBrandSettings();
                 }
+
 
             } catch (err) {
                 console.error("Auth state processing failed:", err);
@@ -675,12 +678,11 @@ function handleRoute() {
 
     // Route protection for superadmin or saas_admin
     const forbiddenViewsForAdmins = ['pos', 'inventario', 'clientes', 'caja'];
+    if (currentUserRole === 'saas_admin') {
+        forbiddenViewsForAdmins.push('configuracion');
+    }
     if ((currentUserRole === 'superadmin' || currentUserRole === 'saas_admin') && forbiddenViewsForAdmins.includes(targetView)) {
-        if (currentUserRole === 'saas_admin') {
-            window.location.hash = '#saas';
-        } else {
-            window.location.hash = '#dashboard';
-        }
+        window.location.hash = '#dashboard';
         return;
     }
 
@@ -1475,6 +1477,20 @@ function renderApp() {
    1. DASHBOARD VIEW CONTROLLER
    ========================================================================== */
 function renderDashboard() {
+    if (currentUserRole === 'saas_admin') {
+        const standardContent = document.getElementById('standard-dashboard-content');
+        if (standardContent) standardContent.style.display = 'none';
+        const saasPanel = document.getElementById('saas-dashboard-panel');
+        if (saasPanel) saasPanel.style.display = 'block';
+        renderSaasDashboard();
+        return;
+    } else {
+        const standardContent = document.getElementById('standard-dashboard-content');
+        if (standardContent) standardContent.style.display = 'block';
+        const saasPanel = document.getElementById('saas-dashboard-panel');
+        if (saasPanel) saasPanel.style.display = 'none';
+    }
+
     // Calculate dashboard statistics
     const today = new Date().toDateString();
 
@@ -1619,6 +1635,185 @@ function renderSalesChartContainer() {
 
     renderSalesChart('sales-chart-container', chartData, state.settings.currency);
 }
+
+async function renderSaasDashboard() {
+    const select = document.getElementById('saas-store-select');
+    if (!select) return;
+
+    // Show empty state for dashboard metrics/charts initially
+    const metricsGrid = document.getElementById('saas-metrics-grid');
+    if (metricsGrid) metricsGrid.style.display = 'none';
+    const chartLayout = document.getElementById('saas-chart-layout');
+    if (chartLayout) chartLayout.style.display = 'none';
+    const emptyState = document.getElementById('saas-dash-empty');
+    if (emptyState) emptyState.style.display = 'flex';
+
+    select.innerHTML = '<option value="">— Cargando negocios... —</option>';
+
+    try {
+        const { data: stores, error } = await supabaseClient
+            .from('stores')
+            .select('id, name')
+            .order('name', { ascending: true });
+
+        if (error) throw error;
+
+        select.innerHTML = '<option value="">— Seleccionar Negocio —</option>';
+        if (stores && stores.length > 0) {
+            stores.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.textContent = s.name;
+                select.appendChild(opt);
+            });
+        } else {
+            select.innerHTML = '<option value="">— No hay negocios registrados —</option>';
+        }
+    } catch (err) {
+        console.error("Error al cargar negocios para el dashboard SaaS:", err);
+        select.innerHTML = '<option value="">— Error al cargar negocios —</option>';
+    }
+}
+
+async function onSaasStoreSelected(storeId) {
+    const metricsGrid = document.getElementById('saas-metrics-grid');
+    const chartLayout = document.getElementById('saas-chart-layout');
+    const emptyState = document.getElementById('saas-dash-empty');
+
+    if (!storeId) {
+        if (metricsGrid) metricsGrid.style.display = 'none';
+        if (chartLayout) chartLayout.style.display = 'none';
+        if (emptyState) emptyState.style.display = 'flex';
+        return;
+    }
+
+    if (emptyState) emptyState.style.display = 'none';
+    
+    try {
+        // Fetch the selected store's state
+        const { data, error } = await supabaseClient
+            .from('store_states')
+            .select('state')
+            .eq('store_id', storeId)
+            .single();
+
+        if (error) throw error;
+
+        const storeState = (data && data.state) ? data.state : {};
+        const sales = Array.isArray(storeState.sales) ? storeState.sales : [];
+        const products = Array.isArray(storeState.products) ? storeState.products : [];
+        const settings = storeState.settings || {};
+        const currency = settings.currency || '$';
+
+        // 1. Calculate SaaS Dashboard statistics for last 7 days
+        const today = new Date();
+        const todayStr = today.toDateString();
+        const daysWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+        
+        // Filter completed sales
+        const completedSales = sales.filter(s => s.status === 'completed');
+
+        // Ventas Hoy
+        const salesToday = completedSales.filter(s => new Date(s.date).toDateString() === todayStr);
+        const totalToday = salesToday.reduce((sum, s) => sum + s.total, 0);
+
+        // Ventas 7 días
+        const dateLimit = new Date();
+        dateLimit.setDate(today.getDate() - 7);
+        const sales7Days = completedSales.filter(s => new Date(s.date) >= dateLimit);
+        const total7Days = sales7Days.reduce((sum, s) => sum + s.total, 0);
+
+        // Ticket Promedio (7 días)
+        const avgTicket = sales7Days.length > 0 ? (total7Days / sales7Days.length) : 0;
+
+        // Artículos en stock
+        const totalProducts = products.length;
+        const totalStockQty = products.reduce((sum, p) => sum + p.stock, 0);
+
+        // Update elements
+        document.getElementById('saas-metric-total').textContent = `${currency}${total7Days.toFixed(2)}`;
+        document.getElementById('saas-metric-count').innerHTML = `<i data-lucide="trending-up"></i> ${sales7Days.length} transacciones`;
+        document.getElementById('saas-metric-avg').textContent = `${currency}${avgTicket.toFixed(2)}`;
+        document.getElementById('saas-metric-today').textContent = `${currency}${totalToday.toFixed(2)}`;
+        document.getElementById('saas-metric-today-count').textContent = `${salesToday.length} transacciones hoy`;
+        document.getElementById('saas-metric-products').textContent = totalProducts;
+        document.getElementById('saas-metric-stock').textContent = `${totalStockQty} unidades físicas`;
+
+        // 2. Generate Chart Data (last 7 days, today back to 6 days ago)
+        const chartData = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(today.getDate() - i);
+            const dateStr = d.toDateString();
+            const dailyTotal = completedSales
+                .filter(s => new Date(s.date).toDateString() === dateStr)
+                .reduce((sum, s) => sum + s.total, 0);
+
+            chartData.push({
+                date: daysWeek[d.getDay()],
+                total: dailyTotal
+            });
+        }
+
+        // Render sales chart
+        const chartContainer = document.getElementById('saas-sales-chart-container');
+        if (chartContainer) {
+            chartContainer.innerHTML = '';
+            renderSalesChart('saas-sales-chart-container', chartData, currency);
+        }
+
+        // 3. Render Recent Sales (top 5) for this business
+        const recentSalesContainer = document.getElementById('saas-recent-sales-list');
+        if (recentSalesContainer) {
+            const sortedSales = [...completedSales].sort((a, b) => new Date(b.date) - new Date(a.date));
+            if (sortedSales.length === 0) {
+                recentSalesContainer.innerHTML = `
+                    <div class="empty-state-small">
+                        <i data-lucide="info"></i>
+                        <p>No se registran ventas en este negocio.</p>
+                    </div>
+                `;
+            } else {
+                let html = '';
+                sortedSales.slice(0, 5).forEach(s => {
+                    const timeStr = new Date(s.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                    html += `
+                        <div class="feed-item">
+                            <div class="feed-item-left">
+                                <div class="feed-item-icon bg-success" style="color: var(--text-success);">
+                                    <i data-lucide="shopping-bag" style="width:14px; height:14px;"></i>
+                                </div>
+                                <div>
+                                    <p class="feed-item-title">Venta #${s.id.toString().slice(-6)}</p>
+                                    <p class="feed-item-subtext">${timeStr} • ${s.items.length} items</p>
+                                </div>
+                            </div>
+                            <div class="feed-item-right">
+                                <span class="feed-item-value text-success">+${currency}${s.total.toFixed(2)}</span>
+                                <p class="feed-item-subtext">${s.paymentMethod === 'cash' ? 'Efectivo' : s.paymentMethod === 'card' ? 'Tarjeta' : 'Transferencia'}</p>
+                            </div>
+                        </div>
+                    `;
+                });
+                recentSalesContainer.innerHTML = html;
+            }
+        }
+
+        if (window.lucide) lucide.createIcons();
+
+        // Show layouts
+        if (metricsGrid) metricsGrid.style.display = 'grid';
+        if (chartLayout) chartLayout.style.display = 'flex';
+
+    } catch (err) {
+        console.error("Error al cargar detalles de negocio:", err);
+        alert("Error al cargar la información del negocio seleccionado: " + err.message);
+    }
+}
+
+// Expose globally for inline events
+window.onSaasStoreSelected = onSaasStoreSelected;
+window.renderSaasDashboard = renderSaasDashboard;
 
 /* ==========================================================================
    2. POINT OF SALE (POS) VIEW CONTROLLER
@@ -2706,7 +2901,10 @@ function applyBrandSettings() {
     applyThemeMode(state.settings.theme || 'dark');
     applyAccentTheme(state.settings.accentColor || 'violet');
 
-    const storeName = state.settings.storeName || "Bigthech";
+    let storeName = state.settings.storeName || "Bigthech";
+    if (currentUserRole === 'saas_admin') {
+        storeName = "Bigthech";
+    }
 
     // Update page title
     document.title = `${storeName} - Control de Ventas e Inventario`;
