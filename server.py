@@ -44,6 +44,16 @@ class DHMotopartesRequestHandler(SimpleHTTPRequestHandler):
                     self.wfile.write(b'{}')
             else:
                 self.wfile.write(b'{}')
+        elif self.path == '/api/info':
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
+            self.end_headers()
+            is_frozen = getattr(sys, 'frozen', False)
+            info = {
+                "frozen": is_frozen
+            }
+            self.wfile.write(json.dumps(info).encode('utf-8'))
         else:
             # Serve static files normally
             super().do_GET()

@@ -49,7 +49,7 @@ let lastKeyTime = 0;
    Initialization & Authentication
    ========================================================================== */
 document.addEventListener('DOMContentLoaded', async () => {
-    setupAuthentication();
+    await setupAuthentication();
     initRouter();
     initDatetime();
     setupEventListeners();
@@ -77,7 +77,7 @@ let currentUserProfile = null;
 let myStoreId = null;
 
 // Setup Supabase Auth & Login UI flow
-function setupAuthentication() {
+async function setupAuthentication() {
     const loginOverlay = document.getElementById('login-overlay');
     const loginForm = document.getElementById('login-form');
     const loginEmail = document.getElementById('login-email');
@@ -86,6 +86,20 @@ function setupAuthentication() {
     const loginStatus = document.getElementById('login-status-notice');
     const loginBtnLocal = document.getElementById('login-btn-local');
     const btnLogout = document.getElementById('btn-logout');
+
+    // Detectar si estamos en el ejecutable compilado (.exe)
+    let isExecutable = false;
+    try {
+        if (window.location.protocol !== 'file:') {
+            const res = await fetch('/api/info');
+            if (res.ok) {
+                const data = await res.json();
+                isExecutable = !!data.frozen;
+            }
+        }
+    } catch (e) {
+        console.warn("No se pudo conectar al servidor de control de entorno. Asumiendo desarrollo.", e);
+    }
 
     // Set up logout button click listener
     if (btnLogout) {
@@ -101,24 +115,34 @@ function setupAuthentication() {
     }
 
     if (!supabaseInitialized) {
-        // Supabase is not configured yet. Show local mode notice and let user bypass.
+        // Supabase is not configured yet.
         if (loginOverlay) {
             loginOverlay.classList.add('active');
             loginOverlay.style.display = 'flex';
         }
-        if (loginStatus) {
-            loginStatus.innerHTML = `⚠️ <strong>Base de datos en la nube no configurada.</strong><br>Completa las credenciales en <code>supabase-config.js</code> para conectar el sistema a internet.`;
-        }
-        if (loginBtnLocal) {
-            loginBtnLocal.style.display = 'block';
-            loginBtnLocal.addEventListener('click', () => {
-                if (loginOverlay) {
-                    loginOverlay.classList.remove('active');
-                    loginOverlay.style.display = 'none';
-                }
-                loadDatabase(); // Loads local/demo data
-                renderApp();
-            });
+        
+        if (isExecutable) {
+            if (loginStatus) {
+                loginStatus.innerHTML = `⚠️ <strong>Acceso denegado: Base de datos no configurada.</strong><br>Contacte al administrador del sistema para configurar Supabase.`;
+            }
+            if (loginBtnLocal) {
+                loginBtnLocal.style.display = 'none';
+            }
+        } else {
+            if (loginStatus) {
+                loginStatus.innerHTML = `⚠️ <strong>Base de datos en la nube no configurada.</strong><br>Completa las credenciales en <code>supabase-config.js</code> para conectar el sistema a internet.`;
+            }
+            if (loginBtnLocal) {
+                loginBtnLocal.style.display = 'block';
+                loginBtnLocal.onclick = () => {
+                    if (loginOverlay) {
+                        loginOverlay.classList.remove('active');
+                        loginOverlay.style.display = 'none';
+                    }
+                    loadDatabase(); // Loads local/demo data
+                    renderApp();
+                };
+            }
         }
         // Disable submit button since there is no Supabase to authenticate against
         const btnSubmit = document.getElementById('login-btn-submit');
@@ -133,6 +157,23 @@ function setupAuthentication() {
     }
     if (loginStatus) {
         loginStatus.textContent = "Ingresa tus credenciales para acceder a la base de datos remota.";
+    }
+
+    // Habilitar/deshabilitar botón de modo local según el entorno
+    if (loginBtnLocal) {
+        if (isExecutable) {
+            loginBtnLocal.style.display = 'none';
+        } else {
+            loginBtnLocal.style.display = 'block';
+            loginBtnLocal.onclick = () => {
+                if (loginOverlay) {
+                    loginOverlay.classList.remove('active');
+                    loginOverlay.style.display = 'none';
+                }
+                loadDatabase(); // Loads local/demo data
+                renderApp();
+            };
+        }
     }
 
     // Set up Supabase auth state listener
