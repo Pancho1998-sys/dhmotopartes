@@ -2360,3 +2360,7 @@ body.catalog-fullscreen .content-container {
     transform: translateY(-50%);
     pointer-events: none;
 }
+.saas-dash-select-wrapper select option {
+    color: #111111;
+    background-color: #ffffff;
+}
