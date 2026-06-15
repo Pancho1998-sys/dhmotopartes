@@ -1,0 +1,59 @@
+RANGOS DE USUARIO Y PERMISOS - DHMOTOPARTES
+==========================================
+
+El sistema DHMotopartes cuenta con un control de acceso basado en roles (RBAC) con los siguientes niveles de menor a mayor privilegio:
+
+1. USUARIO ("usuario")
+---------------------
+- Quién es: Rol asignado por defecto al registrarse una nueva cuenta.
+- Qué puede hacer: 
+  * Ninguna acción en la aplicación POS.
+  * No puede pasar de la pantalla de inicio de sesión (Login).
+  * No tiene permisos de lectura ni escritura en la base de datos (seguridad RLS de Supabase) para ninguna tienda.
+- Propósito: Estado de espera/seguridad antes de ser verificado y asignado a una tienda.
+
+2. CAJERO ("cajero")
+-------------------
+- Quién es: Personal de ventas del mostrador.
+- Qué puede hacer:
+  * Acceder a la pantalla de Punto de Venta (POS) y consultar el Catálogo.
+  * Registrar ventas, escanear artículos y cobrar.
+- Funciones restringidas (No puede hacer):
+  * No puede ver estadísticas (Dashboard de rentabilidad).
+  * No puede modificar ni exportar el inventario de repuestos.
+  * No puede ver la base de datos de clientes (CRM).
+  * No puede ver el historial de ventas previas ni anular comprobantes.
+  * No puede ver el dinero disponible en caja ni registrar ingresos/egresos manuales.
+  * No tiene acceso a la configuración del local.
+
+3. ADMINISTRADOR DE TIENDA ("admin")
+------------------------------------
+- Quién es: Encargados del local, gerentes operativos o socios.
+- Qué puede hacer:
+  * Control total de la tienda a la que está asignado.
+  * Ver el Dashboard de estadísticas y gráficos de rentabilidad.
+  * Usar el Punto de Venta (POS).
+  * Administrar el Inventario (crear, modificar, eliminar, importar y exportar en Excel).
+  * Gestionar Clientes (CRM).
+  * Controlar la Caja y Movimientos (aperturas, retiros, pagos de fletes, etc.).
+  * Ver el Historial de Ventas e imprimir o anular comprobantes.
+  * Modificar la Configuración de la tienda (datos fiscales, moneda, impuestos, visuales).
+- Funciones restringidas (No puede hacer):
+  * No puede ver datos de otras tiendas.
+  * No puede gestionar (crear, habilitar, editar) a otros empleados o cajeros de su local.
+
+4. SUPERADMINISTRADOR DE TIENDA ("superadmin")
+----------------------------------------------
+- Quién es: Dueño absoluto del local o gerente general.
+- Qué puede hacer:
+  * Todo lo que hace el Administrador ("admin").
+  * [Exclusivo]: Gestionar los usuarios y cajeros de su local (habilitar cuentas, asignar o modificar sus roles).
+
+5. ADMINISTRADOR GLOBAL SAAS ("saas_admin")
+-------------------------------------------
+- Quién es: Propietario o administrador del software multi-tenant (ej. francisco.r.s.w.98@gmail.com).
+- Qué puede hacer:
+  * Control total sobre toda la plataforma SaaS.
+  * Acceso al Panel Global SaaS.
+  * Visualizar y gestionar todas las tiendas / repuesteras registradas en el sistema.
+  * Acceso total a la base de datos sin restricción de tienda (multi-tenant).
