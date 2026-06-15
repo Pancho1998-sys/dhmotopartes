@@ -10,7 +10,7 @@ let state = {
     customers: [],
     cashMovements: [],
     settings: {
-        storeName: "Macutech",
+        storeName: "Bigthech",
         storeAddress: "Av. Libertador 2450, Ciudad",
         storePhone: "+54 9 11 5555-1234",
         currency: "$",
@@ -238,9 +238,16 @@ async function setupAuthentication() {
                     loginOverlay.style.display = 'none';
                 }
 
-                // Show/Hide panels based on cajero role
-                const navItemsToHide = ['nav-dashboard', 'nav-inventario', 'nav-clientes', 'nav-historial', 'nav-caja', 'nav-configuracion'];
+                // Reset all navigation display to block first
+                const allNavIds = ['nav-dashboard', 'nav-pos', 'nav-inventario', 'nav-clientes', 'nav-historial', 'nav-caja', 'nav-configuracion'];
+                allNavIds.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el && el.parentElement) el.parentElement.style.display = 'block';
+                });
+
+                // Show/Hide panels based on role
                 if (currentUserRole === 'cajero') {
+                    const navItemsToHide = ['nav-dashboard', 'nav-inventario', 'nav-clientes', 'nav-historial', 'nav-caja', 'nav-configuracion'];
                     navItemsToHide.forEach(id => {
                         const el = document.getElementById(id);
                         if (el && el.parentElement) el.parentElement.style.display = 'none';
@@ -248,11 +255,23 @@ async function setupAuthentication() {
                     if (window.location.hash === '#dashboard' || window.location.hash === '') {
                         window.location.hash = '#pos';
                     }
-                } else {
+                } else if (currentUserRole === 'superadmin' || currentUserRole === 'saas_admin') {
+                    const navItemsToHide = ['nav-pos', 'nav-inventario', 'nav-clientes', 'nav-caja'];
                     navItemsToHide.forEach(id => {
                         const el = document.getElementById(id);
-                        if (el && el.parentElement) el.parentElement.style.display = 'block';
+                        if (el && el.parentElement) el.parentElement.style.display = 'none';
                     });
+                    const targetView = window.location.hash.replace('#', '');
+                    const forbiddenViewsForAdmins = ['pos', 'inventario', 'clientes', 'caja'];
+                    if (currentUserRole === 'saas_admin') {
+                        if (window.location.hash === '' || window.location.hash === '#dashboard' || forbiddenViewsForAdmins.includes(targetView)) {
+                            window.location.hash = '#saas';
+                        }
+                    } else {
+                        if (window.location.hash === '' || forbiddenViewsForAdmins.includes(targetView)) {
+                            window.location.hash = '#dashboard';
+                        }
+                    }
                 }
 
                 // Show/Hide SaaS panel link if global admin
@@ -260,7 +279,6 @@ async function setupAuthentication() {
                 if (navSaas) {
                     if (currentUserRole === 'saas_admin') {
                         navSaas.style.display = 'block';
-                        window.location.hash = '#saas';
                         loadSaasStores();
                     } else {
                         navSaas.style.display = 'none';
@@ -663,6 +681,29 @@ function handleRoute() {
     if (currentUserRole === 'cajero' && targetView !== 'pos' && targetView !== 'catalogo') {
         window.location.hash = '#pos';
         return;
+    }
+
+    // Route protection for superadmin or saas_admin
+    const forbiddenViewsForAdmins = ['pos', 'inventario', 'clientes', 'caja'];
+    if ((currentUserRole === 'superadmin' || currentUserRole === 'saas_admin') && forbiddenViewsForAdmins.includes(targetView)) {
+        if (currentUserRole === 'saas_admin') {
+            window.location.hash = '#saas';
+        } else {
+            window.location.hash = '#dashboard';
+        }
+        return;
+    }
+
+    // Hide/Show backups configuration panel dynamically based on role
+    if (targetView === 'configuracion') {
+        const backupPanel = document.getElementById('config-respaldo-panel');
+        if (backupPanel) {
+            if (currentUserRole === 'superadmin' || currentUserRole === 'saas_admin') {
+                backupPanel.style.display = 'none';
+            } else {
+                backupPanel.style.display = ''; // Restore default
+            }
+        }
     }
 
     // Toggle active link in sidebar
@@ -2588,7 +2629,7 @@ function applyBrandSettings() {
     applyThemeMode(state.settings.theme || 'dark');
     applyAccentTheme(state.settings.accentColor || 'violet');
 
-    const storeName = state.settings.storeName || "Macutech";
+    const storeName = state.settings.storeName || "Bigthech";
 
     // Update page title
     document.title = `${storeName} - Control de Ventas e Inventario`;
@@ -2868,7 +2909,7 @@ window.deleteCategory = function (index) {
    Public Customer Catalog Controller
    ========================================================================== */
 function renderCatalog() {
-    const storeName = state.settings.storeName || "Macutech";
+    const storeName = state.settings.storeName || "Bigthech";
     const logoUrl = state.settings.logo;
 
     // Sync store name and logo preview elements
