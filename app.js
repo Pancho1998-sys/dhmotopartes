@@ -533,6 +533,7 @@ async function loadDatabase() {
 
 // Save DB state to LocalStorage and background push to Supabase
 async function saveDatabase() {
+    if (currentUserRole === 'saas_admin') return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 
     const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
@@ -2411,7 +2412,89 @@ window.deleteCustomer = function (id) {
    ========================================================================== */
 let activeReceiptId = '';
 
-function renderHistory() {
+async function renderHistory() {
+    const tbody = document.getElementById('history-table-body');
+    
+    // Show Negocio column header if saas_admin or superadmin
+    const negocioHeader = document.getElementById('history-header-negocio');
+    if (negocioHeader) {
+        if (currentUserRole === 'saas_admin' || currentUserRole === 'superadmin') {
+            negocioHeader.style.display = '';
+        } else {
+            negocioHeader.style.display = 'none';
+        }
+    }
+
+    if (currentUserRole === 'saas_admin') {
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" class="text-center text-muted" style="padding: 40px;">
+                        <i data-lucide="loader" class="animate-spin" style="animation: spin 1s linear infinite; margin-right: 8px;"></i>
+                        Cargando ventas de todos los negocios...
+                    </td>
+                </tr>
+            `;
+            if (window.lucide) lucide.createIcons();
+        }
+
+        try {
+            // Fetch stores to map store_id to name
+            const { data: stores, error: storesError } = await supabaseClient
+                .from('stores')
+                .select('id, name');
+
+            if (storesError) throw storesError;
+
+            // Fetch all store states
+            const { data: statesList, error: statesError } = await supabaseClient
+                .from('store_states')
+                .select('store_id, state');
+
+            if (statesError) throw statesError;
+
+            const storeMap = {};
+            if (stores) {
+                stores.forEach(st => {
+                    storeMap[st.id] = st.name;
+                });
+            }
+
+            let allSales = [];
+            if (statesList) {
+                statesList.forEach(item => {
+                    const storeId = item.store_id;
+                    const storeName = storeMap[storeId] || (item.state && item.state.settings && item.state.settings.storeName) || 'Bigthech';
+                    if (item.state && Array.isArray(item.state.sales)) {
+                        item.state.sales.forEach(sale => {
+                            allSales.push({
+                                ...sale,
+                                storeName: storeName,
+                                storeId: storeId,
+                                storeSettings: item.state.settings
+                            });
+                        });
+                    }
+                });
+            }
+
+            // Assign to global state.sales so that filtering/pagination/exporting works seamlessly
+            state.sales = allSales;
+        } catch (err) {
+            console.error("Error al cargar el historial global de ventas:", err);
+            if (tbody) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" class="text-center text-danger" style="padding: 40px;">
+                            Error al cargar el historial de ventas: ${err.message}
+                        </td>
+                    </tr>
+                `;
+            }
+            return;
+        }
+    }
+
     renderHistoryTable();
 }
 
@@ -2421,6 +2504,10 @@ function renderHistoryTable() {
     const endVal = document.getElementById('history-filter-end').value;
     const statusVal = document.getElementById('history-filter-status').value;
     const tbody = document.getElementById('history-table-body');
+    
+    // Determine colspan based on role (9 for saas_admin and superadmin, 8 for others)
+    const showNegocio = (currentUserRole === 'saas_admin' || currentUserRole === 'superadmin');
+    const totalCols = showNegocio ? 9 : 8;
 
     const filtered = state.sales.filter(s => {
         const matchesSearch = s.id.toLowerCase().includes(searchVal) ||
@@ -2454,7 +2541,7 @@ function renderHistoryTable() {
     if (pageItems.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" class="text-center text-muted" style="padding: 40px;">
+                <td colspan="${totalCols}" class="text-center text-muted" style="padding: 40px;">
                     No se encontraron transacciones registradas.
                 </td>
             </tr>
@@ -2478,6 +2565,7 @@ function renderHistoryTable() {
             <tr>
                 <td style="font-weight: 700; color: var(--primary);">${s.id}</td>
                 <td>${new Date(s.date).toLocaleString('es-ES')}</td>
+                ${showNegocio ? `<td>${s.storeName || (state.settings && state.settings.storeName) || 'Bigthech'}</td>` : ''}
                 <td style="font-weight: 500;">${s.customerName}</td>
                 <td>${itemsCount} artículos</td>
                 <td class="text-right" style="font-weight: 700;">${state.settings.currency}${s.total.toFixed(2)}</td>
@@ -2518,16 +2606,16 @@ window.viewSaleDetail = function (saleId) {
 
     activeReceiptId = saleId;
 
-    // Hide/show refund button depending on status
+    // Hide/show refund button depending on status and role
     const voidBtn = document.getElementById('receipt-void-btn');
-    if (sale.status === 'voided') {
+    if (sale.status === 'voided' || currentUserRole === 'saas_admin' || currentUserRole === 'superadmin') {
         voidBtn.style.display = 'none';
     } else {
         voidBtn.style.display = 'inline-flex';
     }
 
     const container = document.getElementById('receipt-modal-content');
-    container.innerHTML = renderReceipt(sale, state.settings);
+    container.innerHTML = renderReceipt(sale, sale.storeSettings || state.settings);
 
     openModal('modal-receipt');
 };
@@ -3036,12 +3124,22 @@ function exportSalesCSV() {
 
     // CSV Headers
     let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Folio,Fecha,Cliente,Subtotal,Descuento,Impuestos,Total,Metodo Pago,Estado\r\n";
+    const showNegocio = (currentUserRole === 'saas_admin' || currentUserRole === 'superadmin');
+    if (showNegocio) {
+        csvContent += "Folio,Fecha,Negocio,Cliente,Subtotal,Descuento,Impuestos,Total,Metodo Pago,Estado\r\n";
+    } else {
+        csvContent += "Folio,Fecha,Cliente,Subtotal,Descuento,Impuestos,Total,Metodo Pago,Estado\r\n";
+    }
 
     state.sales.forEach(s => {
         const row = [
             s.id,
-            new Date(s.date).toISOString().replace('T', ' ').slice(0, 19),
+            new Date(s.date).toISOString().replace('T', ' ').slice(0, 19)
+        ];
+        if (showNegocio) {
+            row.push(`"${s.storeName || (state.settings && state.settings.storeName) || 'Bigthech'}"`);
+        }
+        row.push(
             `"${s.customerName}"`,
             s.subtotal.toFixed(2),
             s.discount.toFixed(2),
@@ -3049,7 +3147,7 @@ function exportSalesCSV() {
             s.total.toFixed(2),
             s.paymentMethod,
             s.status
-        ];
+        );
         csvContent += row.join(",") + "\r\n";
     });
 
