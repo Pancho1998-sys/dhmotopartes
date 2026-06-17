@@ -3,7 +3,7 @@
    ========================================================================== */
 
 // App State Definition
-let state = {
+const DEFAULT_STATE = {
     products: [],
     cart: [],
     sales: [],
@@ -24,8 +24,27 @@ let state = {
     }
 };
 
-// Database Key
-const STORAGE_KEY = 'dhmotopartes_db';
+let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+
+// Dynamic Database Key helper
+function getStorageKey() {
+    return myStoreId ? `dhmotopartes_db_${myStoreId}` : 'dhmotopartes_db';
+}
+
+function resetStateToDefault() {
+    state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+    // Clear temporary brand variables to prevent assets leaking between stores
+    tempLogoBase64 = null;
+    tempCardBgImageBase64 = null;
+    tempProductImageBase64 = "";
+    activeCatalogCategory = '';
+    // Reset pagination counters
+    inventoryPage = 1;
+    customersPage = 1;
+    historyPage = 1;
+    cajaPage = 1;
+}
+
 let supabaseSyncActive = false;
 
 // Temporary branding variables
@@ -126,6 +145,7 @@ async function setupAuthentication() {
     if (btnLogout) {
         btnLogout.addEventListener('click', async () => {
             if (supabaseInitialized && supabaseClient) {
+                resetStateToDefault();
                 await supabaseClient.auth.signOut();
                 playScanSound('warning');
             } else {
@@ -318,6 +338,8 @@ async function setupAuthentication() {
             currentUserRole = 'usuario';
             currentUserProfile = null;
             myStoreId = null;
+            resetStateToDefault();
+            renderApp();
 
             if (loginOverlay) {
                 loginOverlay.classList.add('active');
@@ -468,6 +490,7 @@ function syncSettingsInputs() {
 
 // Load DB from Supabase or fallback to LocalStorage/Demo Data
 async function loadDatabase() {
+    resetStateToDefault(); // Clean local memory first to prevent leakage
     const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
     if (supabaseInitialized && session && session.user) {
         try {
@@ -525,17 +548,31 @@ async function loadDatabase() {
     }
 
     updateSidebarStatus(false, "Modo Local");
-    const localData = localStorage.getItem(STORAGE_KEY);
+    const localData = localStorage.getItem(getStorageKey());
     if (localData) {
         try {
             state = JSON.parse(localData);
             if (!state.cashMovements) state.cashMovements = [];
         } catch (e) {
             console.error("Error parsing local database. Using empty data.", e);
-            loadDemoData();
+            if (myStoreId) {
+                state.products = [];
+                state.sales = [];
+                state.customers = [];
+                state.cashMovements = [];
+            } else {
+                loadDemoData();
+            }
         }
     } else {
-        loadDemoData();
+        if (myStoreId) {
+            state.products = [];
+            state.sales = [];
+            state.customers = [];
+            state.cashMovements = [];
+        } else {
+            loadDemoData();
+        }
     }
     syncSettingsInputs();
 }
@@ -622,16 +659,16 @@ async function saveDatabase(retryCount = 0) {
             }
 
             // Si llegamos acá, se guardó bien en la nube. Actualizamos localStorage.
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            localStorage.setItem(getStorageKey(), JSON.stringify(state));
             console.log("Database synchronized to Supabase successfully.");
         } catch (err) {
             console.error("Could not sync to Supabase:", err);
             // Revertir versión si hubo error de red
             if (state.version) state.version -= 1;
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            localStorage.setItem(getStorageKey(), JSON.stringify(state));
         }
     } else {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        localStorage.setItem(getStorageKey(), JSON.stringify(state));
         fetch('/api/db', {
             method: 'POST',
             headers: {
