@@ -45,6 +45,26 @@ function resetStateToDefault() {
     cajaPage = 1;
 }
 
+function ensureStateProperties(loadedState) {
+    if (!loadedState) return JSON.parse(JSON.stringify(DEFAULT_STATE));
+    if (!loadedState.products) loadedState.products = [];
+    if (!loadedState.cart) loadedState.cart = [];
+    if (!loadedState.sales) loadedState.sales = [];
+    if (!loadedState.customers) loadedState.customers = [];
+    if (!loadedState.cashMovements) loadedState.cashMovements = [];
+    if (!loadedState.settings) {
+        loadedState.settings = JSON.parse(JSON.stringify(DEFAULT_STATE.settings));
+    } else {
+        const defaultSettings = DEFAULT_STATE.settings;
+        for (let key in defaultSettings) {
+            if (loadedState.settings[key] === undefined) {
+                loadedState.settings[key] = defaultSettings[key];
+            }
+        }
+    }
+    return loadedState;
+}
+
 let supabaseSyncActive = false;
 
 // Temporary branding variables
@@ -515,8 +535,7 @@ async function loadDatabase() {
                         renderApp();
                     }
                 } else if (data && data.state) {
-                    state = data.state;
-                    if (!state.cashMovements) state.cashMovements = [];
+                    state = ensureStateProperties(data.state);
                     syncSettingsInputs();
                     renderApp();
                 }
@@ -529,8 +548,7 @@ async function loadDatabase() {
                         (payload) => {
                             console.log("Realtime state update received from Supabase");
                             if (payload.new && payload.new.state) {
-                                state = payload.new.state;
-                                if (!state.cashMovements) state.cashMovements = [];
+                                state = ensureStateProperties(payload.new.state);
                                 syncSettingsInputs();
                                 renderApp();
                             }
@@ -551,26 +569,17 @@ async function loadDatabase() {
     const localData = localStorage.getItem(getStorageKey());
     if (localData) {
         try {
-            state = JSON.parse(localData);
-            if (!state.cashMovements) state.cashMovements = [];
+            state = ensureStateProperties(JSON.parse(localData));
         } catch (e) {
             console.error("Error parsing local database. Using empty data.", e);
-            if (myStoreId) {
-                state.products = [];
-                state.sales = [];
-                state.customers = [];
-                state.cashMovements = [];
-            } else {
+            state = ensureStateProperties(null);
+            if (!myStoreId) {
                 loadDemoData();
             }
         }
     } else {
-        if (myStoreId) {
-            state.products = [];
-            state.sales = [];
-            state.customers = [];
-            state.cashMovements = [];
-        } else {
+        state = ensureStateProperties(null);
+        if (!myStoreId) {
             loadDemoData();
         }
     }
@@ -616,7 +625,7 @@ async function saveDatabase(retryCount = 0) {
                     // 1. Obtener estado más reciente de la nube
                     const dbRes = await supabaseClient.from('store_states').select('state').eq('store_id', myStoreId).single();
                     if (dbRes.error) throw dbRes.error;
-                    let dbState = dbRes.data.state || { products: [], sales: [], cashMovements: [], customers: [] };
+                    let dbState = ensureStateProperties(dbRes.data.state);
 
                     // 2. Fusionar los datos locales nuevos en el dbState
                     const dbSaleIds = new Set((dbState.sales || []).map(s => s.id));
