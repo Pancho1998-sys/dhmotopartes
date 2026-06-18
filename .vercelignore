@@ -1,0 +1,18 @@
+# Ignore Python server and scripts from Vercel deployment
+server.py
+requirements.txt
+download_xlsx.py
+stress_test.py
+test_json_eq.py
+inspect_vercel.py
+
+# Ignore local environment and caches
+.venv/
+__pycache__/
+build/
+dist/
+
+# Ignore local database and binaries
+dhmotopartes_db.json
+DHMotopartes-Server.spec
+dhmotopartes.exe

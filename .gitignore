@@ -14,8 +14,6 @@ Thumbs.db
 #Ignore vscode AI rules
 .github\instructions\codacy.instructions.md
 
-# Supabase configuration (contains private credentials/keys)
-supabase-config.js
 
 # PyInstaller build directories
 build/
