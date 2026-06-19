@@ -11,8 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- SheetJS for Excel import/export (local offline file) -->
-    <script src="xlsx.full.min.js"></script>
+    <!-- SheetJS for Excel import/export (loaded dynamically when needed) -->
     <link rel="stylesheet" href="style.css">
     <!-- Dynamic custom styles for SaaS branding -->
     <style id="custom-brand-styles"></style>
@@ -413,6 +412,9 @@
                             <div class="pos-products-wrapper">
                                 <div class="pos-products-grid" id="pos-products-grid">
                                     <!-- Product cards rendered here -->
+                                </div>
+                                <div class="table-footer-pagination" id="pos-pagination" style="margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 12px; display: none;">
+                                    <!-- POS catalog pagination injected dynamically -->
                                 </div>
                             </div>
                         </div>

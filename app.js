@@ -79,6 +79,43 @@ const itemsPerPage = 8;
 let customersPage = 1;
 let historyPage = 1;
 let cajaPage = 1;
+let posPage = 1;
+const posItemsPerPage = 16;
+
+// Debounce utility for input event performance optimization
+function debounce(func, delay = 200) {
+    let timeout;
+    return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func(...args), delay);
+    };
+}
+
+// Dynamic loader for SheetJS (XLSX) to optimize initial page weight
+let xlsxLoadingPromise = null;
+function ensureXLSX() {
+    if (window.XLSX) {
+        return Promise.resolve(window.XLSX);
+    }
+    if (xlsxLoadingPromise) {
+        return xlsxLoadingPromise;
+    }
+    xlsxLoadingPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'xlsx.full.min.js';
+        script.onload = () => {
+            console.log("SheetJS (XLSX) cargado dinámicamente con éxito.");
+            resolve(window.XLSX);
+        };
+        script.onerror = (err) => {
+            xlsxLoadingPromise = null; // permitir reintento
+            console.error("Error al cargar SheetJS (XLSX) dinámicamente:", err);
+            reject(new Error("No se pudo cargar el módulo de Excel. Por favor, reintente."));
+        };
+        document.head.appendChild(script);
+    });
+    return xlsxLoadingPromise;
+}
 
 // Barcode scanner buffer
 let barcodeBuffer = '';
@@ -964,18 +1001,21 @@ function setupEventListeners() {
     // POS Search & Clear Inputs
     const posSearchInput = document.getElementById('pos-search-input');
     const posClearSearch = document.getElementById('pos-clear-search');
+    const debouncedRenderPOSGrid = debounce(renderPOSProductGrid, 150);
     posSearchInput.addEventListener('input', () => {
         if (posSearchInput.value) {
             posClearSearch.style.display = 'block';
         } else {
             posClearSearch.style.display = 'none';
         }
-        renderPOSProductGrid();
+        posPage = 1; // Reset to page 1 on search
+        debouncedRenderPOSGrid();
     });
     posClearSearch.addEventListener('click', () => {
         posSearchInput.value = '';
         posClearSearch.style.display = 'none';
         posSearchInput.focus();
+        posPage = 1; // Reset to page 1
         renderPOSProductGrid();
     });
 
@@ -1053,12 +1093,14 @@ function setupEventListeners() {
     });
 
     document.getElementById('product-form').addEventListener('submit', saveProduct);
-    document.getElementById('inventory-search').addEventListener('input', renderInventoryTable);
+    const debouncedRenderInventoryTable = debounce(renderInventoryTable, 150);
+    document.getElementById('inventory-search').addEventListener('input', debouncedRenderInventoryTable);
     document.getElementById('inventory-filter-category').addEventListener('change', renderInventoryTable);
     document.getElementById('inventory-filter-stock').addEventListener('change', renderInventoryTable);
 
     // Customers View Search
-    document.getElementById('customers-search').addEventListener('input', renderCustomersTable);
+    const debouncedRenderCustomersTable = debounce(renderCustomersTable, 150);
+    document.getElementById('customers-search').addEventListener('input', debouncedRenderCustomersTable);
     document.getElementById('customers-add-btn').addEventListener('click', () => {
         document.getElementById('customer-modal-title').textContent = "Registrar Cliente Nuevo";
         document.getElementById('customer-id-field').value = "";
@@ -1067,7 +1109,8 @@ function setupEventListeners() {
     });
 
     // History View Search & Filters
-    document.getElementById('history-search').addEventListener('input', renderHistoryTable);
+    const debouncedRenderHistoryTable = debounce(renderHistoryTable, 150);
+    document.getElementById('history-search').addEventListener('input', debouncedRenderHistoryTable);
     document.getElementById('history-filter-start').addEventListener('change', renderHistoryTable);
     document.getElementById('history-filter-end').addEventListener('change', renderHistoryTable);
     document.getElementById('history-filter-status').addEventListener('change', renderHistoryTable);
@@ -1097,10 +1140,11 @@ function setupEventListeners() {
     });
 
     document.getElementById('caja-movement-form').addEventListener('submit', saveCajaMovement);
-    document.getElementById('caja-search').addEventListener('input', () => {
+    const debouncedRenderCaja = debounce(() => {
         cajaPage = 1;
         renderCaja();
-    });
+    }, 150);
+    document.getElementById('caja-search').addEventListener('input', debouncedRenderCaja);
     document.getElementById('caja-filter-type').addEventListener('change', () => {
         cajaPage = 1;
         renderCaja();
@@ -1463,9 +1507,14 @@ function processBarcodeScan(code) {
             return;
         }
 
-        // Add to cart!
-        addCartItem(product.id);
+        // Redirect first if needed so handleRoute renders the target view
+        const needsRedirect = window.location.hash !== '#pos';
+        if (needsRedirect) {
+            window.location.hash = '#pos';
+        }
 
+        // Add to cart! If we redirected, handleRoute will render the page/cart, so avoid duplicate render.
+        addCartItem(product.id, !needsRedirect);
         // Flash barcode status indicator in UI
         const badge = document.getElementById('pos-barcode-badge');
         if (badge) {
@@ -1479,12 +1528,7 @@ function processBarcodeScan(code) {
                 badge.style.backgroundColor = '';
             }, 300);
         }
-
-        // Redirect to POS hash if on another view so the user can visually see the cart updating!
-        if (window.location.hash !== '#pos') {
-            window.location.hash = '#pos';
-        }
-
+        
     } else {
         // Not found
         playScanSound('warning');
@@ -1599,12 +1643,23 @@ function initDatetime() {
    General Render Router dispatcher
    ========================================================================== */
 function renderApp() {
-    renderDashboard();
-    renderPOS();
-    renderInventory();
-    renderCustomers();
-    renderHistory();
-    renderCaja();
+    const hash = window.location.hash || '#dashboard';
+    const targetView = hash.replace('#', '');
+    
+    // Only render the currently active view to save performance cycles on old PCs
+    if (targetView === 'dashboard') {
+        renderDashboard();
+    } else if (targetView === 'pos') {
+        renderPOS();
+    } else if (targetView === 'inventario') {
+        renderInventory();
+    } else if (targetView === 'clientes') {
+        renderCustomers();
+    } else if (targetView === 'historial') {
+        renderHistory();
+    } else if (targetView === 'caja') {
+        renderCaja();
+    }
 }
 
 /* ==========================================================================
@@ -2062,6 +2117,7 @@ function renderPOS() {
 
 window.setPOSCategory = function (cat) {
     activePOSCategory = cat;
+    posPage = 1; // Reset to page 1 on category change
     renderPOS();
 };
 
@@ -2077,26 +2133,60 @@ function renderPOSProductGrid() {
         return matchesCategory && matchesSearch;
     });
 
-    if (filtered.length === 0) {
+    // Pagination slice to keep DOM footprint extremely low for old devices
+    const totalItems = filtered.length;
+    const totalPages = Math.ceil(totalItems / posItemsPerPage) || 1;
+    if (posPage > totalPages) posPage = totalPages;
+    
+    const startIdx = (posPage - 1) * posItemsPerPage;
+    const endIdx = startIdx + posItemsPerPage;
+    const pageItems = filtered.slice(startIdx, endIdx);
+
+    const posPagination = document.getElementById('pos-pagination');
+
+    if (pageItems.length === 0) {
         grid.innerHTML = `
             <div class="empty-state-small" style="grid-column: 1 / -1;">
                 <i data-lucide="package-x" style="width: 48px; height: 48px; opacity: 0.3;"></i>
                 <p>No se encontraron repuestos o herramientas.</p>
             </div>
         `;
+        if (posPagination) posPagination.style.display = 'none';
     } else {
         let cardsHtml = '';
-        filtered.forEach(p => {
+        pageItems.forEach(p => {
             cardsHtml += createPOSProductCard(p, state.settings.currency);
         });
         grid.innerHTML = cardsHtml;
+        
+        // Render pagination controls
+        if (posPagination) {
+            if (totalItems <= posItemsPerPage) {
+                posPagination.style.display = 'none';
+            } else {
+                posPagination.style.display = 'flex';
+                posPagination.innerHTML = `
+                    <span>Mostrando registros ${startIdx + 1}-${Math.min(endIdx, totalItems)} de ${totalItems}</span>
+                    <div class="flex-align-center" style="gap: 8px;">
+                        <button class="btn btn-secondary btn-icon-only" onclick="changePOSPage(-1)" ${posPage === 1 ? 'disabled' : ''}><i data-lucide="chevron-left" style="width:14px; height:14px;"></i></button>
+                        <span>Pág. ${posPage} de ${totalPages}</span>
+                        <button class="btn btn-secondary btn-icon-only" onclick="changePOSPage(1)" ${posPage === totalPages ? 'disabled' : ''}><i data-lucide="chevron-right" style="width:14px; height:14px;"></i></button>
+                    </div>
+                `;
+            }
+        }
     }
 
     if (window.lucide) lucide.createIcons();
 }
 
+window.changePOSPage = function(delta) {
+    posPage += delta;
+    renderPOSProductGrid();
+};
+
 // Shopping Cart Actions
-window.addCartItem = function (prodId) {
+window.addCartItem = function(prodId, shouldRender = true) {
     const product = state.products.find(p => p.id === prodId);
     if (!product) return;
 
@@ -2123,7 +2213,9 @@ window.addCartItem = function (prodId) {
     }
 
     playScanSound('success');
-    renderCart();
+    if (shouldRender) {
+        renderCart();
+    }
 };
 
 window.modifyCartItemQty = function (prodId, delta) {
@@ -2964,7 +3056,7 @@ function renderHistoryTable() {
                 <td style="font-weight: 500;">${s.customerName}</td>
                 <td>${itemsCount} artículos</td>
                 <td class="text-right" style="font-weight: 700;">${state.settings.currency}${s.total.toFixed(2)}</td>
-                <td>${getPaymentMethodLabel(s.paymentMethod)}</td>
+                <td>${getPaymentMethodLabel(s.paymentMethod, true)}</td>
                 <td class="text-center">
                     <span class="badge badge-${statusBadge}">${statusText}</span>
                 </td>
@@ -3559,16 +3651,6 @@ function exportSalesCSV() {
     playScanSound('success');
 }
 
-// Utility helper for translation mapping
-function getPaymentMethodLabel(method) {
-    switch (method) {
-        case 'cash': return 'Efectivo';
-        case 'card': return 'Tarjeta';
-        case 'transfer': return 'Transferencia';
-        default: return 'Otro';
-    }
-}
-
 /* ==========================================================================
    7. CAJA (CASH CONTROL) VIEW CONTROLLER
    ========================================================================== */
@@ -3801,10 +3883,17 @@ function findExcelColumnIndex(headers, targets) {
     return -1;
 }
 
-function handleExcelImport(e) {
+async function handleExcelImport(e) {
     const file = e.target.files[0];
     if (!file) return;
-
+    
+    try {
+        await ensureXLSX();
+    } catch (err) {
+        alert(err.message);
+        return;
+    }
+    
     const reader = new FileReader();
     reader.onload = function (evt) {
         try {
@@ -3999,7 +4088,14 @@ function confirmExcelImport() {
     tempExcelProducts = [];
 }
 
-function downloadExcelTemplate() {
+async function downloadExcelTemplate() {
+    try {
+        await ensureXLSX();
+    } catch (err) {
+        alert(err.message);
+        return;
+    }
+
     // Columns
     const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio', 'Stock', 'Stock Minimo'];
 
@@ -4026,12 +4122,19 @@ function downloadExcelTemplate() {
     }
 }
 
-function exportInventoryExcel() {
+async function exportInventoryExcel() {
     if (state.products.length === 0) {
         alert("No hay productos en el inventario para exportar.");
         return;
     }
-
+    
+    try {
+        await ensureXLSX();
+    } catch (err) {
+        alert(err.message);
+        return;
+    }
+    
     // Headers
     const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio', 'Stock', 'Stock Minimo'];
 

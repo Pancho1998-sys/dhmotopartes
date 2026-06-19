@@ -313,11 +313,11 @@ function renderReceipt(sale, settings) {
     `;
 }
 
-function getPaymentMethodLabel(method) {
+function getPaymentMethodLabel(method, short = false) {
     switch (method) {
         case 'cash': return 'Efectivo';
-        case 'card': return 'Tarjeta Crédito/Débito';
-        case 'transfer': return 'Transferencia Bancaria';
+        case 'card': return short ? 'Tarjeta' : 'Tarjeta Crédito/Débito';
+        case 'transfer': return short ? 'Transferencia' : 'Transferencia Bancaria';
         default: return 'Otro';
     }
 }
