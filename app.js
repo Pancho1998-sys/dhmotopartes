@@ -15,7 +15,7 @@ const DEFAULT_STATE = {
         storePhone: "+54 9 11 5555-1234",
         currency: "$",
         storeTax: 15,
-        categories: ['Sistema Eléctrico', 'Repuestos de Motor', 'Frenos', 'Transmisión', 'Herramientas', 'Accesorios'],
+        categories: ['Sistema Eléctrico', 'Repuestos de Motor', 'Frenos', 'Transmisión', 'Herramientas', 'Accesorios', 'Aceites'],
         logo: "",
         cardBgType: "default",
         cardBgColor: "#1f2937",
@@ -61,6 +61,10 @@ function ensureStateProperties(loadedState) {
                 loadedState.settings[key] = defaultSettings[key];
             }
         }
+    }
+    // Ensure 'Aceites' is in the categories list
+    if (loadedState.settings.categories && !loadedState.settings.categories.includes('Aceites')) {
+        loadedState.settings.categories.push('Aceites');
     }
     return loadedState;
 }
@@ -3421,7 +3425,7 @@ function renderCategorySettings() {
     if (!list) return;
 
     if (!state.settings.categories) {
-        state.settings.categories = ['Sistema Eléctrico', 'Repuestos de Motor', 'Frenos', 'Transmisión', 'Herramientas', 'Accesorios'];
+        state.settings.categories = ['Sistema Eléctrico', 'Repuestos de Motor', 'Frenos', 'Transmisión', 'Herramientas', 'Accesorios', 'Aceites'];
     }
 
     let html = '';

@@ -30,30 +30,33 @@ class DHMotopartesRequestHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == '/api/db':
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
-            self.end_headers()
-            
+            db_data = b'{}'
             if os.path.exists(DB_PATH):
                 try:
                     with open(DB_PATH, 'r', encoding='utf-8') as f:
-                        data = f.read()
-                    self.wfile.write(data.encode('utf-8'))
+                        db_data = f.read().encode('utf-8')
                 except Exception as e:
-                    self.wfile.write(b'{}')
-            else:
-                self.wfile.write(b'{}')
-        elif self.path == '/api/info':
+                    pass
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(db_data)))
+            self.send_header('Connection', 'close')
             self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
             self.end_headers()
+            self.wfile.write(db_data)
+        elif self.path == '/api/info':
             is_frozen = getattr(sys, 'frozen', False)
             info = {
                 "frozen": is_frozen
             }
-            self.wfile.write(json.dumps(info).encode('utf-8'))
+            response_bytes = json.dumps(info).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(response_bytes)))
+            self.send_header('Connection', 'close')
+            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
+            self.end_headers()
+            self.wfile.write(response_bytes)
         else:
             # Serve static files normally
             super().do_GET()
@@ -128,11 +131,12 @@ def run():
     print(" Presione Ctrl+C en esta ventana para cerrar el servidor.")
     print("=" * 60)
     
-    # Auto open browser
-    try:
-        webbrowser.open(f"http://localhost:{PORT}")
-    except Exception:
-        pass
+    # Auto open browser (only if interactive)
+    if sys.stdin and sys.stdin.isatty():
+        try:
+            webbrowser.open(f"http://localhost:{PORT}")
+        except Exception:
+            pass
         
     try:
         httpd.serve_forever()
