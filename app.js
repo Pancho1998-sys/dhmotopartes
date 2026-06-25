@@ -8,6 +8,7 @@ const DEFAULT_STATE = {
     cart: [],
     sales: [],
     customers: [],
+    suppliers: [],
     cashMovements: [],
     settings: {
         storeName: "Bigtech",
@@ -41,6 +42,7 @@ function resetStateToDefault() {
     // Reset pagination counters
     inventoryPage = 1;
     customersPage = 1;
+    suppliersPage = 1;
     historyPage = 1;
     cajaPage = 1;
 }
@@ -51,6 +53,7 @@ function ensureStateProperties(loadedState) {
     if (!loadedState.cart) loadedState.cart = [];
     if (!loadedState.sales) loadedState.sales = [];
     if (!loadedState.customers) loadedState.customers = [];
+    if (!loadedState.suppliers) loadedState.suppliers = [];
     if (!loadedState.cashMovements) loadedState.cashMovements = [];
     if (!loadedState.settings) {
         loadedState.settings = JSON.parse(JSON.stringify(DEFAULT_STATE.settings));
@@ -70,17 +73,20 @@ function ensureStateProperties(loadedState) {
 }
 
 let supabaseSyncActive = false;
+let isSyncing = false;
 
 // Temporary branding variables
 let tempLogoBase64 = null;
 let tempCardBgImageBase64 = null;
 let tempProductImageBase64 = "";
 let activeCatalogCategory = '';
+let activeSaasStoreSettings = null;
 
 // Pagination state
 let inventoryPage = 1;
 const itemsPerPage = 8;
 let customersPage = 1;
+let suppliersPage = 1;
 let historyPage = 1;
 let cajaPage = 1;
 let posPage = 1;
@@ -138,18 +144,68 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Listen for custom hash changes
     window.addEventListener('hashchange', handleRoute);
+
+    // Listen for recovery of internet connection
+    window.addEventListener('online', async () => {
+        console.log("Internet connection restored. Attempting to sync offline data...");
+        if (myStoreId && localStorage.getItem('dhmotopartes_needs_sync_' + myStoreId) === 'true' && !isSyncing) {
+            await saveDatabase();
+        }
+    });
+
+    // Check periodically (every 30 seconds) if sync is needed and we are online
+    setInterval(async () => {
+        if (myStoreId && localStorage.getItem('dhmotopartes_needs_sync_' + myStoreId) === 'true' && !isSyncing) {
+            const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
+            if (supabaseInitialized && session && session.user) {
+                console.log("Periodic sync check: Unsynced changes detected. Attempting sync...");
+                await saveDatabase();
+            }
+        }
+    }, 30000);
 });
 
 // Update connection status label on sidebar
-function updateSidebarStatus(online, text) {
+function updateSidebarStatus(status, text) {
     const dot = document.getElementById('store-status-dot');
     const label = document.getElementById('store-status-text');
     if (dot) {
-        dot.className = online ? "status-dot online pulse" : "status-dot offline";
+        if (status === 'online') {
+            dot.className = "status-dot online pulse";
+        } else if (status === 'pending') {
+            dot.className = "status-dot pending pulse";
+        } else {
+            dot.className = "status-dot offline";
+        }
     }
     if (label) {
         label.textContent = text;
     }
+}
+
+function setupSupabaseRealtime() {
+    if (supabaseSyncActive || !myStoreId || !supabaseInitialized) return;
+    
+    supabaseClient.channel('public:store_states')
+        .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'store_states', filter: `store_id=eq.${myStoreId}` },
+            (payload) => {
+                console.log("Realtime state update received from Supabase");
+                if (localStorage.getItem('dhmotopartes_needs_sync_' + myStoreId) !== 'true') {
+                    if (payload.new && payload.new.state) {
+                        state = ensureStateProperties(payload.new.state);
+                        syncSettingsInputs();
+                        renderApp();
+                    }
+                } else {
+                    console.log("Realtime update ignored: local changes are pending sync.");
+                }
+            }
+        )
+        .subscribe();
+
+    supabaseSyncActive = true;
 }
 
 let currentUserRole = 'usuario';
@@ -273,7 +329,7 @@ async function setupAuthentication() {
                 // Fetch profile and check role
                 let { data: profile, error } = await supabaseClient
                     .from('user_profiles')
-                    .select('first_name, last_name, dni, role, store_id')
+                    .select('first_name, last_name, dni, role, store_id, stores (name)')
                     .eq('id', user.id)
                     .single();
 
@@ -282,7 +338,7 @@ async function setupAuthentication() {
                     await new Promise(r => setTimeout(r, 800));
                     const { data: retryProfile } = await supabaseClient
                         .from('user_profiles')
-                        .select('first_name, last_name, dni, role, store_id')
+                        .select('first_name, last_name, dni, role, store_id, stores (name)')
                         .eq('id', user.id)
                         .single();
                     if (!retryProfile) {
@@ -326,7 +382,7 @@ async function setupAuthentication() {
                 }
 
                 // Reset all navigation display to block first
-                const allNavIds = ['nav-dashboard', 'nav-pos', 'nav-inventario', 'nav-clientes', 'nav-historial', 'nav-caja', 'nav-configuracion'];
+                const allNavIds = ['nav-dashboard', 'nav-pos', 'nav-inventario', 'nav-clientes', 'nav-proveedores', 'nav-historial', 'nav-caja', 'nav-configuracion'];
                 allNavIds.forEach(id => {
                     const el = document.getElementById(id);
                     if (el && el.parentElement) el.parentElement.style.display = 'block';
@@ -334,7 +390,7 @@ async function setupAuthentication() {
 
                 // Show/Hide panels based on role
                 if (currentUserRole === 'cajero') {
-                    const navItemsToHide = ['nav-dashboard', 'nav-inventario', 'nav-clientes', 'nav-historial', 'nav-caja', 'nav-configuracion'];
+                    const navItemsToHide = ['nav-dashboard', 'nav-inventario', 'nav-clientes', 'nav-proveedores', 'nav-historial', 'nav-caja', 'nav-configuracion'];
                     navItemsToHide.forEach(id => {
                         const el = document.getElementById(id);
                         if (el && el.parentElement) el.parentElement.style.display = 'none';
@@ -343,7 +399,7 @@ async function setupAuthentication() {
                         window.location.hash = '#pos';
                     }
                 } else if (currentUserRole === 'superadmin' || currentUserRole === 'saas_admin') {
-                    const navItemsToHide = ['nav-pos', 'nav-inventario', 'nav-clientes', 'nav-caja'];
+                    const navItemsToHide = ['nav-pos', 'nav-inventario', 'nav-clientes', 'nav-proveedores', 'nav-caja'];
                     if (currentUserRole === 'saas_admin') {
                         navItemsToHide.push('nav-configuracion');
                     }
@@ -352,7 +408,7 @@ async function setupAuthentication() {
                         if (el && el.parentElement) el.parentElement.style.display = 'none';
                     });
                     const targetView = window.location.hash.replace('#', '');
-                    const forbiddenViewsForAdmins = ['pos', 'inventario', 'clientes', 'caja'];
+                    const forbiddenViewsForAdmins = ['pos', 'inventario', 'clientes', 'proveedores', 'caja'];
                     if (currentUserRole === 'saas_admin') {
                         forbiddenViewsForAdmins.push('configuracion');
                     }
@@ -550,9 +606,42 @@ function syncSettingsInputs() {
 }
 
 // Load DB from Supabase or fallback to LocalStorage/Demo Data
+// Load DB from Supabase or fallback to LocalStorage/Demo Data
 async function loadDatabase() {
     resetStateToDefault(); // Clean local memory first to prevent leakage
     const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
+    
+    // Check if we have unsynced local data that must be pushed first
+    const needsSync = myStoreId && localStorage.getItem('dhmotopartes_needs_sync_' + myStoreId) === 'true';
+    
+    if (needsSync) {
+        console.log("Unsynced local changes detected. Loading from LocalStorage first to prevent data loss.");
+        const localData = localStorage.getItem(getStorageKey());
+        if (localData) {
+            try {
+                state = ensureStateProperties(JSON.parse(localData));
+                syncSettingsInputs();
+                renderApp();
+                
+                // If we are online, attempt to sync now
+                if (supabaseInitialized && session && session.user) {
+                    updateSidebarStatus('pending', "Sincronizando...");
+                    await saveDatabase();
+                } else {
+                    updateSidebarStatus('pending', "Modo Offline (Pendiente)");
+                }
+                
+                // Set up subscription after successful sync
+                if (localStorage.getItem('dhmotopartes_needs_sync_' + myStoreId) !== 'true') {
+                    setupSupabaseRealtime();
+                }
+                return;
+            } catch (e) {
+                console.error("Error parsing local database during offline recovery:", e);
+            }
+        }
+    }
+
     if (supabaseInitialized && session && session.user) {
         try {
             if (!supabaseSyncActive && myStoreId) {
@@ -572,41 +661,34 @@ async function loadDatabase() {
                         state.sales = [];
                         state.customers = [];
                         state.cashMovements = [];
+                        state.suppliers = [];
+                        if (currentUserProfile && currentUserProfile.stores && currentUserProfile.stores.name) {
+                            state.settings.storeName = currentUserProfile.stores.name;
+                        }
                         syncSettingsInputs();
                         renderApp();
                     }
                 } else if (data && data.state) {
                     state = ensureStateProperties(data.state);
+                    if (currentUserProfile && currentUserProfile.stores && currentUserProfile.stores.name) {
+                        if (!state.settings.storeName || state.settings.storeName === "Bigtech") {
+                            state.settings.storeName = currentUserProfile.stores.name;
+                        }
+                    }
                     syncSettingsInputs();
                     renderApp();
                 }
 
-                // Subscribe to real-time updates for this specific store
-                supabaseClient.channel('public:store_states')
-                    .on(
-                        'postgres_changes',
-                        { event: 'UPDATE', schema: 'public', table: 'store_states', filter: `store_id=eq.${myStoreId}` },
-                        (payload) => {
-                            console.log("Realtime state update received from Supabase");
-                            if (payload.new && payload.new.state) {
-                                state = ensureStateProperties(payload.new.state);
-                                syncSettingsInputs();
-                                renderApp();
-                            }
-                        }
-                    )
-                    .subscribe();
-
-                supabaseSyncActive = true;
+                setupSupabaseRealtime();
             }
-            updateSidebarStatus(true, "Conectado Nube");
+            updateSidebarStatus('online', "Conectado Nube");
             return;
         } catch (e) {
             console.error("Error setting up Supabase sync:", e);
         }
     }
 
-    updateSidebarStatus(false, "Modo Local");
+    updateSidebarStatus('offline', "Modo Local");
     const localData = localStorage.getItem(getStorageKey());
     if (localData) {
         try {
@@ -632,11 +714,16 @@ async function saveDatabase(retryCount = 0) {
     if (currentUserRole === 'saas_admin') return;
     if (retryCount > 3) {
         console.error("Demasiadas colisiones de red, abortando guardado.");
+        isSyncing = false;
         return;
     }
 
+    // Save to LocalStorage immediately to guarantee no data loss
+    localStorage.setItem(getStorageKey(), JSON.stringify(state));
+
     const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
     if (supabaseInitialized && session && session.user && myStoreId) {
+        isSyncing = true;
         try {
             let oldVersion = state.version || 0;
             state.version = oldVersion + 1;
@@ -678,16 +765,26 @@ async function saveDatabase(retryCount = 0) {
                     const dbCustIds = new Set((dbState.customers || []).map(c => c.id));
                     const newLocalCust = (state.customers || []).filter(c => !dbCustIds.has(c.id));
 
+                    const dbSuppIds = new Set((dbState.suppliers || []).map(s => s.id));
+                    const newLocalSupp = (state.suppliers || []).filter(s => !dbSuppIds.has(s.id));
+
+                    const dbProdIds = new Set((dbState.products || []).map(p => p.id));
+                    const newLocalProducts = (state.products || []).filter(p => !dbProdIds.has(p.id));
+
                     // Clonamos dbState para que sea nuestro nuevo state base
                     let mergedState = JSON.parse(JSON.stringify(dbState));
                     if (!mergedState.sales) mergedState.sales = [];
                     if (!mergedState.cashMovements) mergedState.cashMovements = [];
                     if (!mergedState.customers) mergedState.customers = [];
+                    if (!mergedState.suppliers) mergedState.suppliers = [];
+                    if (!mergedState.products) mergedState.products = [];
 
                     // Añadimos lo nuestro
                     mergedState.sales.push(...newLocalSales);
                     mergedState.cashMovements.push(...newLocalCash);
                     mergedState.customers.push(...newLocalCust);
+                    mergedState.suppliers.push(...newLocalSupp);
+                    mergedState.products.push(...newLocalProducts);
 
                     // Ajustamos el stock en base a nuestras ventas nuevas que no estaban en la BD
                     for (let sale of newLocalSales) {
@@ -701,23 +798,33 @@ async function saveDatabase(retryCount = 0) {
 
                     // 3. Asumimos el nuevo estado y reintentamos guardar
                     state = mergedState;
+                    localStorage.setItem(getStorageKey(), JSON.stringify(state)); // Guardar estado fusionado en local
                     syncSettingsInputs();
                     renderApp();
                     
+                    isSyncing = false;
                     return saveDatabase(retryCount + 1);
                 }
             }
 
-            // Si llegamos acá, se guardó bien en la nube. Actualizamos localStorage.
+            // Si llegamos acá, se guardó bien en la nube. Actualizamos localStorage y limpiamos bandera de sync.
+            localStorage.removeItem('dhmotopartes_needs_sync_' + myStoreId);
             localStorage.setItem(getStorageKey(), JSON.stringify(state));
+            updateSidebarStatus('online', "Conectado Nube");
             console.log("Database synchronized to Supabase successfully.");
+            setupSupabaseRealtime();
         } catch (err) {
             console.error("Could not sync to Supabase:", err);
             // Revertir versión si hubo error de red
             if (state.version) state.version -= 1;
+            localStorage.setItem('dhmotopartes_needs_sync_' + myStoreId, 'true');
             localStorage.setItem(getStorageKey(), JSON.stringify(state));
+            updateSidebarStatus('pending', "Modo Offline (Pendiente)");
+        } finally {
+            isSyncing = false;
         }
     } else {
+        // En Modo Local sin conexión
         localStorage.setItem(getStorageKey(), JSON.stringify(state));
         fetch('/api/db', {
             method: 'POST',
@@ -828,7 +935,7 @@ function initRouter() {
 
 function handleRoute() {
     const hash = window.location.hash || '#dashboard';
-    const views = ['dashboard', 'pos', 'inventario', 'clientes', 'historial', 'caja', 'configuracion', 'saas', 'catalogo'];
+    const views = ['dashboard', 'pos', 'inventario', 'clientes', 'proveedores', 'historial', 'caja', 'configuracion', 'saas', 'catalogo'];
 
     // Parse target view
     let targetView = hash.replace('#', '');
@@ -852,7 +959,7 @@ function handleRoute() {
     }
 
     // Route protection for superadmin or saas_admin
-    const forbiddenViewsForAdmins = ['pos', 'inventario', 'clientes', 'caja'];
+    const forbiddenViewsForAdmins = ['pos', 'inventario', 'clientes', 'proveedores', 'caja'];
     if (currentUserRole === 'saas_admin') {
         forbiddenViewsForAdmins.push('configuracion');
     }
@@ -895,6 +1002,7 @@ function handleRoute() {
         'pos': 'Punto de Venta (POS)',
         'inventario': 'Control de Inventario',
         'clientes': 'Clientes CRM',
+        'proveedores': 'Gestión de Proveedores',
         'historial': 'Historial de Ventas',
         'caja': 'Control de Caja y Movimientos',
         'configuracion': 'Configuración del Sistema',
@@ -916,6 +1024,8 @@ function handleRoute() {
         renderInventory();
     } else if (targetView === 'clientes') {
         renderCustomers();
+    } else if (targetView === 'proveedores') {
+        renderSuppliers();
     } else if (targetView === 'historial') {
         renderHistory();
     } else if (targetView === 'caja') {
@@ -971,14 +1081,33 @@ function playScanSound(type = 'success') {
    Global Event Listeners Setup
    ========================================================================== */
 function setupEventListeners() {
-    // Mobile Sidebar Toggle
-    document.getElementById('sidebar-toggle-btn').addEventListener('click', () => {
-        document.getElementById('app-sidebar').classList.add('mobile-open');
-    });
+    // Sidebar Toggle (Mobile & Desktop)
+    const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+    if (sidebarToggleBtn) {
+        sidebarToggleBtn.addEventListener('click', () => {
+            const sidebar = document.getElementById('app-sidebar');
+            if (window.innerWidth <= 768) {
+                sidebar.classList.add('mobile-open');
+            } else {
+                sidebar.classList.toggle('collapsed');
+                localStorage.setItem('sidebar-collapsed', sidebar.classList.contains('collapsed'));
+            }
+        });
+    }
 
-    document.getElementById('sidebar-close-btn').addEventListener('click', () => {
-        document.getElementById('app-sidebar').classList.remove('mobile-open');
-    });
+    const sidebarCloseBtn = document.getElementById('sidebar-close-btn');
+    if (sidebarCloseBtn) {
+        sidebarCloseBtn.addEventListener('click', () => {
+            document.getElementById('app-sidebar').classList.remove('mobile-open');
+        });
+    }
+
+    // Apply saved sidebar collapsed state on load (for desktop)
+    const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+    const sidebar = document.getElementById('app-sidebar');
+    if (isCollapsed && window.innerWidth > 768 && sidebar) {
+        sidebar.classList.add('collapsed');
+    }
 
     // Theme Toggle
     document.getElementById('theme-toggle-btn').addEventListener('click', toggleTheme);
@@ -1111,6 +1240,30 @@ function setupEventListeners() {
         document.getElementById('customer-form').reset();
         openModal('modal-customer');
     });
+
+    // Suppliers View Search & Actions
+    const debouncedRenderSuppliersTable = debounce(renderSuppliersTable, 150);
+    const suppSearchInput = document.getElementById('suppliers-search');
+    if (suppSearchInput) {
+        suppSearchInput.addEventListener('input', debouncedRenderSuppliersTable);
+    }
+    const suppAddBtn = document.getElementById('suppliers-add-btn');
+    if (suppAddBtn) {
+        suppAddBtn.addEventListener('click', () => {
+            document.getElementById('supplier-modal-title').textContent = "Registrar Proveedor Nuevo";
+            document.getElementById('supplier-id-field').value = "";
+            document.getElementById('supplier-form').reset();
+            openModal('modal-supplier');
+        });
+    }
+    const suppForm = document.getElementById('supplier-form');
+    if (suppForm) {
+        suppForm.addEventListener('submit', saveSupplier);
+    }
+    const suppPayForm = document.getElementById('supplier-payment-form');
+    if (suppPayForm) {
+        suppPayForm.addEventListener('submit', processSupplierPayment);
+    }
 
     // History View Search & Filters
     const debouncedRenderHistoryTable = debounce(renderHistoryTable, 150);
@@ -1659,6 +1812,8 @@ function renderApp() {
         renderInventory();
     } else if (targetView === 'clientes') {
         renderCustomers();
+    } else if (targetView === 'proveedores') {
+        renderSuppliers();
     } else if (targetView === 'historial') {
         renderHistory();
     } else if (targetView === 'caja') {
@@ -1890,6 +2045,8 @@ async function onSaasStoreSelected(storeId) {
         if (metricsGrid) metricsGrid.style.display = 'none';
         if (chartLayout) chartLayout.style.display = 'none';
         if (emptyState) emptyState.style.display = 'flex';
+        activeSaasStoreSettings = null;
+        applyBrandSettings();
         return;
     }
 
@@ -1920,6 +2077,9 @@ async function onSaasStoreSelected(storeId) {
                 });
             }
         }
+
+        activeSaasStoreSettings = storeState.settings || {};
+        applyBrandSettings();
 
         const sales = Array.isArray(storeState.sales) ? storeState.sales : [];
         const products = Array.isArray(storeState.products) ? storeState.products : [];
@@ -2899,6 +3059,250 @@ window.deleteCustomer = function (id) {
 };
 
 /* ==========================================================================
+   4.5. SUPPLIERS VIEW CONTROLLER
+   ========================================================================== */
+function renderSuppliers() {
+    renderSuppliersTable();
+    updateSuppliersMetrics();
+}
+
+function updateSuppliersMetrics() {
+    const suppliersList = state.suppliers || [];
+    const totalCount = suppliersList.length;
+    
+    let totalDebt = 0;
+    let indebtedCount = 0;
+    
+    suppliersList.forEach(s => {
+        const debtVal = parseFloat(s.debt) || 0;
+        if (debtVal > 0) {
+            totalDebt += debtVal;
+            indebtedCount++;
+        }
+    });
+
+    const countEl = document.getElementById('suppliers-metric-count');
+    const debtEl = document.getElementById('suppliers-metric-total-debt');
+    const indebtedEl = document.getElementById('suppliers-metric-indebted-count');
+
+    if (countEl) countEl.textContent = totalCount;
+    if (debtEl) {
+        const currency = (state.settings && state.settings.currency) || "$";
+        debtEl.textContent = `${currency}${totalDebt.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    if (indebtedEl) indebtedEl.textContent = `${indebtedCount} proveedores con deuda`;
+}
+
+function renderSuppliersTable() {
+    const searchInput = document.getElementById('suppliers-search');
+    const searchVal = searchInput ? searchInput.value.toLowerCase() : '';
+    const tbody = document.getElementById('suppliers-table-body');
+    if (!tbody) return;
+
+    const filtered = (state.suppliers || []).filter(s => {
+        return (s.name || '').toLowerCase().includes(searchVal) ||
+            (s.contactName || '').toLowerCase().includes(searchVal) ||
+            (s.phone && s.phone.includes(searchVal)) ||
+            (s.email && s.email.toLowerCase().includes(searchVal));
+    });
+
+    const totalItems = filtered.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+    if (suppliersPage > totalPages) suppliersPage = totalPages;
+
+    const startIdx = (suppliersPage - 1) * itemsPerPage;
+    const endIdx = startIdx + itemsPerPage;
+    const pageItems = filtered.slice(startIdx, endIdx);
+
+    if (pageItems.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center text-muted" style="padding: 40px;">
+                    No se registran proveedores en el sistema.
+                </td>
+            </tr>
+        `;
+        const pagEl = document.getElementById('suppliers-pagination');
+        if (pagEl) pagEl.innerHTML = '';
+        return;
+    }
+
+    const currency = (state.settings && state.settings.currency) || "$";
+    let rowsHtml = '';
+    pageItems.forEach(s => {
+        const debtVal = parseFloat(s.debt) || 0;
+        const formattedDebt = `${currency}${debtVal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const debtClass = debtVal > 0 ? 'text-danger font-bold' : 'text-muted';
+
+        rowsHtml += `
+            <tr>
+                <td>${s.id}</td>
+                <td style="font-weight: 600;">
+                    ${s.name}
+                    ${s.notes ? `<div style="font-size: 11px; color: var(--text-muted); font-weight: normal; margin-top: 2px;">Nota: ${s.notes}</div>` : ''}
+                </td>
+                <td>${s.contactName || '<span class="text-muted">—</span>'}</td>
+                <td>${s.phone || '<span class="text-muted">—</span>'}</td>
+                <td>${s.email || '<span class="text-muted">—</span>'}</td>
+                <td class="text-right ${debtClass}" style="font-weight: 700;">${formattedDebt}</td>
+                <td class="text-center">
+                    <div class="table-action-btn-group">
+                        <button class="btn btn-emerald btn-outline btn-icon-only" onclick="openSupplierPayment('${s.id}')" title="Registrar Pago"><i data-lucide="hand-coins" style="width:14px; height:14px;"></i></button>
+                        <button class="btn btn-secondary btn-icon-only" onclick="editSupplier('${s.id}')" title="Editar"><i data-lucide="edit-3" style="width:14px; height:14px;"></i></button>
+                        <button class="btn btn-danger btn-outline btn-icon-only" onclick="deleteSupplier('${s.id}')" title="Eliminar"><i data-lucide="trash-2" style="width:14px; height:14px;"></i></button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+    tbody.innerHTML = rowsHtml;
+
+    const pagEl = document.getElementById('suppliers-pagination');
+    if (pagEl) {
+        pagEl.innerHTML = `
+            <span>Mostrando registros ${startIdx + 1}-${Math.min(endIdx, totalItems)} de ${totalItems}</span>
+            <div class="flex-align-center" style="gap: 8px;">
+                <button class="btn btn-secondary btn-icon-only" onclick="changeSuppliersPage(-1)" ${suppliersPage === 1 ? 'disabled' : ''}><i data-lucide="chevron-left" style="width:14px; height:14px;"></i></button>
+                <span>Pág. ${suppliersPage} de ${totalPages}</span>
+                <button class="btn btn-secondary btn-icon-only" onclick="changeSuppliersPage(1)" ${suppliersPage === totalPages ? 'disabled' : ''}><i data-lucide="chevron-right" style="width:14px; height:14px;"></i></button>
+            </div>
+        `;
+    }
+
+    if (window.lucide) lucide.createIcons();
+}
+
+window.changeSuppliersPage = function (delta) {
+    suppliersPage += delta;
+    renderSuppliersTable();
+};
+
+function saveSupplier(e) {
+    e.preventDefault();
+
+    const id = document.getElementById('supplier-id-field').value;
+    const name = document.getElementById('supp-name').value.trim();
+    const contactName = document.getElementById('supp-contact').value.trim();
+    const phone = document.getElementById('supp-phone').value.trim();
+    const email = document.getElementById('supp-email').value.trim();
+    const address = document.getElementById('supp-address').value.trim();
+    const debt = parseFloat(document.getElementById('supp-debt').value) || 0;
+    const notes = document.getElementById('supp-notes').value.trim();
+
+    if (!state.suppliers) state.suppliers = [];
+
+    if (!id) {
+        // Create new
+        state.suppliers.push({
+            id: `s_${Date.now()}`,
+            name,
+            contactName,
+            phone,
+            email,
+            address,
+            debt,
+            notes,
+            dateRegistered: new Date().toISOString().split('T')[0]
+        });
+    } else {
+        // Edit existing
+        const supplier = state.suppliers.find(s => s.id === id);
+        if (supplier) {
+            supplier.name = name;
+            supplier.contactName = contactName;
+            supplier.phone = phone;
+            supplier.email = email;
+            supplier.address = address;
+            supplier.debt = debt;
+            supplier.notes = notes;
+        }
+    }
+
+    saveDatabase();
+    closeModal('modal-supplier');
+    renderSuppliers();
+    playScanSound('success');
+}
+
+window.editSupplier = function (id) {
+    const s = state.suppliers.find(supp => supp.id === id);
+    if (!s) return;
+
+    document.getElementById('supplier-modal-title').textContent = "Editar Proveedor";
+    document.getElementById('supplier-id-field').value = s.id;
+    document.getElementById('supp-name').value = s.name;
+    document.getElementById('supp-contact').value = s.contactName || '';
+    document.getElementById('supp-phone').value = s.phone || '';
+    document.getElementById('supp-email').value = s.email || '';
+    document.getElementById('supp-address').value = s.address || '';
+    document.getElementById('supp-debt').value = s.debt || 0;
+    document.getElementById('supp-notes').value = s.notes || '';
+
+    openModal('modal-supplier');
+};
+
+window.deleteSupplier = function (id) {
+    if (confirm("¿Deseas eliminar a este proveedor de la base de datos?")) {
+        state.suppliers = state.suppliers.filter(s => s.id !== id);
+        saveDatabase();
+        renderSuppliers();
+        playScanSound('fail');
+    }
+};
+
+window.openSupplierPayment = function (id) {
+    const s = state.suppliers.find(supp => supp.id === id);
+    if (!s) return;
+
+    document.getElementById('supp-pay-id-field').value = s.id;
+    document.getElementById('supp-pay-name').textContent = s.name;
+
+    const currency = (state.settings && state.settings.currency) || "$";
+    const debtVal = parseFloat(s.debt) || 0;
+    document.getElementById('supp-pay-current-debt').textContent = `${currency}${debtVal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    document.getElementById('supp-pay-amount').value = "";
+    document.getElementById('supp-pay-amount').max = debtVal;
+    document.getElementById('supp-pay-outflow-check').checked = true;
+
+    openModal('modal-supplier-payment');
+};
+
+window.processSupplierPayment = function (e) {
+    e.preventDefault();
+
+    const id = document.getElementById('supp-pay-id-field').value;
+    const amount = parseFloat(document.getElementById('supp-pay-amount').value) || 0;
+    const logOutflow = document.getElementById('supp-pay-outflow-check').checked;
+
+    if (amount <= 0) return;
+
+    const supplier = state.suppliers.find(s => s.id === id);
+    if (!supplier) return;
+
+    const previousDebt = parseFloat(supplier.debt) || 0;
+    supplier.debt = Math.max(0, previousDebt - amount);
+
+    // Register as cash outflow if selected
+    if (logOutflow) {
+        if (!state.cashMovements) state.cashMovements = [];
+        state.cashMovements.push({
+            id: `cm_${Date.now()}`,
+            date: new Date().toISOString(),
+            type: "outflow",
+            amount: amount,
+            concept: `Pago a Proveedor: ${supplier.name}`,
+            notes: `Abono de deuda. Saldo anterior: $${previousDebt.toFixed(2)}. Saldo restante: $${supplier.debt.toFixed(2)}.`
+        });
+    }
+
+    saveDatabase();
+    closeModal('modal-supplier-payment');
+    renderSuppliers();
+    playScanSound('success');
+};
+
+/* ==========================================================================
    5. SALES HISTORY VIEW CONTROLLER
    ========================================================================== */
 let activeReceiptId = '';
@@ -3210,7 +3614,11 @@ function applyBrandSettings() {
 
     let storeName = state.settings.storeName || "Bigtech";
     if (currentUserRole === 'saas_admin') {
-        storeName = "Bigtech";
+        if (activeSaasStoreSettings) {
+            storeName = activeSaasStoreSettings.storeName || "Bigtech";
+        } else {
+            storeName = "Bigtech";
+        }
     }
 
     // Update page title
@@ -3220,6 +3628,10 @@ function applyBrandSettings() {
     const storeNameSidebar = document.getElementById('store-name-sidebar');
     if (storeNameSidebar) {
         storeNameSidebar.textContent = storeName;
+    }
+    const headerStoreName = document.getElementById('header-store-name');
+    if (headerStoreName) {
+        headerStoreName.textContent = storeName;
     }
 
     const logoTitleSidebar = document.getElementById('logo-title-sidebar');
@@ -3297,7 +3709,7 @@ function applyBrandSettings() {
     }
 
     // Logo handling
-    const logoUrl = state.settings.logo;
+    const logoUrl = (currentUserRole === 'saas_admin' && activeSaasStoreSettings) ? (activeSaasStoreSettings.logo || "") : state.settings.logo;
     const sidebarLogoIcon = document.getElementById('logo-icon-container');
     const sidebarLogoDefault = document.getElementById('logo-icon-default');
     const sidebarLogoImg = document.getElementById('logo-icon-img');
@@ -3309,6 +3721,9 @@ function applyBrandSettings() {
     const catalogLogoIcon = document.getElementById('catalog-logo-container');
     const catalogLogoDefault = document.getElementById('catalog-logo-default');
     const catalogLogoImg = document.getElementById('catalog-logo-img');
+
+    const headerLogoDefault = document.getElementById('header-store-icon-default');
+    const headerLogoImg = document.getElementById('header-store-logo-img');
 
     if (logoUrl) {
         // Display custom logo image
@@ -3332,6 +3747,12 @@ function applyBrandSettings() {
             catalogLogoImg.src = logoUrl;
             catalogLogoImg.style.display = 'block';
         }
+
+        if (headerLogoDefault) headerLogoDefault.style.display = 'none';
+        if (headerLogoImg) {
+            headerLogoImg.src = logoUrl;
+            headerLogoImg.style.display = 'block';
+        }
     } else {
         // Default wrench icon
         if (sidebarLogoIcon) sidebarLogoIcon.classList.remove('has-custom-logo');
@@ -3345,6 +3766,9 @@ function applyBrandSettings() {
         if (catalogLogoIcon) catalogLogoIcon.classList.remove('has-custom-logo');
         if (catalogLogoDefault) catalogLogoDefault.style.display = 'block';
         if (catalogLogoImg) catalogLogoImg.style.display = 'none';
+
+        if (headerLogoDefault) headerLogoDefault.style.display = 'block';
+        if (headerLogoImg) headerLogoImg.style.display = 'none';
     }
 
     // Card custom styles logic
