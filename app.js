@@ -608,6 +608,10 @@ function syncSettingsInputs() {
 // Load DB from Supabase or fallback to LocalStorage/Demo Data
 // Load DB from Supabase or fallback to LocalStorage/Demo Data
 async function loadDatabase() {
+    if (supabaseSyncActive && myStoreId) {
+        console.log("Database already loaded and synced with Supabase. Skipping reload.");
+        return;
+    }
     resetStateToDefault(); // Clean local memory first to prevent leakage
     const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
     
