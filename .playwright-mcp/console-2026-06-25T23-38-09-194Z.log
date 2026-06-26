@@ -1,0 +1,206 @@
+[    1030ms] [LOG] Supabase inicializado con éxito. @ http://localhost:8000/supabase-config.js:13
+[    1122ms] [LOG] Facturador electrónico inicializado: ARCAFacturadorAPI @ http://localhost:8000/fiscal.js:124
+[    1136ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8000/index.html:0
+[    1136ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8000/index.html:0
+[    1441ms] [ERROR] Failed to load resource: net::ERR_EMPTY_RESPONSE @ http://localhost:8000/api/info:0
+[    1441ms] [WARNING] No se pudo conectar al servidor de control de entorno. Asumiendo desarrollo. TypeError: Failed to fetch
+    at setupAuthentication (http://localhost:8000/app.js:252:31)
+    at HTMLDocument.<anonymous> (http://localhost:8000/app.js:139:11) @ http://localhost:8000/app.js:258
+[    1468ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[    1497ms] [LOG] Usuario desautenticado. @ http://localhost:8000/app.js:454
+[    1512ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[    1526ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[    1571ms] [ERROR] Failed to load resource: net::ERR_EMPTY_RESPONSE @ http://localhost:8000/favicon.ico:0
+[    1694ms] [ERROR] Failed to load resource: net::ERR_EMPTY_RESPONSE @ http://localhost:8000/favicon.ico:0
+[   74226ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[   75325ms] [LOG] Usuario autenticado en Supabase: dhmotopartes@gmail.com @ http://localhost:8000/app.js:326
+[   76130ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[   76160ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[   76390ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[   77007ms] [ERROR] Failed to load resource: net::ERR_EMPTY_RESPONSE @ http://localhost:8000/favicon.ico:0
+[  126635ms] [ERROR] Failed to load resource: net::ERR_EMPTY_RESPONSE @ http://localhost:8000/favicon.ico:0
+[  278745ms] [LOG] OVERRIDDEN ALERT: ¡Configuración fiscal guardada con éxito! @ :0
+[  313231ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[  313243ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[  313626ms] [ERROR] Failed to load resource: net::ERR_EMPTY_RESPONSE @ http://localhost:8000/favicon.ico:0
+[  531597ms] [ERROR] Access to fetch at 'https://wkgxssfbzgahkztdjzmo.supabase.co/functions/v1/arca-wsfe/emitir' from origin 'http://localhost:8000' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: It does not have HTTP ok status. @ http://localhost:8000/index.html#pos:0
+[  531597ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://wkgxssfbzgahkztdjzmo.supabase.co/functions/v1/arca-wsfe/emitir:0
+[  531597ms] [ERROR] Error al emitir factura electrónica: TypeError: Failed to fetch
+    at ARCAFacturadorAPI.emitirComprobante (http://localhost:8000/fiscal.js:94:31)
+    at HTMLButtonElement.processCheckout (http://localhost:8000/app.js:2720:45) @ http://localhost:8000/fiscal.js:104
+[  531598ms] [ERROR] Facturación electrónica fallida: Error: Failed to fetch
+    at HTMLButtonElement.processCheckout (http://localhost:8000/app.js:2727:23) @ http://localhost:8000/app.js:2729
+[  531598ms] [LOG] OVERRIDDEN ALERT: ⚠️ La venta se registró con éxito, pero la facturación electrónica falló:
+Failed to fetch
+
+Puede reintentar la facturación desde el Historial de Ventas. @ :0
+[  531609ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[  531622ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[  531635ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[  531995ms] [LOG] Database synchronized to Supabase successfully. @ http://localhost:8000/app.js:850
+[  532439ms] [LOG] Realtime state update received from Supabase @ http://localhost:8000/app.js:194
+[  532453ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[  532471ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[  532482ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[ 3572517ms] [LOG] Usuario autenticado en Supabase: dhmotopartes@gmail.com @ http://localhost:8000/app.js:326
+[ 3573136ms] [LOG] Database already loaded and synced with Supabase. Skipping reload. @ http://localhost:8000/app.js:643
+[ 7052365ms] [LOG] Usuario autenticado en Supabase: dhmotopartes@gmail.com @ http://localhost:8000/app.js:326
+[ 7052934ms] [LOG] Database already loaded and synced with Supabase. Skipping reload. @ http://localhost:8000/app.js:643
+[16082429ms] [ERROR] WebSocket connection to 'wss://wkgxssfbzgahkztdjzmo.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrZ3hzc2ZiemdhaGt6dGRqem1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0NzI4MjcsImV4cCI6MjA5NjA0ODgyN30.BNlE6dOMlbMlERR7ri4c4QIKqVXCJPHcZviTNunku44&vsn=2.0.0' failed: WebSocket opening handshake timed out @ https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:6
+[16082689ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://wkgxssfbzgahkztdjzmo.supabase.co/auth/v1/token?grant_type=refresh_token:0
+[16082689ms] [ERROR] TypeError: Failed to fetch
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:106655
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:111638
+    at Nr (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:111806)
+    at s (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:170109)
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:169871
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:169948
+    at new Promise (<anonymous>)
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:169802
+    at vs._refreshAccessToken (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:169953)
+    at vs._callRefreshToken (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:173027) @ https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:6
+[16085142ms] [ERROR] WebSocket connection to 'wss://wkgxssfbzgahkztdjzmo.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrZ3hzc2ZiemdhaGt6dGRqem1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0NzI4MjcsImV4cCI6MjA5NjA0ODgyN30.BNlE6dOMlbMlERR7ri4c4QIKqVXCJPHcZviTNunku44&vsn=2.0.0' failed: Error in connection establishment: net::ERR_NAME_NOT_RESOLVED @ https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:6
+[16085143ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://wkgxssfbzgahkztdjzmo.supabase.co/auth/v1/token?grant_type=refresh_token:0
+[16085143ms] [ERROR] TypeError: Failed to fetch
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:106655
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:111638
+    at Nr (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:111806)
+    at s (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:170109)
+    at async https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:169865 @ https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:6
+[16085560ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://wkgxssfbzgahkztdjzmo.supabase.co/auth/v1/token?grant_type=refresh_token:0
+[16085560ms] [ERROR] TypeError: Failed to fetch
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:106655
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:111638
+    at Nr (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:111806)
+    at s (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:170109)
+    at async https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:169865 @ https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:6
+[16086381ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://wkgxssfbzgahkztdjzmo.supabase.co/auth/v1/token?grant_type=refresh_token:0
+[16086381ms] [ERROR] TypeError: Failed to fetch
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:106655
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:111638
+    at Nr (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:111806)
+    at s (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:170109)
+    at async https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:169865 @ https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:6
+[30481774ms] [ERROR] WebSocket connection to 'wss://wkgxssfbzgahkztdjzmo.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrZ3hzc2ZiemdhaGt6dGRqem1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0NzI4MjcsImV4cCI6MjA5NjA0ODgyN30.BNlE6dOMlbMlERR7ri4c4QIKqVXCJPHcZviTNunku44&vsn=2.0.0' failed: Error in connection establishment: net::ERR_NAME_NOT_RESOLVED @ https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:6
+[30487511ms] [ERROR] Failed to load resource: net::ERR_NETWORK_CHANGED @ https://wkgxssfbzgahkztdjzmo.supabase.co/auth/v1/token?grant_type=refresh_token:0
+[30487511ms] [ERROR] TypeError: Failed to fetch
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:106655
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:111638
+    at Nr (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:111806)
+    at s (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:170109)
+    at async https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:169865 @ https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:6
+[49750996ms] [ERROR] WebSocket connection to 'wss://wkgxssfbzgahkztdjzmo.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrZ3hzc2ZiemdhaGt6dGRqem1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0NzI4MjcsImV4cCI6MjA5NjA0ODgyN30.BNlE6dOMlbMlERR7ri4c4QIKqVXCJPHcZviTNunku44&vsn=2.0.0' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED @ https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:6
+[49751026ms] [ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ https://wkgxssfbzgahkztdjzmo.supabase.co/auth/v1/token?grant_type=refresh_token:0
+[49751026ms] [ERROR] TypeError: Failed to fetch
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:106655
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:111638
+    at Nr (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:111806)
+    at s (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:170109)
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:169871
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:169948
+    at new Promise (<anonymous>)
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:169802
+    at vs._refreshAccessToken (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:169953)
+    at vs._callRefreshToken (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:173027) @ https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:6
+[49751314ms] [ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ https://wkgxssfbzgahkztdjzmo.supabase.co/auth/v1/token?grant_type=refresh_token:0
+[49751315ms] [ERROR] TypeError: Failed to fetch
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:106655
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:111638
+    at Nr (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:111806)
+    at s (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:170109)
+    at async https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:169865 @ https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:6
+[49751732ms] [ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ https://wkgxssfbzgahkztdjzmo.supabase.co/auth/v1/token?grant_type=refresh_token:0
+[49751732ms] [ERROR] TypeError: Failed to fetch
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:106655
+    at https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:111638
+    at Nr (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:111806)
+    at s (https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:170109)
+    at async https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:7:169865 @ https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2:6
+[49754506ms] [LOG] Internet connection restored. Attempting to sync offline data... @ http://localhost:8000/app.js:150
+[49755845ms] [LOG] Usuario autenticado en Supabase: dhmotopartes@gmail.com @ http://localhost:8000/app.js:326
+[49756625ms] [LOG] Database already loaded and synced with Supabase. Skipping reload. @ http://localhost:8000/app.js:643
+[49774246ms] [LOG] Database synchronized to Supabase successfully. @ http://localhost:8000/app.js:850
+[49774504ms] [LOG] Realtime state update received from Supabase @ http://localhost:8000/app.js:194
+[49774529ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[49774558ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[49774585ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[49997661ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[49997676ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[49997688ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[49999133ms] [LOG] Database synchronized to Supabase successfully. @ http://localhost:8000/app.js:850
+[49999230ms] [LOG] Realtime state update received from Supabase @ http://localhost:8000/app.js:194
+[49999240ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[49999255ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[49999265ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50178690ms] [LOG] Database synchronized to Supabase successfully. @ http://localhost:8000/app.js:850
+[50179044ms] [LOG] Realtime state update received from Supabase @ http://localhost:8000/app.js:194
+[50179055ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50179069ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50179079ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50257326ms] [ERROR] Access to fetch at 'https://wkgxssfbzgahkztdjzmo.supabase.co/functions/v1/arca-wsfe/emitir' from origin 'http://localhost:8000' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: It does not have HTTP ok status. @ http://localhost:8000/index.html#pos:0
+[50257327ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://wkgxssfbzgahkztdjzmo.supabase.co/functions/v1/arca-wsfe/emitir:0
+[50257327ms] [ERROR] Error al emitir factura electrónica: TypeError: Failed to fetch
+    at ARCAFacturadorAPI.emitirComprobante (http://localhost:8000/fiscal.js:94:31)
+    at HTMLButtonElement.processCheckout (http://localhost:8000/app.js:2720:45) @ http://localhost:8000/fiscal.js:104
+[50257327ms] [ERROR] Facturación electrónica fallida: Error: Failed to fetch
+    at HTMLButtonElement.processCheckout (http://localhost:8000/app.js:2727:23) @ http://localhost:8000/app.js:2729
+[50257328ms] [LOG] OVERRIDDEN ALERT: ⚠️ La venta se registró con éxito, pero la facturación electrónica falló:
+Failed to fetch
+
+Puede reintentar la facturación desde el Historial de Ventas. @ :0
+[50257341ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50257362ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50257373ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50257640ms] [LOG] Database synchronized to Supabase successfully. @ http://localhost:8000/app.js:850
+[50257671ms] [LOG] Realtime state update received from Supabase @ http://localhost:8000/app.js:194
+[50257680ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50257694ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50257703ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50386937ms] [LOG] Facturador electrónico inicializado: ARCAFacturadorAPI @ http://localhost:8000/fiscal.js:124
+[50476670ms] [LOG] Database synchronized to Supabase successfully. @ http://localhost:8000/app.js:850
+[50476757ms] [LOG] Realtime state update received from Supabase @ http://localhost:8000/app.js:194
+[50476767ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50476779ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50476789ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50560059ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50560071ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50560081ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50560403ms] [LOG] Database synchronized to Supabase successfully. @ http://localhost:8000/app.js:850
+[50560470ms] [LOG] Realtime state update received from Supabase @ http://localhost:8000/app.js:194
+[50560478ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50560491ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50560500ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50659174ms] [LOG] Database synchronized to Supabase successfully. @ http://localhost:8000/app.js:850
+[50659563ms] [LOG] Realtime state update received from Supabase @ http://localhost:8000/app.js:194
+[50659573ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50659587ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50659597ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50809556ms] [ERROR] Facturación electrónica fallida: Error: Failed to fetch (Edge Function simulated offline)
+    at facturador.emitirComprobante (eval at <anonymous> (eval at evaluate (:303:30)), <anonymous>:1:80)
+    at HTMLButtonElement.processCheckout (http://localhost:8000/app.js:2720:45) @ http://localhost:8000/app.js:2729
+[50809557ms] [LOG] OVERRIDDEN ALERT: ⚠️ La venta se registró con éxito, pero la facturación electrónica falló:
+Failed to fetch (Edge Function simulated offline)
+
+Puede reintentar la facturación desde el Historial de Ventas. @ :0
+[50809570ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50809585ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50809601ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50809920ms] [LOG] Database synchronized to Supabase successfully. @ http://localhost:8000/app.js:850
+[50810098ms] [LOG] Realtime state update received from Supabase @ http://localhost:8000/app.js:194
+[50810108ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50810121ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50810130ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50948987ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[50949337ms] [ERROR] Failed to load resource: net::ERR_EMPTY_RESPONSE @ http://localhost:8000/favicon.ico:0
+[51148289ms] [LOG] OVERRIDDEN CONFIRM: ¿Deseas reintentar la facturación electrónica de la venta V-497666? @ :0
+[51149616ms] [LOG] Database synchronized to Supabase successfully. @ http://localhost:8000/app.js:850
+[51149617ms] [LOG] OVERRIDDEN ALERT: ¡Facturación electrónica emitida con éxito!
+CAE: 36695272638057 @ :0
+[51149629ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[51149884ms] [LOG] Realtime state update received from Supabase @ http://localhost:8000/app.js:194
+[51149894ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[51149907ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[51473062ms] [LOG] Realtime state update received from Supabase @ http://localhost:8000/app.js:194
+[51473072ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[51473083ms] [WARNING] <i data-lucide="instagram"></i> icon name was not found in the provided icons object. @ https://unpkg.com/lucide@latest:7
+[51473092ms] [LOG] Database synchronized to Supabase successfully. @ http://localhost:8000/app.js:850

@@ -135,6 +135,7 @@ let lastKeyTime = 0;
    Initialization & Authentication
    ========================================================================== */
 document.addEventListener('DOMContentLoaded', async () => {
+    initFacturador();
     await setupAuthentication();
     initRouter();
     initDatetime();
@@ -605,6 +606,37 @@ function syncSettingsInputs() {
     }
 }
 
+// Sync fiscal settings inputs with loaded fiscal config
+async function syncFiscalSettingsInputs() {
+    try {
+        const config = await loadFiscalConfig();
+        const cuitEl = document.getElementById('set-fiscal-cuit');
+        const posEl = document.getElementById('set-fiscal-pos');
+        const ivaEl = document.getElementById('set-fiscal-iva');
+        const envEl = document.getElementById('set-fiscal-env');
+        const certEl = document.getElementById('set-fiscal-cert');
+        const keyEl = document.getElementById('set-fiscal-key');
+
+        if (config) {
+            if (cuitEl) cuitEl.value = config.cuit || "";
+            if (posEl) posEl.value = config.pos_number || 1;
+            if (ivaEl) ivaEl.value = config.iva_condition || "";
+            if (envEl) envEl.value = config.environment || "homologacion";
+            if (certEl) certEl.value = config.certificate_text || "";
+            if (keyEl) keyEl.value = config.private_key_text || "";
+        } else {
+            if (cuitEl) cuitEl.value = "";
+            if (posEl) posEl.value = 1;
+            if (ivaEl) ivaEl.value = "";
+            if (envEl) envEl.value = "homologacion";
+            if (certEl) certEl.value = "";
+            if (keyEl) keyEl.value = "";
+        }
+    } catch (e) {
+        console.error("Error al sincronizar inputs fiscales:", e);
+    }
+}
+
 // Load DB from Supabase or fallback to LocalStorage/Demo Data
 // Load DB from Supabase or fallback to LocalStorage/Demo Data
 async function loadDatabase() {
@@ -711,6 +743,7 @@ async function loadDatabase() {
         }
     }
     syncSettingsInputs();
+    syncFiscalSettingsInputs();
 }
 
 // Save DB state to LocalStorage and background push to Supabase
@@ -982,6 +1015,7 @@ function handleRoute() {
                 backupPanel.style.display = ''; // Restore default
             }
         }
+        syncFiscalSettingsInputs();
     }
 
     // Toggle active link in sidebar
@@ -1284,6 +1318,36 @@ function setupEventListeners() {
 
     // Settings Store Form
     document.getElementById('settings-store-form').addEventListener('submit', saveSettings);
+
+    // Settings Fiscal Form (ARCA)
+    const settingsFiscalForm = document.getElementById('settings-fiscal-form');
+    if (settingsFiscalForm) {
+        settingsFiscalForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const cuit = document.getElementById('set-fiscal-cuit').value;
+            const pos = document.getElementById('set-fiscal-pos').value;
+            const iva = document.getElementById('set-fiscal-iva').value;
+            const env = document.getElementById('set-fiscal-env').value;
+            const cert = document.getElementById('set-fiscal-cert').value;
+            const key = document.getElementById('set-fiscal-key').value;
+            
+            try {
+                const saveBtn = settingsFiscalForm.querySelector('button[type="submit"]');
+                const originalHtml = saveBtn.innerHTML;
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '⌛ Guardando...';
+                
+                await saveFiscalConfig(cuit, pos, iva, env, cert, key);
+                
+                alert("¡Configuración fiscal guardada con éxito!");
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalHtml;
+            } catch (err) {
+                alert("Error al guardar la configuración fiscal: " + err.message);
+                console.error(err);
+            }
+        });
+    }
 
     // Cash Movement Listeners
     document.getElementById('caja-add-inflow-btn').addEventListener('click', () => {
@@ -2571,7 +2635,7 @@ function calculateChange() {
 }
 
 // Process Checkout & deduct inventory stocks
-function processCheckout() {
+async function processCheckout() {
     const selectedCustomerId = document.getElementById('cart-customer-select').value;
     let customerName = "Consumidor Final";
     let customer = null;
@@ -2634,6 +2698,44 @@ function processCheckout() {
         changeReturned: Math.max(0, change),
         status: "completed"
     };
+
+    // Check if electronic invoice is requested
+    const emitInvoiceCheckbox = document.getElementById('checkout-emit-invoice');
+    const shouldEmitInvoice = emitInvoiceCheckbox ? emitInvoiceCheckbox.checked : false;
+
+    saleRecord.estado_fiscal = "no_requerido";
+
+    if (shouldEmitInvoice) {
+        const confirmBtn = document.getElementById('checkout-confirm-btn');
+        const originalBtnHtml = confirmBtn.innerHTML;
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '⌛ Autorizando ARCA...';
+
+        try {
+            const fiscalConfig = await loadFiscalConfig();
+            if (!fiscalConfig || !fiscalConfig.cuit) {
+                throw new Error("No hay configuración fiscal cargada para esta tienda. Configúrala en Ajustes.");
+            }
+
+            const result = await facturador.emitirComprobante(saleRecord, fiscalConfig);
+            if (result.success) {
+                saleRecord.estado_fiscal = "emitido";
+                saleRecord.nro_comprobante = result.nroComprobante;
+                saleRecord.cae = result.cae;
+                saleRecord.cae_vto = result.caeFchVto;
+            } else {
+                throw new Error(result.error || "Error desconocido al autorizar CAE.");
+            }
+        } catch (err) {
+            console.error("Facturación electrónica fallida:", err);
+            saleRecord.estado_fiscal = "pendiente";
+            saleRecord.error_fiscal = err.message;
+            alert("⚠️ La venta se registró con éxito, pero la facturación electrónica falló:\n" + err.message + "\n\nPuede reintentar la facturación desde el Historial de Ventas.");
+        } finally {
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = originalBtnHtml;
+        }
+    }
 
     state.sales.push(saleRecord);
 
@@ -3460,6 +3562,24 @@ function renderHistoryTable() {
             statusText = 'Anulada';
         }
 
+        let fiscalBadgeHtml = '';
+        if (s.estado_fiscal === 'emitido') {
+            fiscalBadgeHtml = `
+                <div style="font-size: 11px; margin-top: 5px; color: var(--success); font-weight: 600;">
+                    📄 Factura: ${s.nro_comprobante}
+                </div>
+            `;
+        } else if (s.estado_fiscal === 'pendiente') {
+            fiscalBadgeHtml = `
+                <div style="font-size: 11px; margin-top: 5px; color: var(--warning); display: flex; align-items: center; justify-content: center; gap: 4px; font-weight: 600;">
+                    <span>⚠️ Pendiente</span>
+                    <button class="btn btn-secondary btn-icon-only" style="padding: 1px 3px; font-size: 9px; height: auto; width: auto; min-width: 0;" onclick="event.stopPropagation(); retryInvoicing('${s.id}')" title="Reintentar Facturar">
+                        <i data-lucide="refresh-cw" style="width: 10px; height: 10px;"></i>
+                    </button>
+                </div>
+            `;
+        }
+
         rowsHtml += `
             <tr>
                 <td style="font-weight: 700; color: var(--primary);">${s.id}</td>
@@ -3471,6 +3591,7 @@ function renderHistoryTable() {
                 <td>${getPaymentMethodLabel(s.paymentMethod, true)}</td>
                 <td class="text-center">
                     <span class="badge badge-${statusBadge}">${statusText}</span>
+                    ${fiscalBadgeHtml}
                 </td>
                 <td class="text-center">
                     <button class="btn btn-secondary" onclick="viewSaleDetail('${s.id}')">
@@ -3497,6 +3618,50 @@ function renderHistoryTable() {
 window.changeHistoryPage = function (delta) {
     historyPage += delta;
     renderHistoryTable();
+};
+
+window.retryInvoicing = async function (saleId) {
+    const sale = state.sales.find(s => s.id === saleId);
+    if (!sale) return;
+    
+    if (sale.estado_fiscal !== 'pendiente') {
+        alert("Esta venta no tiene una facturación pendiente.");
+        return;
+    }
+
+    const confirmRetry = confirm(`¿Deseas reintentar la facturación electrónica de la venta ${saleId}?`);
+    if (!confirmRetry) return;
+
+    try {
+        const fiscalConfig = await loadFiscalConfig();
+        if (!fiscalConfig || !fiscalConfig.cuit) {
+            throw new Error("No hay configuración fiscal cargada para esta tienda. Por favor confígurala en Ajustes.");
+        }
+
+        const result = await facturador.emitirComprobante(sale, fiscalConfig);
+        if (result.success) {
+            sale.estado_fiscal = "emitido";
+            sale.nro_comprobante = result.nroComprobante;
+            sale.cae = result.cae;
+            sale.cae_vto = result.caeFchVto;
+            delete sale.error_fiscal;
+            
+            await saveDatabase();
+            alert("¡Facturación electrónica emitida con éxito!\nCAE: " + result.cae);
+            
+            renderHistory();
+            if (activeReceiptId === saleId) {
+                viewSaleDetail(saleId);
+            }
+        } else {
+            throw new Error(result.error || "Error desconocido.");
+        }
+    } catch (err) {
+        alert("Error al reintentar facturación: " + err.message);
+        sale.error_fiscal = err.message;
+        await saveDatabase();
+        renderHistory();
+    }
 };
 
 window.viewSaleDetail = function (saleId) {
