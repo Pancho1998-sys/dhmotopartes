@@ -1,0 +1,637 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e5]:
+        - img [ref=e348]
+        - generic [ref=e8]:
+          - generic [ref=e9]: DH Motopartes
+          - generic [ref=e10]: Catálogo Digital
+      - navigation [ref=e11]:
+        - list [ref=e12]:
+          - listitem [ref=e13]:
+            - link "Panel Control" [ref=e14] [cursor=pointer]:
+              - /url: "#dashboard"
+              - img [ref=e350]
+              - generic [ref=e16]: Panel Control
+          - listitem [ref=e17]:
+            - link "Vender (POS)" [ref=e18] [cursor=pointer]:
+              - /url: "#pos"
+              - img [ref=e355]
+              - generic [ref=e20]: Vender (POS)
+          - listitem [ref=e21]:
+            - link "Inventario" [ref=e22] [cursor=pointer]:
+              - /url: "#inventario"
+              - img [ref=e359]
+              - generic [ref=e24]: Inventario
+          - listitem [ref=e25]:
+            - link "Clientes CRM" [ref=e26] [cursor=pointer]:
+              - /url: "#clientes"
+              - img [ref=e363]
+              - generic [ref=e28]: Clientes CRM
+          - listitem [ref=e29]:
+            - link "Proveedores" [ref=e30] [cursor=pointer]:
+              - /url: "#proveedores"
+              - img [ref=e368]
+              - generic [ref=e32]: Proveedores
+          - listitem [ref=e33]:
+            - link "Historial Ventas" [ref=e34] [cursor=pointer]:
+              - /url: "#historial"
+              - img [ref=e373]
+              - generic [ref=e36]: Historial Ventas
+          - listitem [ref=e37]:
+            - link "Caja y Movimientos" [ref=e38] [cursor=pointer]:
+              - /url: "#caja"
+              - img [ref=e377]
+              - generic [ref=e40]: Caja y Movimientos
+          - listitem [ref=e41]:
+            - link "Configuración" [ref=e42] [cursor=pointer]:
+              - /url: "#configuracion"
+              - img [ref=e380]
+              - generic [ref=e44]: Configuración
+      - generic [ref=e46]:
+        - img [ref=e383]
+        - generic [ref=e48]:
+          - paragraph [ref=e49]: DH Motopartes
+          - paragraph [ref=e50]:
+            - generic [ref=e52]: Conectado Nube
+    - generic [ref=e53]:
+      - banner [ref=e54]:
+        - generic [ref=e55]:
+          - button "Abrir menú lateral" [ref=e56] [cursor=pointer]:
+            - img [ref=e387]
+          - generic [ref=e57]:
+            - img [ref=e388]
+            - generic [ref=e59]: DH Motopartes
+          - text: /
+          - heading "Configuración del Sistema" [level=1] [ref=e515]
+        - generic [ref=e61]:
+          - generic [ref=e62]:
+            - img [ref=e392]
+            - generic [ref=e64]: jueves, 25 de junio de 2026, 20:42
+          - button "Cambiar tema de color" [ref=e65] [cursor=pointer]:
+            - img [ref=e394]
+            - img [ref=e400]
+          - generic [ref=e66]:
+            - generic [ref=e67]: D
+            - generic [ref=e68]: DH Motopartes
+            - button "Cerrar Sesión" [ref=e69] [cursor=pointer]:
+              - img [ref=e402]
+      - main [ref=e71]:
+        - text: ▼
+        - generic [ref=e517]:
+          - generic [ref=e518]:
+            - heading "Datos del Comercio" [level=3] [ref=e520]:
+              - img [ref=e521]
+              - text: Datos del Comercio
+            - generic [ref=e526]:
+              - generic [ref=e527]:
+                - generic [ref=e528]: Nombre del Comercio / Empresa
+                - textbox "Nombre del Comercio / Empresa" [ref=e529]: DH Motopartes
+              - generic [ref=e530]:
+                - generic [ref=e531]: Dirección Física
+                - textbox "Dirección Física" [ref=e532]: Av. Libertador 2450, Ciudad
+              - generic [ref=e533]:
+                - generic [ref=e534]: Teléfono de Contacto
+                - textbox "Teléfono de Contacto" [ref=e535]: +54 9 11 5555-1234
+              - generic [ref=e536]:
+                - generic [ref=e537]:
+                  - generic [ref=e538]: WhatsApp (Número/Link)
+                  - textbox "WhatsApp (Número/Link)" [ref=e539]:
+                    - /placeholder: "Ej: +5491155551234"
+                - generic [ref=e540]:
+                  - generic [ref=e541]: Instagram (Usuario/Link)
+                  - textbox "Instagram (Usuario/Link)" [ref=e542]:
+                    - /placeholder: "Ej: @dhmotopartes"
+              - generic [ref=e543]:
+                - generic [ref=e544]: Descripción de Marca para Clientes
+                - textbox "Descripción de Marca para Clientes" [ref=e545]:
+                  - /placeholder: Escribe una breve descripción de tu marca o tienda que verán los clientes...
+              - generic [ref=e546]:
+                - generic [ref=e547]:
+                  - generic [ref=e548]: Moneda (Símbolo)
+                  - textbox "Moneda (Símbolo)" [ref=e549]: $
+                - generic [ref=e550]:
+                  - generic [ref=e551]: Tasa Impuesto (%)
+                  - spinbutton "Tasa Impuesto (%)" [ref=e552]: "0"
+              - button "Guardar Cambios" [ref=e553] [cursor=pointer]:
+                - img [ref=e554]
+                - text: Guardar Cambios
+          - generic [ref=e558]:
+            - heading "Gestión de Categorías" [level=3] [ref=e560]:
+              - img [ref=e561]
+              - text: Gestión de Categorías
+            - generic [ref=e566]:
+              - generic [ref=e567]:
+                - generic [ref=e568]: Añadir Nueva Categoría
+                - generic [ref=e569]:
+                  - textbox "Añadir Nueva Categoría" [ref=e570]:
+                    - /placeholder: "Ej: Neumáticos"
+                  - button "Añadir" [ref=e571] [cursor=pointer]
+              - generic [ref=e572]: Categorías Actuales
+              - generic [ref=e573]:
+                - generic [ref=e574]:
+                  - text: Sistema Eléctrico
+                  - button "Eliminar categoría" [ref=e575] [cursor=pointer]:
+                    - img [ref=e576]
+                - generic [ref=e579]:
+                  - text: Repuestos de Motor
+                  - button "Eliminar categoría" [ref=e580] [cursor=pointer]:
+                    - img [ref=e581]
+                - generic [ref=e584]:
+                  - text: Frenos
+                  - button "Eliminar categoría" [ref=e585] [cursor=pointer]:
+                    - img [ref=e586]
+                - generic [ref=e589]:
+                  - text: Transmisión
+                  - button "Eliminar categoría" [ref=e590] [cursor=pointer]:
+                    - img [ref=e591]
+                - generic [ref=e594]:
+                  - text: Herramientas
+                  - button "Eliminar categoría" [ref=e595] [cursor=pointer]:
+                    - img [ref=e596]
+                - generic [ref=e599]:
+                  - text: Accesorios
+                  - button "Eliminar categoría" [ref=e600] [cursor=pointer]:
+                    - img [ref=e601]
+                - generic [ref=e604]:
+                  - text: Aceites
+                  - button "Eliminar categoría" [ref=e605] [cursor=pointer]:
+                    - img [ref=e606]
+          - generic [ref=e609]:
+            - heading "Personalización Visual & Marca" [level=3] [ref=e611]:
+              - img [ref=e612]
+              - text: Personalización Visual & Marca
+            - generic [ref=e619]:
+              - generic [ref=e620]:
+                - generic [ref=e621]: Tema Predeterminado
+                - generic [ref=e622]:
+                  - button "Modo Oscuro" [ref=e623] [cursor=pointer]:
+                    - img [ref=e624]
+                    - text: Modo Oscuro
+                  - button "Modo Claro" [ref=e626] [cursor=pointer]:
+                    - img [ref=e627]
+                    - text: Modo Claro
+              - generic [ref=e633]:
+                - generic [ref=e634]: Color de Acento Primario
+                - generic [ref=e635]:
+                  - button "Violeta Indigo" [ref=e636] [cursor=pointer]
+                  - button "Azul Eléctrico" [ref=e637] [cursor=pointer]
+                  - button "Verde Esmeralda" [ref=e638] [cursor=pointer]
+                  - button "Rojo Carmesí" [ref=e639] [cursor=pointer]
+                  - button "Ámbar/Naranja" [ref=e640] [cursor=pointer]
+              - separator [ref=e641]
+              - generic [ref=e642]:
+                - generic [ref=e643]: Logo de la Empresa (PNG/JPG)
+                - generic [ref=e644] [cursor=pointer]:
+                  - img [ref=e645]
+                  - paragraph [ref=e648]: Haz clic o arrastra una imagen aquí
+                  - text: Recomendado horizontal transparente
+              - separator [ref=e649]
+              - generic [ref=e650]:
+                - generic [ref=e651]: Diseño de Tarjetas / Cuadros
+                - combobox "Elegir diseño de tarjetas" [ref=e652]:
+                  - option "Gris Slate (Predeterminado)" [selected]
+                  - option "Glassmorphism Traslúcido (Efecto Vidrio Blur)"
+                  - option "Degradado Aurora (Cyberpunk)"
+                  - option "Degradado Carbon (Elegante Oscuro)"
+                  - option "Color Sólido Personalizado"
+                  - option "Imagen de Fondo Personalizada"
+              - separator [ref=e653]
+              - button "Ver Catálogo de Clientes (Vista Previa)" [ref=e655] [cursor=pointer]:
+                - img [ref=e656]
+                - text: Ver Catálogo de Clientes (Vista Previa)
+          - generic [ref=e659]:
+            - heading "Facturación Electrónica ARCA (AFIP)" [level=3] [ref=e661]:
+              - img [ref=e662]
+              - text: Facturación Electrónica ARCA (AFIP)
+            - generic [ref=e666]:
+              - generic [ref=e667]:
+                - generic [ref=e668]: CUIT de la Empresa (solo números)
+                - textbox "CUIT de la Empresa (solo números)" [ref=e669]:
+                  - /placeholder: "Ej: 20123456789"
+                  - text: "20123456789"
+              - generic [ref=e670]:
+                - generic [ref=e671]: Punto de Venta
+                - spinbutton "Punto de Venta" [ref=e672]: "2"
+              - generic [ref=e673]:
+                - generic [ref=e674]: Condición frente al IVA
+                - combobox "Condición frente al IVA" [ref=e675]:
+                  - option "Seleccione condición..."
+                  - option "Responsable Inscripto"
+                  - option "Monotributista" [selected]
+                  - option "Exento"
+              - generic [ref=e676]:
+                - generic [ref=e677]: Entorno de Operación
+                - combobox "Entorno de Operación" [ref=e678]:
+                  - option "Homologación (Pruebas)" [selected]
+                  - option "Producción (Real)"
+              - generic [ref=e679]:
+                - generic [ref=e680]: Certificado Digital (X.509 .crt/.pem)
+                - textbox "Certificado Digital (X.509 .crt/.pem)" [ref=e681]:
+                  - /placeholder: "-----BEGIN CERTIFICATE-----\\n..."
+                  - text: "-----BEGIN CERTIFICATE-----\\nTEST_CERTIFICATE\\n-----END CERTIFICATE-----"
+              - generic [ref=e682]:
+                - generic [ref=e683]: Clave Privada (.key/.pem)
+                - textbox "Clave Privada (.key/.pem)" [ref=e684]:
+                  - /placeholder: "-----BEGIN PRIVATE KEY-----\\n..."
+                  - text: "-----BEGIN PRIVATE KEY-----\\nTEST_KEY\\n-----END PRIVATE KEY-----"
+              - button "Guardar Configuración Fiscal" [ref=e685] [cursor=pointer]:
+                - img [ref=e731]
+                - text: Guardar Configuración Fiscal
+          - generic [ref=e690]:
+            - heading "Respaldo & Operaciones de Datos" [level=3] [ref=e692]:
+              - img [ref=e693]
+              - text: Respaldo & Operaciones de Datos
+            - generic [ref=e698]:
+              - generic [ref=e699]:
+                - heading "Cargar Datos de Demostración" [level=4] [ref=e700]
+                - paragraph [ref=e701]: Llena el sistema con productos de repuestos de motos, clientes e historial de ventas simulado para pruebas.
+                - button "Poblar Base de Datos Demo" [ref=e702] [cursor=pointer]:
+                  - img [ref=e703]
+                  - text: Poblar Base de Datos Demo
+              - generic [ref=e706]:
+                - heading "Exportar/Importar Respaldo" [level=4] [ref=e707]
+                - paragraph [ref=e708]: Crea una copia de seguridad en formato JSON de todo tu inventario, ventas y clientes, o restáurala.
+                - generic [ref=e709]:
+                  - button "Exportar JSON" [ref=e710] [cursor=pointer]:
+                    - img [ref=e711]
+                    - text: Exportar JSON
+                  - generic [ref=e714] [cursor=pointer]:
+                    - img [ref=e715]
+                    - text: Importar JSON
+              - generic [ref=e718]:
+                - heading "Exportar Reporte de Ventas" [level=4] [ref=e719]
+                - paragraph [ref=e720]: Descarga el historial completo de ventas formateado en CSV para abrir en Excel o Google Sheets.
+                - button "Descargar Reporte CSV" [ref=e721] [cursor=pointer]:
+                  - img [ref=e722]
+                  - text: Descargar Reporte CSV
+              - generic [ref=e725]:
+                - heading "Limpieza Total del Sistema" [level=4] [ref=e726]
+                - paragraph [ref=e727]: Borra definitivamente todos los productos, ventas realizadas y clientes registrados en este navegador.
+                - button "Borrar Todo e Inicializar" [ref=e728] [cursor=pointer]:
+                  - img [ref=e729]
+                  - text: Borrar Todo e Inicializar
+  - generic:
+    - generic:
+      - generic:
+        - heading "Registrar Nueva Empresa (SaaS)" [level=3]
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic:
+            - generic: Nombre Comercial de la Tienda
+            - textbox "Nombre Comercial de la Tienda":
+              - /placeholder: Ej. Repuestos López
+          - generic:
+            - img
+            - paragraph: Se creará la empresa en la base de datos de forma independiente. Luego podrás crear un usuario (Store Owner) asignado a este store_id.
+      - generic:
+        - button "Cancelar"
+        - button "Crear Empresa"
+  - generic:
+    - generic:
+      - generic:
+        - heading "Confirmar Pago de Venta" [level=3]
+        - button:
+          - img
+      - generic:
+        - generic:
+          - text: TOTAL A COBRAR
+          - heading "$0.00" [level=2]
+        - generic:
+          - generic:
+            - generic: Método de Pago
+            - generic:
+              - button "Efectivo":
+                - img
+                - text: Efectivo
+              - button "Tarjeta":
+                - img
+                - text: Tarjeta
+              - button "Transferencia":
+                - img
+                - text: Transferencia
+          - generic:
+            - generic:
+              - generic: Monto Recibido ($)
+              - spinbutton "Monto Recibido ($)"
+            - generic:
+              - generic: "Cambio a devolver:"
+              - generic: $0.00
+          - generic:
+            - generic:
+              - checkbox "Emitir Factura Electrónica (ARCA / AFIP)"
+              - generic: Emitir Factura Electrónica (ARCA / AFIP)
+      - generic:
+        - button "Cancelar"
+        - button "Confirmar y Generar Recibo" [disabled]:
+          - img
+          - text: Confirmar y Generar Recibo
+  - generic:
+    - generic:
+      - generic:
+        - heading "Aplicar Descuento" [level=3]
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic: Tipo de Descuento
+          - combobox "Seleccionar tipo de descuento":
+            - option "Monto Fijo ($)" [selected]
+            - option "Porcentaje (%)"
+        - generic:
+          - generic: Valor del Descuento
+          - spinbutton "Valor del Descuento"
+      - generic:
+        - button "Cancelar"
+        - button "Aplicar"
+  - generic:
+    - generic:
+      - generic:
+        - heading "Registrar Nuevo Repuesto" [level=3]
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - generic: SKU / Código Único *
+              - textbox "SKU / Código Único *":
+                - /placeholder: Ej. BUJ-NGK-CPR7
+            - generic:
+              - generic: Categoría *
+              - combobox "Categoría *":
+                - option "Seleccione una categoría" [selected]
+                - option "Repuestos de Motor"
+                - option "Transmisión"
+                - option "Frenos"
+                - option "Sistema Eléctrico"
+                - option "Herramientas"
+                - option "Accesorios"
+                - option "Aceites"
+          - generic:
+            - generic: Nombre / Descripción del Artículo *
+            - textbox "Nombre / Descripción del Artículo *":
+              - /placeholder: Ej. Pastillas de Freno Delanteras Yamaha YBR 125
+          - generic:
+            - generic:
+              - generic: Precio de Compra (Costo) *
+              - spinbutton "Precio de Compra (Costo) *"
+            - generic:
+              - generic: Precio de Venta *
+              - spinbutton "Precio de Venta *"
+          - generic:
+            - generic:
+              - generic: Stock Inicial *
+              - spinbutton "Stock Inicial *"
+            - generic:
+              - generic: Stock Mínimo (Alerta) *
+              - spinbutton "Stock Mínimo (Alerta) *"
+          - generic:
+            - generic: Imagen del Producto
+            - generic:
+              - generic:
+                - generic:
+                  - radio "Cargar archivo local" [checked]
+                  - text: Cargar archivo local
+                - generic:
+                  - radio "Dirección web (URL)"
+                  - text: Dirección web (URL)
+              - generic:
+                - img
+                - paragraph: Haz clic o arrastra una imagen aquí
+                - generic: PNG, JPG, WEBP (Se auto-comprimirá)
+        - generic:
+          - button "Cancelar"
+          - button "Guardar Artículo"
+  - generic:
+    - generic:
+      - generic:
+        - heading "Registrar Cliente Nuevo" [level=3]
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - generic: Nombre *
+              - textbox "Nombre *":
+                - /placeholder: Ej. Juan
+            - generic:
+              - generic: Apellido *
+              - textbox "Apellido *":
+                - /placeholder: Ej. Pérez
+          - generic:
+            - generic: DNI *
+            - textbox "DNI *":
+              - /placeholder: Ej. 30123456
+          - generic:
+            - generic: Número de Teléfono
+            - textbox "Número de Teléfono":
+              - /placeholder: Ej. +54 9 11 6789-0123
+          - generic:
+            - generic: Correo Electrónico
+            - textbox "Correo Electrónico":
+              - /placeholder: Ej. juan.perez@email.com
+          - generic:
+            - generic: Puntos de Fidelidad Iniciales
+            - spinbutton "Puntos de Fidelidad Iniciales": "0"
+        - generic:
+          - button "Cancelar"
+          - button "Registrar Cliente"
+  - generic:
+    - generic:
+      - generic:
+        - heading "Registrar Proveedor Nuevo" [level=3]
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic:
+            - generic: Nombre / Razón Social *
+            - textbox "Nombre / Razón Social *":
+              - /placeholder: Ej. Distribuidora de Repuestos S.A.
+          - generic:
+            - generic: Nombre de Contacto
+            - textbox "Nombre de Contacto":
+              - /placeholder: Ej. Carlos Pérez
+          - generic:
+            - generic: Número de Teléfono
+            - textbox "Número de Teléfono":
+              - /placeholder: Ej. +54 9 11 6789-0123
+          - generic:
+            - generic: Correo Electrónico
+            - textbox "Correo Electrónico":
+              - /placeholder: Ej. ventas@distribuidora.com
+          - generic:
+            - generic: Dirección Física
+            - textbox "Dirección Física":
+              - /placeholder: Ej. Av. Rivadavia 4500, CABA
+          - generic:
+            - generic: Deuda Pendiente ($)
+            - spinbutton "Deuda Pendiente ($)": "0.00"
+          - generic:
+            - generic: Notas / Observaciones
+            - textbox "Notas / Observaciones":
+              - /placeholder: Ej. Repuestos de motor, pago los 5 de cada mes...
+        - generic:
+          - button "Cancelar"
+          - button "Registrar Proveedor"
+  - generic:
+    - generic:
+      - generic:
+        - heading "Registrar Pago a Proveedor" [level=3]
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic:
+            - generic: Proveedor
+            - heading "—" [level=4]
+            - generic: "Deuda actual: $0.00"
+          - generic:
+            - generic: Monto a Pagar ($) *
+            - spinbutton "Monto a Pagar ($) *"
+          - generic:
+            - checkbox "Registrar también como un egreso de caja" [checked]
+            - generic: Registrar también como un egreso de caja
+        - generic:
+          - button "Cancelar"
+          - button "Registrar Pago"
+  - generic:
+    - generic:
+      - generic:
+        - heading "Detalle de Transacción" [level=3]
+        - button:
+          - img
+      - generic:
+        - button "Anular Venta":
+          - img
+          - text: Anular Venta
+        - generic:
+          - button "Cerrar"
+          - button "Imprimir [F9]":
+            - img
+            - text: Imprimir [F9]
+  - generic:
+    - generic:
+      - generic:
+        - heading "Registrar Movimiento de Caja" [level=3]
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic:
+            - generic: Monto ($) *
+            - spinbutton "Monto ($) *"
+          - generic:
+            - generic: Concepto / Motivo *
+            - textbox "Concepto / Motivo *":
+              - /placeholder: Ej. Cambio inicial, Pago de flete, Retiro de efectivo
+          - generic:
+            - generic: Notas u Observaciones (Opcional)
+            - textbox "Notas u Observaciones (Opcional)":
+              - /placeholder: Detalle adicional del movimiento...
+        - generic:
+          - button "Cancelar"
+          - button "Guardar Movimiento"
+  - generic:
+    - generic:
+      - generic:
+        - heading "Vista Previa de Importación" [level=3]
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic:
+            - text: Productos Totales
+            - heading "0" [level=2]
+          - generic:
+            - text: Nuevos (Crear)
+            - heading "0" [level=2]
+          - generic:
+            - text: Existentes (Actualizar)
+            - heading "0" [level=2]
+        - generic:
+          - img
+          - paragraph: El sistema ha mapeado las columnas de forma inteligente. Revisa la previsualización de las primeras 5 filas antes de confirmar la importación.
+        - generic:
+          - generic:
+            - table:
+              - rowgroup:
+                - row "SKU Nombre / Descripción Categoría Costo Precio Stock Acción":
+                  - columnheader "SKU"
+                  - columnheader "Nombre / Descripción"
+                  - columnheader "Categoría"
+                  - columnheader "Costo"
+                  - columnheader "Precio"
+                  - columnheader "Stock"
+                  - columnheader "Acción"
+              - rowgroup
+        - generic:
+          - generic: ¿No sabes qué columnas usar? Descarga la plantilla oficial en Excel.
+          - button "Descargar Plantilla":
+            - img
+            - text: Descargar Plantilla
+      - generic:
+        - button "Cancelar"
+        - button "Confirmar e Importar":
+          - img
+          - text: Confirmar e Importar
+  - generic:
+    - generic:
+      - generic:
+        - heading "Mi Carrito de Compras" [level=3]:
+          - img
+          - text: Mi Carrito de Compras
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic:
+            - generic: "TOTAL DEL PEDIDO:"
+            - generic: $0.00
+      - generic:
+        - button "Seguir Comprando"
+        - button "Proceder al Checkout":
+          - img
+          - text: Proceder al Checkout
+  - generic:
+    - generic:
+      - generic:
+        - heading "Datos de Entrega y Pago" [level=3]:
+          - img
+          - text: Datos de Entrega y Pago
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic:
+            - generic: Nombre y Apellido *
+            - textbox "Nombre y Apellido *":
+              - /placeholder: "Ej: Juan Pérez"
+          - generic:
+            - generic: WhatsApp / Teléfono *
+            - textbox "WhatsApp / Teléfono *":
+              - /placeholder: "Ej: +54 9 11 5555-6666"
+          - generic:
+            - generic: Dirección de Entrega / Notas *
+            - textbox "Dirección de Entrega / Notas *":
+              - /placeholder: "Ej: Av. Siempreviva 742, Depto 3B. Entregar por la tarde."
+          - generic:
+            - generic: Método de Pago Preferido *
+            - combobox "Método de Pago Preferido *":
+              - option "Seleccione una opción" [selected]
+              - option "Efectivo al recibir"
+              - option "Transferencia Bancaria / CVU"
+              - option "Mercado Pago / Enlace de pago"
+          - generic:
+            - text: RESUMEN DEL PEDIDO
+            - text: TOTAL A PAGAR
+            - heading "$0.00" [level=2]
+          - generic:
+            - button "Volver al Carrito"
+            - button "Enviar Pedido por WhatsApp":
+              - img
+              - text: Enviar Pedido por WhatsApp

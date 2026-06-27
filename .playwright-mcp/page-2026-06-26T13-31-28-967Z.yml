@@ -1,0 +1,710 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e5]:
+        - img [ref=e2226]
+        - generic [ref=e8]:
+          - generic [ref=e9]: DH Motopartes
+          - generic [ref=e10]: Catálogo Digital
+      - navigation [ref=e11]:
+        - list [ref=e12]:
+          - listitem [ref=e13]:
+            - link "Panel Control" [ref=e14] [cursor=pointer]:
+              - /url: "#dashboard"
+              - img [ref=e2228]
+              - generic [ref=e16]: Panel Control
+          - listitem [ref=e17]:
+            - link "Vender (POS)" [ref=e18] [cursor=pointer]:
+              - /url: "#pos"
+              - img [ref=e2233]
+              - generic [ref=e20]: Vender (POS)
+          - listitem [ref=e21]:
+            - link "Inventario" [ref=e22] [cursor=pointer]:
+              - /url: "#inventario"
+              - img [ref=e2237]
+              - generic [ref=e24]: Inventario
+          - listitem [ref=e25]:
+            - link "Clientes CRM" [ref=e26] [cursor=pointer]:
+              - /url: "#clientes"
+              - img [ref=e2241]
+              - generic [ref=e28]: Clientes CRM
+          - listitem [ref=e29]:
+            - link "Proveedores" [ref=e30] [cursor=pointer]:
+              - /url: "#proveedores"
+              - img [ref=e2246]
+              - generic [ref=e32]: Proveedores
+          - listitem [ref=e33]:
+            - link "Historial Ventas" [ref=e34] [cursor=pointer]:
+              - /url: "#historial"
+              - img [ref=e2251]
+              - generic [ref=e36]: Historial Ventas
+          - listitem [ref=e37]:
+            - link "Caja y Movimientos" [ref=e38] [cursor=pointer]:
+              - /url: "#caja"
+              - img [ref=e2255]
+              - generic [ref=e40]: Caja y Movimientos
+          - listitem [ref=e41]:
+            - link "Configuración" [ref=e42] [cursor=pointer]:
+              - /url: "#configuracion"
+              - img [ref=e2258]
+              - generic [ref=e44]: Configuración
+      - generic [ref=e46]:
+        - img [ref=e2261]
+        - generic [ref=e48]:
+          - paragraph [ref=e49]: DH Motopartes
+          - paragraph [ref=e50]:
+            - generic [ref=e52]: Conectado Nube
+    - generic [ref=e53]:
+      - banner [ref=e54]:
+        - generic [ref=e55]:
+          - button "Abrir menú lateral" [ref=e56] [cursor=pointer]:
+            - img [ref=e2265]
+          - generic [ref=e57]:
+            - img [ref=e2266]
+            - generic [ref=e59]: DH Motopartes
+          - text: /
+          - heading "Punto de Venta (POS)" [level=1] [ref=e779]
+        - generic [ref=e61]:
+          - generic [ref=e62]:
+            - img [ref=e2270]
+            - generic [ref=e64]: viernes, 26 de junio de 2026, 10:31
+          - button "Cambiar tema de color" [ref=e65] [cursor=pointer]:
+            - img [ref=e2272]
+            - img [ref=e2278]
+          - generic [ref=e66]:
+            - generic [ref=e67]: D
+            - generic [ref=e68]: DH Motopartes
+            - button "Cerrar Sesión" [ref=e69] [cursor=pointer]:
+              - img [ref=e2280]
+      - main [ref=e71]:
+        - text: ▼
+        - generic [ref=e794]:
+          - generic [ref=e795]:
+            - generic [ref=e796]:
+              - generic [ref=e797]:
+                - generic [ref=e798]:
+                  - img [ref=e2283]
+                  - textbox "Buscar producto" [ref=e802]:
+                    - /placeholder: Buscar repuesto por nombre, SKU o código de barra...
+                - generic "Lector de código de barras físico/teclado activo. Escanea en cualquier momento." [ref=e803]:
+                  - img [ref=e2286]
+                  - generic [ref=e810]: Lector Listo
+              - generic [ref=e811]:
+                - button "Todas" [ref=e2291] [cursor=pointer]
+                - button "Sistema Eléctrico" [ref=e2292] [cursor=pointer]
+                - button "Repuestos de Motor" [ref=e2293] [cursor=pointer]
+                - button "Frenos" [ref=e2294] [cursor=pointer]
+                - button "Transmisión" [ref=e2295] [cursor=pointer]
+                - button "Herramientas" [ref=e2296] [cursor=pointer]
+                - button "Accesorios" [ref=e2297] [cursor=pointer]
+                - button "Aceites" [ref=e2298] [cursor=pointer]
+            - generic [ref=e820]:
+              - generic [ref=e821]:
+                - generic [ref=e2299]:
+                  - generic [ref=e2300]: DH1292
+                  - img [ref=e2303]
+                  - generic [ref=e2307]:
+                    - generic [ref=e2308]: Aceites
+                    - heading "Aceite Wander BMX 20w50 x900ML" [level=4] [ref=e2309]
+                    - generic [ref=e2310]:
+                      - generic [ref=e2311]: $7000.00
+                      - generic [ref=e2312]: Agotado
+                - generic [ref=e2313]:
+                  - generic [ref=e2314]: DH1286
+                  - img [ref=e2317]
+                  - generic [ref=e2321]:
+                    - generic [ref=e2322]: Aceites
+                    - heading "Aceite Gulf" [level=4] [ref=e2323]
+                    - generic [ref=e2324]:
+                      - generic [ref=e2325]: $6000.00
+                      - generic [ref=e2326]: Agotado
+                - generic [ref=e2327] [cursor=pointer]:
+                  - generic [ref=e2328]: DH1288
+                  - img [ref=e2331]
+                  - generic [ref=e2335]:
+                    - generic [ref=e2336]: Aceites
+                    - heading "Aceite Castrol Actevo Esscential 20W-50 Mineral BCO 4T 1L" [level=4] [ref=e2337]
+                    - generic [ref=e2338]:
+                      - generic [ref=e2339]: $9500.00
+                      - generic [ref=e2340]: 13 disp.
+                - generic [ref=e2341] [cursor=pointer]:
+                  - generic [ref=e2342]: DH1287
+                  - img [ref=e2345]
+                  - generic [ref=e2349]:
+                    - generic [ref=e2350]: Aceites
+                    - heading "Aceite Castrol Actevo 20W-50 4T 1L Gris" [level=4] [ref=e2351]
+                    - generic [ref=e2352]:
+                      - generic [ref=e2353]: $12500.00
+                      - generic [ref=e2354]: Stock Bajo
+                - generic [ref=e2355] [cursor=pointer]:
+                  - generic [ref=e2356]: AC6
+                  - img [ref=e2359]
+                  - generic [ref=e2363]:
+                    - generic [ref=e2364]: Aceites
+                    - heading "Aceite Castrol Dorado Power 1" [level=4] [ref=e2365]
+                    - generic [ref=e2366]:
+                      - generic [ref=e2367]: $16500.00
+                      - generic [ref=e2368]: Stock Bajo
+                - generic [ref=e2369] [cursor=pointer]:
+                  - generic [ref=e2370]: "1003793"
+                  - img [ref=e2373]
+                  - generic [ref=e2377]:
+                    - generic [ref=e2378]: Aceites
+                    - heading "Aceite Motul 3000" [level=4] [ref=e2379]
+                    - generic [ref=e2380]:
+                      - generic [ref=e2381]: $12000.00
+                      - generic [ref=e2382]: 8 disp.
+                - generic [ref=e2383] [cursor=pointer]:
+                  - generic [ref=e2384]: AC13
+                  - img [ref=e2387]
+                  - generic [ref=e2391]:
+                    - generic [ref=e2392]: Aceites
+                    - heading "Aceite Motul 5000" [level=4] [ref=e2393]
+                    - generic [ref=e2394]:
+                      - generic [ref=e2395]: $15000.00
+                      - generic [ref=e2396]: 12 disp.
+                - generic [ref=e2397] [cursor=pointer]:
+                  - generic [ref=e2398]: "1003650"
+                  - img [ref=e2401]
+                  - generic [ref=e2405]:
+                    - generic [ref=e2406]: Aceites
+                    - heading "Aceite Motul 5100" [level=4] [ref=e2407]
+                    - generic [ref=e2408]:
+                      - generic [ref=e2409]: $17500.00
+                      - generic [ref=e2410]: 12 disp.
+                - generic [ref=e2411] [cursor=pointer]:
+                  - generic [ref=e2412]: "1011189"
+                  - img [ref=e2415]
+                  - generic [ref=e2419]:
+                    - generic [ref=e2420]: Aceites
+                    - heading "Aceite Motul 300V 15W50 4T" [level=4] [ref=e2421]
+                    - generic [ref=e2422]:
+                      - generic [ref=e2423]: $50000.00
+                      - generic [ref=e2424]: Stock Bajo
+                - generic [ref=e2425]:
+                  - generic [ref=e2426]: "1011485"
+                  - img [ref=e2429]
+                  - generic [ref=e2433]:
+                    - generic [ref=e2434]: Aceites
+                    - heading "Aceite Motul 710 2T Sintetico" [level=4] [ref=e2435]
+                    - generic [ref=e2436]:
+                      - generic [ref=e2437]: $35000.00
+                      - generic [ref=e2438]: Agotado
+                - generic [ref=e2439]:
+                  - generic [ref=e2440]: "1011562"
+                  - img [ref=e2443]
+                  - generic [ref=e2447]:
+                    - generic [ref=e2448]: Aceites
+                    - heading "Aceite Motul 7100 10W40 4T" [level=4] [ref=e2449]
+                    - generic [ref=e2450]:
+                      - generic [ref=e2451]: $30000.00
+                      - generic [ref=e2452]: Agotado
+                - generic [ref=e2453] [cursor=pointer]:
+                  - generic [ref=e2454]: "1011156"
+                  - img [ref=e2457]
+                  - generic [ref=e2461]:
+                    - generic [ref=e2462]: Aceites
+                    - heading "Motul Kart Grand Prix" [level=4] [ref=e2463]
+                    - generic [ref=e2464]:
+                      - generic [ref=e2465]: $45000.00
+                      - generic [ref=e2466]: Stock Bajo
+                - generic [ref=e2467] [cursor=pointer]:
+                  - generic [ref=e2468]: "6464"
+                  - img [ref=e2471]
+                  - generic [ref=e2475]:
+                    - generic [ref=e2476]: Aceites
+                    - heading "Aceite WD40 Chico" [level=4] [ref=e2477]
+                    - generic [ref=e2478]:
+                      - generic [ref=e2479]: $10000.00
+                      - generic [ref=e2480]: 7 disp.
+                - generic [ref=e2481] [cursor=pointer]:
+                  - generic [ref=e2482]: "1011455"
+                  - img [ref=e2485]
+                  - generic [ref=e2489]:
+                    - generic [ref=e2490]: Aceites
+                    - heading "Aceite Castrol Power A747" [level=4] [ref=e2491]
+                    - generic [ref=e2492]:
+                      - generic [ref=e2493]: $65000.00
+                      - generic [ref=e2494]: Stock Bajo
+                - generic [ref=e2495] [cursor=pointer]:
+                  - generic [ref=e2496]: AC12
+                  - img [ref=e2499]
+                  - generic [ref=e2503]:
+                    - generic [ref=e2504]: Aceites
+                    - heading "Aceite Imola" [level=4] [ref=e2505]
+                    - generic [ref=e2506]:
+                      - generic [ref=e2507]: $2300.00
+                      - generic [ref=e2508]: 22 disp.
+                - generic [ref=e2509] [cursor=pointer]:
+                  - generic [ref=e2510]: DH1290
+                  - img [ref=e2513]
+                  - generic [ref=e2517]:
+                    - generic [ref=e2518]: Aceites
+                    - heading "Aceite Castrol Actevo Essential Go 2T X100ML" [level=4] [ref=e2519]
+                    - generic [ref=e2520]:
+                      - generic [ref=e2521]: $3000.00
+                      - generic [ref=e2522]: 19 disp.
+              - generic [ref=e1046]:
+                - generic [ref=e2523]: Mostrando registros 1-16 de 19
+                - generic [ref=e2524]:
+                  - button [disabled] [ref=e2525]:
+                    - img [ref=e2526]
+                  - generic [ref=e2528]: Pág. 1 de 2
+                  - button [ref=e2529] [cursor=pointer]:
+                    - img [ref=e2530]
+          - generic [ref=e1056]:
+            - generic [ref=e1057]:
+              - generic [ref=e1058]:
+                - img [ref=e2532]
+                - combobox "Seleccionar cliente para la venta" [ref=e1062]:
+                  - option "Consumidor Final" [selected]
+              - button "Registrar Cliente Nuevo" [ref=e1063] [cursor=pointer]:
+                - img [ref=e2535]
+            - generic [ref=e1065]:
+              - generic [ref=e1066]:
+                - generic [ref=e1067]: Producto
+                - generic [ref=e1068]: Cant.
+                - generic [ref=e1069]: Total
+              - generic [ref=e2536]:
+                - img [ref=e2537]
+                - paragraph [ref=e2540]: El carrito está vacío
+                - generic [ref=e2541]: Haz clic en los repuestos del catálogo para agregarlos
+            - generic [ref=e1077]:
+              - generic [ref=e1078]:
+                - generic [ref=e1079]: "Subtotal:"
+                - generic [ref=e1080]: $0.00
+              - generic [ref=e1081]:
+                - generic [ref=e1082]:
+                  - text: "Descuento ($):"
+                  - button "Editar" [ref=e1083] [cursor=pointer]
+                - generic [ref=e1084]: "-$0.00"
+              - generic [ref=e1085]:
+                - generic [ref=e1086]: "Impuesto (0%):"
+                - generic [ref=e1087]: $0.00
+              - separator [ref=e1088]
+              - generic [ref=e1089]:
+                - generic [ref=e1090]: "Total a Pagar:"
+                - generic [ref=e1091]: $0.00
+              - generic [ref=e1092]:
+                - button "Vaciar" [ref=e1093] [cursor=pointer]:
+                  - img [ref=e2542]
+                  - text: Vaciar
+                - button "Cobrar [F8]" [disabled] [ref=e1097]:
+                  - img [ref=e2545]
+                  - text: Cobrar [F8]
+  - generic:
+    - generic:
+      - generic:
+        - heading "Registrar Nueva Empresa (SaaS)" [level=3]
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic:
+            - generic: Nombre Comercial de la Tienda
+            - textbox "Nombre Comercial de la Tienda":
+              - /placeholder: Ej. Repuestos López
+          - generic:
+            - img
+            - paragraph: Se creará la empresa en la base de datos de forma independiente. Luego podrás crear un usuario (Store Owner) asignado a este store_id.
+      - generic:
+        - button "Cancelar"
+        - button "Crear Empresa"
+  - generic:
+    - generic:
+      - generic:
+        - heading "Confirmar Pago de Venta" [level=3]
+        - button:
+          - img
+      - generic:
+        - generic:
+          - text: TOTAL A COBRAR
+          - heading "$9500.00" [level=2]
+        - generic:
+          - generic:
+            - generic: Método de Pago
+            - generic:
+              - button "Efectivo":
+                - img
+                - text: Efectivo
+              - button "Tarjeta":
+                - img
+                - text: Tarjeta
+              - button "Transferencia":
+                - img
+                - text: Transferencia
+          - generic:
+            - generic:
+              - generic: Monto Recibido ($)
+              - spinbutton "Monto Recibido ($)": "10000"
+            - generic:
+              - button "$9500"
+              - button "$10000"
+            - generic:
+              - generic: "Cambio a devolver:"
+              - generic: $500.00
+          - generic:
+            - generic:
+              - checkbox "Emitir Factura Electrónica (ARCA / AFIP)"
+              - generic: Emitir Factura Electrónica (ARCA / AFIP)
+      - generic:
+        - button "Cancelar"
+        - button "Confirmar y Generar Recibo" [active]:
+          - img
+          - text: Confirmar y Generar Recibo
+  - generic:
+    - generic:
+      - generic:
+        - heading "Aplicar Descuento" [level=3]
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic: Tipo de Descuento
+          - combobox "Seleccionar tipo de descuento":
+            - option "Monto Fijo ($)" [selected]
+            - option "Porcentaje (%)"
+        - generic:
+          - generic: Valor del Descuento
+          - spinbutton "Valor del Descuento"
+      - generic:
+        - button "Cancelar"
+        - button "Aplicar"
+  - generic:
+    - generic:
+      - generic:
+        - heading "Registrar Nuevo Repuesto" [level=3]
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - generic: SKU / Código Único *
+              - textbox "SKU / Código Único *":
+                - /placeholder: Ej. BUJ-NGK-CPR7
+            - generic:
+              - generic: Categoría *
+              - combobox "Categoría *":
+                - option "Seleccione una categoría" [selected]
+                - option "Repuestos de Motor"
+                - option "Transmisión"
+                - option "Frenos"
+                - option "Sistema Eléctrico"
+                - option "Herramientas"
+                - option "Accesorios"
+                - option "Aceites"
+          - generic:
+            - generic: Nombre / Descripción del Artículo *
+            - textbox "Nombre / Descripción del Artículo *":
+              - /placeholder: Ej. Pastillas de Freno Delanteras Yamaha YBR 125
+          - generic:
+            - generic:
+              - generic: Precio de Compra (Costo) *
+              - spinbutton "Precio de Compra (Costo) *"
+            - generic:
+              - generic: Precio de Venta *
+              - spinbutton "Precio de Venta *"
+          - generic:
+            - generic:
+              - generic: Stock Inicial *
+              - spinbutton "Stock Inicial *"
+            - generic:
+              - generic: Stock Mínimo (Alerta) *
+              - spinbutton "Stock Mínimo (Alerta) *"
+          - generic:
+            - generic: Imagen del Producto
+            - generic:
+              - generic:
+                - generic:
+                  - radio "Cargar archivo local" [checked]
+                  - text: Cargar archivo local
+                - generic:
+                  - radio "Dirección web (URL)"
+                  - text: Dirección web (URL)
+              - generic:
+                - img
+                - paragraph: Haz clic o arrastra una imagen aquí
+                - generic: PNG, JPG, WEBP (Se auto-comprimirá)
+        - generic:
+          - button "Cancelar"
+          - button "Guardar Artículo"
+  - generic:
+    - generic:
+      - generic:
+        - heading "Registrar Cliente Nuevo" [level=3]
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - generic: Nombre *
+              - textbox "Nombre *":
+                - /placeholder: Ej. Juan
+            - generic:
+              - generic: Apellido *
+              - textbox "Apellido *":
+                - /placeholder: Ej. Pérez
+          - generic:
+            - generic: DNI *
+            - textbox "DNI *":
+              - /placeholder: Ej. 30123456
+          - generic:
+            - generic: Número de Teléfono
+            - textbox "Número de Teléfono":
+              - /placeholder: Ej. +54 9 11 6789-0123
+          - generic:
+            - generic: Correo Electrónico
+            - textbox "Correo Electrónico":
+              - /placeholder: Ej. juan.perez@email.com
+          - generic:
+            - generic: Puntos de Fidelidad Iniciales
+            - spinbutton "Puntos de Fidelidad Iniciales": "0"
+        - generic:
+          - button "Cancelar"
+          - button "Registrar Cliente"
+  - generic:
+    - generic:
+      - generic:
+        - heading "Registrar Proveedor Nuevo" [level=3]
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic:
+            - generic: Nombre / Razón Social *
+            - textbox "Nombre / Razón Social *":
+              - /placeholder: Ej. Distribuidora de Repuestos S.A.
+          - generic:
+            - generic: Nombre de Contacto
+            - textbox "Nombre de Contacto":
+              - /placeholder: Ej. Carlos Pérez
+          - generic:
+            - generic: Número de Teléfono
+            - textbox "Número de Teléfono":
+              - /placeholder: Ej. +54 9 11 6789-0123
+          - generic:
+            - generic: Correo Electrónico
+            - textbox "Correo Electrónico":
+              - /placeholder: Ej. ventas@distribuidora.com
+          - generic:
+            - generic: Dirección Física
+            - textbox "Dirección Física":
+              - /placeholder: Ej. Av. Rivadavia 4500, CABA
+          - generic:
+            - generic: Deuda Pendiente ($)
+            - spinbutton "Deuda Pendiente ($)": "0.00"
+          - generic:
+            - generic: Notas / Observaciones
+            - textbox "Notas / Observaciones":
+              - /placeholder: Ej. Repuestos de motor, pago los 5 de cada mes...
+        - generic:
+          - button "Cancelar"
+          - button "Registrar Proveedor"
+  - generic:
+    - generic:
+      - generic:
+        - heading "Registrar Pago a Proveedor" [level=3]
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic:
+            - generic: Proveedor
+            - heading "—" [level=4]
+            - generic: "Deuda actual: $0.00"
+          - generic:
+            - generic: Monto a Pagar ($) *
+            - spinbutton "Monto a Pagar ($) *"
+          - generic:
+            - checkbox "Registrar también como un egreso de caja" [checked]
+            - generic: Registrar también como un egreso de caja
+        - generic:
+          - button "Cancelar"
+          - button "Registrar Pago"
+  - generic [ref=e1476]:
+    - generic [ref=e1477]:
+      - heading "Detalle de Transacción" [level=3] [ref=e1478]
+      - button [ref=e1479] [cursor=pointer]:
+        - img [ref=e2547]
+    - generic [ref=e2550]:
+      - generic [ref=e2551]:
+        - generic [ref=e2552]: DH Motopartes
+        - generic [ref=e2553]: Av. Libertador 2450, Ciudad
+        - generic [ref=e2554]: "Tel: +54 9 11 5555-1234"
+      - generic [ref=e2555]:
+        - generic [ref=e2556]:
+          - strong [ref=e2557]: "Folio:"
+          - text: V-686845
+        - generic [ref=e2558]:
+          - strong [ref=e2559]: "Fecha:"
+          - text: 26/6/2026, 10:31:26
+        - generic [ref=e2560]:
+          - strong [ref=e2561]: "Cliente:"
+          - text: Consumidor Final
+        - generic [ref=e2562]:
+          - strong [ref=e2563]: "Atendido por:"
+          - text: Administrador
+      - separator [ref=e2564]
+      - table [ref=e2565]:
+        - rowgroup [ref=e2566]:
+          - row "Artículos Subtotal" [ref=e2567]:
+            - columnheader "Artículos" [ref=e2568]
+            - columnheader "Subtotal" [ref=e2569]
+        - rowgroup [ref=e2570]:
+          - row "Aceite Castrol Actevo Esscential 20W-50 Mineral BCO 4T 1L" [ref=e2571]:
+            - cell "Aceite Castrol Actevo Esscential 20W-50 Mineral BCO 4T 1L" [ref=e2572]
+          - row "1 x $9500.00 $9500.00" [ref=e2573]:
+            - cell "1 x $9500.00" [ref=e2574]
+            - cell "$9500.00" [ref=e2575]
+      - separator [ref=e2576]
+      - generic [ref=e2577]:
+        - generic [ref=e2578]: "Subtotal: $9500.00"
+        - generic [ref=e2579]: "IVA (0%): $0.00"
+        - generic [ref=e2580]: "TOTAL: $9500.00"
+      - separator [ref=e2581]
+      - generic [ref=e2582]:
+        - generic [ref=e2583]:
+          - strong [ref=e2584]: "Método de Pago:"
+          - text: Efectivo
+        - generic [ref=e2585]:
+          - strong [ref=e2586]: "Efectivo Recibido:"
+          - text: $10000.00
+        - generic [ref=e2587]:
+          - strong [ref=e2588]: "Cambio Entregado:"
+          - text: $500.00
+      - generic [ref=e2589]:
+        - paragraph [ref=e2590]: ¡Gracias por su compra!
+        - paragraph [ref=e2591]: Conserve este ticket para cambios o garantías de repuestos eléctricos.
+        - generic [ref=e2592]: Desarrollado por Bigtech v1.0.0
+    - generic [ref=e1531]:
+      - button "Anular Venta" [ref=e1532] [cursor=pointer]:
+        - img [ref=e2593]
+        - text: Anular Venta
+      - generic [ref=e1535]:
+        - button "Cerrar" [ref=e1536] [cursor=pointer]
+        - button "Imprimir [F9]" [ref=e1537] [cursor=pointer]:
+          - img [ref=e2595]
+          - text: Imprimir [F9]
+  - generic:
+    - generic:
+      - generic:
+        - heading "Registrar Movimiento de Caja" [level=3]
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic:
+            - generic: Monto ($) *
+            - spinbutton "Monto ($) *"
+          - generic:
+            - generic: Concepto / Motivo *
+            - textbox "Concepto / Motivo *":
+              - /placeholder: Ej. Cambio inicial, Pago de flete, Retiro de efectivo
+          - generic:
+            - generic: Notas u Observaciones (Opcional)
+            - textbox "Notas u Observaciones (Opcional)":
+              - /placeholder: Detalle adicional del movimiento...
+        - generic:
+          - button "Cancelar"
+          - button "Guardar Movimiento"
+  - generic:
+    - generic:
+      - generic:
+        - heading "Vista Previa de Importación" [level=3]
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic:
+            - text: Productos Totales
+            - heading "0" [level=2]
+          - generic:
+            - text: Nuevos (Crear)
+            - heading "0" [level=2]
+          - generic:
+            - text: Existentes (Actualizar)
+            - heading "0" [level=2]
+        - generic:
+          - img
+          - paragraph: El sistema ha mapeado las columnas de forma inteligente. Revisa la previsualización de las primeras 5 filas antes de confirmar la importación.
+        - generic:
+          - generic:
+            - table:
+              - rowgroup:
+                - row "SKU Nombre / Descripción Categoría Costo Precio Stock Acción":
+                  - columnheader "SKU"
+                  - columnheader "Nombre / Descripción"
+                  - columnheader "Categoría"
+                  - columnheader "Costo"
+                  - columnheader "Precio"
+                  - columnheader "Stock"
+                  - columnheader "Acción"
+              - rowgroup
+        - generic:
+          - generic: ¿No sabes qué columnas usar? Descarga la plantilla oficial en Excel.
+          - button "Descargar Plantilla":
+            - img
+            - text: Descargar Plantilla
+      - generic:
+        - button "Cancelar"
+        - button "Confirmar e Importar":
+          - img
+          - text: Confirmar e Importar
+  - generic:
+    - generic:
+      - generic:
+        - heading "Mi Carrito de Compras" [level=3]:
+          - img
+          - text: Mi Carrito de Compras
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic:
+            - generic: "TOTAL DEL PEDIDO:"
+            - generic: $0.00
+      - generic:
+        - button "Seguir Comprando"
+        - button "Proceder al Checkout":
+          - img
+          - text: Proceder al Checkout
+  - generic:
+    - generic:
+      - generic:
+        - heading "Datos de Entrega y Pago" [level=3]:
+          - img
+          - text: Datos de Entrega y Pago
+        - button:
+          - img
+      - generic:
+        - generic:
+          - generic:
+            - generic: Nombre y Apellido *
+            - textbox "Nombre y Apellido *":
+              - /placeholder: "Ej: Juan Pérez"
+          - generic:
+            - generic: WhatsApp / Teléfono *
+            - textbox "WhatsApp / Teléfono *":
+              - /placeholder: "Ej: +54 9 11 5555-6666"
+          - generic:
+            - generic: Dirección de Entrega / Notas *
+            - textbox "Dirección de Entrega / Notas *":
+              - /placeholder: "Ej: Av. Siempreviva 742, Depto 3B. Entregar por la tarde."
+          - generic:
+            - generic: Método de Pago Preferido *
+            - combobox "Método de Pago Preferido *":
+              - option "Seleccione una opción" [selected]
+              - option "Efectivo al recibir"
+              - option "Transferencia Bancaria / CVU"
+              - option "Mercado Pago / Enlace de pago"
+          - generic:
+            - text: RESUMEN DEL PEDIDO
+            - text: TOTAL A PAGAR
+            - heading "$0.00" [level=2]
+          - generic:
+            - button "Volver al Carrito"
+            - button "Enviar Pedido por WhatsApp":
+              - img
+              - text: Enviar Pedido por WhatsApp

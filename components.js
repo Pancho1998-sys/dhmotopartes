@@ -304,6 +304,31 @@ function renderReceipt(sale, settings) {
                 ` : ''}
             </div>
             
+            ${(() => {
+                let fiscalHtml = '';
+                if (sale.estado_fiscal === 'emitido') {
+                    fiscalHtml = `
+                        <hr class="ticket-divider" style="margin-top: 12px; border-top: 1px dashed var(--border-color);">
+                        <div class="ticket-info" style="font-family: monospace; font-size: 11px; text-align: center; line-height: 1.4; background-color: rgba(255, 255, 255, 0.02); padding: 8px; border-radius: 4px;">
+                            <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px; color: var(--success);">COMPROBANTE FISCAL</div>
+                            <div><strong>Nro Factura:</strong> ${sale.nro_comprobante}</div>
+                            <div><strong>CAE:</strong> ${sale.cae}</div>
+                            <div><strong>Vto. CAE:</strong> ${sale.cae_vto}</div>
+                            <div style="font-size: 9px; margin-top: 4px; color: var(--text-muted);">Comprobante Autorizado por ARCA (ex-AFIP)</div>
+                        </div>
+                    `;
+                } else if (sale.estado_fiscal === 'pendiente') {
+                    fiscalHtml = `
+                        <hr class="ticket-divider" style="margin-top: 12px; border-top: 1px dashed var(--border-color);">
+                        <div class="ticket-info" style="font-family: monospace; font-size: 11px; text-align: center; line-height: 1.4; color: var(--warning); background-color: rgba(255, 255, 255, 0.02); padding: 8px; border-radius: 4px;">
+                            <div style="font-weight: bold; font-size: 12px; margin-bottom: 4px;">COMPROBANTE PENDIENTE</div>
+                            <div>Pendiente de autorización fiscal.</div>
+                        </div>
+                    `;
+                }
+                return fiscalHtml;
+            })()}
+            
             <div class="ticket-footer">
                 <p style="font-weight: bold; margin-bottom: 6px;">¡Gracias por su compra!</p>
                 <p>Conserve este ticket para cambios o garantías de repuestos eléctricos.</p>
