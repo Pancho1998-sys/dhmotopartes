@@ -624,6 +624,31 @@ async function syncFiscalSettingsInputs() {
             if (envEl) envEl.value = config.environment || "homologacion";
             if (certEl) certEl.value = config.certificate_text || "";
             if (keyEl) keyEl.value = config.private_key_text || "";
+
+            // Mostrar advertencia si el certificado expira pronto (< 30 días)
+            const warningId = 'fiscal-cert-warning';
+            let warningEl = document.getElementById(warningId);
+            if (config.cert_expires_at) {
+                const expDate = new Date(config.cert_expires_at);
+                const daysLeft = Math.ceil((expDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                
+                if (daysLeft <= 30) {
+                    if (!warningEl) {
+                        warningEl = document.createElement('div');
+                        warningEl.id = warningId;
+                        warningEl.className = 'alert alert-warning';
+                        warningEl.style.cssText = 'background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; padding: 10px; border-radius: 6px; color: #f59e0b; margin-bottom: 15px; font-size: 13px; display: flex; align-items: center; gap: 8px;';
+                        const form = document.getElementById('settings-fiscal-form');
+                        if (form) form.insertBefore(warningEl, form.firstChild);
+                    }
+                    warningEl.innerHTML = `⚠️ <span>El certificado digital expira en <strong>${daysLeft} días</strong> (el ${expDate.toLocaleDateString()}). Renuévelo pronto para evitar interrupción del servicio.</span>`;
+                    warningEl.style.display = 'flex';
+                } else {
+                    if (warningEl) warningEl.style.display = 'none';
+                }
+            } else {
+                if (warningEl) warningEl.style.display = 'none';
+            }
         } else {
             if (cuitEl) cuitEl.value = "";
             if (posEl) posEl.value = 1;
@@ -631,6 +656,8 @@ async function syncFiscalSettingsInputs() {
             if (envEl) envEl.value = "homologacion";
             if (certEl) certEl.value = "";
             if (keyEl) keyEl.value = "";
+            const warningEl = document.getElementById('fiscal-cert-warning');
+            if (warningEl) warningEl.style.display = 'none';
         }
     } catch (e) {
         console.error("Error al sincronizar inputs fiscales:", e);
@@ -1203,11 +1230,34 @@ function setupEventListeners() {
         document.getElementById('customer-modal-title').textContent = "Registrar Cliente Nuevo";
         document.getElementById('customer-id-field').value = "";
         document.getElementById('customer-form').reset();
+        const dniInput = document.getElementById('cust-dni');
+        if (dniInput) {
+            dniInput.readOnly = false;
+            dniInput.required = true;
+        }
         openModal('modal-customer');
     });
 
     // Customer Save Form
     document.getElementById('customer-form').addEventListener('submit', saveCustomer);
+
+    const docTipoSelect = document.getElementById('cust-doc-tipo');
+    if (docTipoSelect) {
+        docTipoSelect.addEventListener('change', () => {
+            const dniInput = document.getElementById('cust-dni');
+            if (dniInput) {
+                if (docTipoSelect.value === '99') {
+                    dniInput.value = '0';
+                    dniInput.readOnly = true;
+                    dniInput.required = false;
+                } else {
+                    if (dniInput.value === '0') dniInput.value = '';
+                    dniInput.readOnly = false;
+                    dniInput.required = true;
+                }
+            }
+        });
+    }
 
     // Checkout Processing Listeners
     document.getElementById('checkout-confirm-btn').addEventListener('click', processCheckout);
@@ -1276,6 +1326,11 @@ function setupEventListeners() {
         document.getElementById('customer-modal-title').textContent = "Registrar Cliente Nuevo";
         document.getElementById('customer-id-field').value = "";
         document.getElementById('customer-form').reset();
+        const dniInput = document.getElementById('cust-dni');
+        if (dniInput) {
+            dniInput.readOnly = false;
+            dniInput.required = true;
+        }
         openModal('modal-customer');
     });
 
@@ -3047,12 +3102,23 @@ function renderCustomersTable() {
 
     let rowsHtml = '';
     pageItems.forEach(c => {
+        let docLabel = "DNI";
+        if (c.doc_tipo === 80) docLabel = "CUIT";
+        else if (c.doc_tipo === 99) docLabel = "CF";
+
+        let ivaLabel = "Consumidor Final";
+        if (c.cond_iva_receptor === 1) ivaLabel = "Resp. Inscripto";
+        else if (c.cond_iva_receptor === 6) ivaLabel = "Monotributista";
+        else if (c.cond_iva_receptor === 4) ivaLabel = "Sujeto Exento";
+
         rowsHtml += `
             <tr>
                 <td>${c.id}</td>
                 <td style="font-weight: 600;">
                     ${c.name}
-                    <div style="font-size: 11px; color: var(--text-muted); font-weight: normal; margin-top: 2px;">DNI: ${c.dni || 'No registrado'}</div>
+                    <div style="font-size: 11px; color: var(--text-muted); font-weight: normal; margin-top: 2px;">
+                        ${docLabel}: ${c.dni || 'No registrado'} | ${ivaLabel}
+                    </div>
                 </td>
                 <td>${c.phone || '<span class="text-muted">No registrado</span>'}</td>
                 <td>${c.email || '<span class="text-muted">No registrado</span>'}</td>
@@ -3096,6 +3162,8 @@ function saveCustomer(e) {
     const phone = document.getElementById('cust-phone').value.trim();
     const email = document.getElementById('cust-email').value.trim();
     const points = parseInt(document.getElementById('cust-points').value) || 0;
+    const docTipo = parseInt(document.getElementById('cust-doc-tipo').value) || 96;
+    const condIva = parseInt(document.getElementById('cust-iva-condition').value) || 5;
 
     const compiledName = `${firstName} ${lastName}`;
 
@@ -3110,6 +3178,8 @@ function saveCustomer(e) {
             phone,
             email,
             points,
+            doc_tipo: docTipo,
+            cond_iva_receptor: condIva,
             dateRegistered: new Date().toISOString().split('T')[0]
         });
     } else {
@@ -3123,6 +3193,8 @@ function saveCustomer(e) {
             customer.phone = phone;
             customer.email = email;
             customer.points = points;
+            customer.doc_tipo = docTipo;
+            customer.cond_iva_receptor = condIva;
         }
     }
 
@@ -3151,6 +3223,23 @@ window.editCustomer = function (id) {
     document.getElementById('cust-phone').value = c.phone || '';
     document.getElementById('cust-email').value = c.email || '';
     document.getElementById('cust-points').value = c.points;
+
+    const docTipoSelect = document.getElementById('cust-doc-tipo');
+    const dniInput = document.getElementById('cust-dni');
+    const ivaSelect = document.getElementById('cust-iva-condition');
+
+    if (docTipoSelect) docTipoSelect.value = c.doc_tipo || '96';
+    if (ivaSelect) ivaSelect.value = c.cond_iva_receptor || '5';
+
+    if (docTipoSelect && dniInput) {
+        if (docTipoSelect.value === '99') {
+            dniInput.readOnly = true;
+            dniInput.required = false;
+        } else {
+            dniInput.readOnly = false;
+            dniInput.required = true;
+        }
+    }
 
     openModal('modal-customer');
 };

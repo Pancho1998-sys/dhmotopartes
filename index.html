@@ -1503,9 +1503,28 @@
                             <input type="text" id="cust-last-name" required placeholder="Ej. Pérez">
                         </div>
                     </div>
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="cust-doc-tipo">Tipo de Documento</label>
+                            <select id="cust-doc-tipo">
+                                <option value="96">DNI</option>
+                                <option value="80">CUIT</option>
+                                <option value="99">Consumidor Final (Sin Doc)</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="cust-dni">Documento / CUIT *</label>
+                            <input type="text" id="cust-dni" required placeholder="Ej. 30123456">
+                        </div>
+                    </div>
                     <div class="form-group">
-                        <label for="cust-dni">DNI *</label>
-                        <input type="text" id="cust-dni" required placeholder="Ej. 30123456">
+                        <label for="cust-iva-condition">Condición frente al IVA</label>
+                        <select id="cust-iva-condition">
+                            <option value="5">Consumidor Final</option>
+                            <option value="1">Responsable Inscripto</option>
+                            <option value="6">Responsable Monotributo</option>
+                            <option value="4">Sujeto Exento</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="cust-phone">Número de Teléfono</label>
