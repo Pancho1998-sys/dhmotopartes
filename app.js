@@ -4039,44 +4039,61 @@ function applyBrandSettings() {
 
     if (bgType === 'glass') {
         dynamicCss = `
-            :root, body.light-theme {
-                --bg-card: rgba(255, 255, 255, 0.03) !important;
-                --bg-card-hover: rgba(255, 255, 255, 0.07) !important;
+            :root {
+                --bg-card: rgba(30, 41, 59, 0.75) !important;
+                --bg-card-hover: rgba(30, 41, 59, 0.85) !important;
                 --border-color: rgba(255, 255, 255, 0.08) !important;
+            }
+            body.light-theme {
+                --bg-card: rgba(255, 255, 255, 0.8) !important;
+                --bg-card-hover: rgba(255, 255, 255, 0.9) !important;
+                --border-color: rgba(15, 23, 42, 0.08) !important;
             }
             .metric-card, .dashboard-panel, .prod-card, .data-table-card, .data-op-card, .login-card {
                 backdrop-filter: blur(14px) !important;
                 -webkit-backdrop-filter: blur(14px) !important;
-                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
             }
         `;
     } else if (bgType === 'aurora') {
         dynamicCss = `
-            :root, body.light-theme {
-                --bg-card: linear-gradient(135deg, rgba(31, 41, 55, 0.9) 0%, rgba(99, 102, 241, 0.12) 100%) !important;
-                --bg-card-hover: linear-gradient(135deg, rgba(38, 53, 74, 0.9) 0%, rgba(99, 102, 241, 0.18) 100%) !important;
-                --border-color: rgba(99, 102, 241, 0.3) !important;
-                --border-hover: rgba(99, 102, 241, 0.5) !important;
+            :root {
+                --bg-card: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(249, 115, 22, 0.06) 100%) !important;
+                --bg-card-hover: linear-gradient(135deg, rgba(38, 53, 74, 0.95) 0%, rgba(249, 115, 22, 0.1) 100%) !important;
+                --border-color: rgba(249, 115, 22, 0.25) !important;
+                --border-hover: rgba(249, 115, 22, 0.45) !important;
+            }
+            body.light-theme {
+                --bg-card: linear-gradient(135deg, #ffffff 0%, rgba(249, 115, 22, 0.04) 100%) !important;
+                --bg-card-hover: linear-gradient(135deg, #f8fafc 0%, rgba(249, 115, 22, 0.08) 100%) !important;
+                --border-color: rgba(249, 115, 22, 0.18) !important;
+                --border-hover: rgba(249, 115, 22, 0.35) !important;
             }
             .metric-card, .dashboard-panel, .prod-card, .data-table-card, .data-op-card, .login-card {
-                box-shadow: 0 4px 20px rgba(99, 102, 241, 0.1) !important;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
             }
         `;
     } else if (bgType === 'carbon') {
         dynamicCss = `
-            :root, body.light-theme {
-                --bg-card: linear-gradient(135deg, #151a22 0%, #0a0c10 100%) !important;
-                --bg-card-hover: linear-gradient(135deg, #1b222c 0%, #101319 100%) !important;
-                --border-color: rgba(255, 255, 255, 0.04) !important;
-                --border-hover: rgba(255, 255, 255, 0.08) !important;
+            :root {
+                --bg-card: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
+                --bg-card-hover: linear-gradient(135deg, #273549 0%, #162030 100%) !important;
+                --border-color: rgba(255, 255, 255, 0.05) !important;
+                --border-hover: rgba(255, 255, 255, 0.1) !important;
+            }
+            body.light-theme {
+                --bg-card: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%) !important;
+                --bg-card-hover: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
+                --border-color: #cbd5e1 !important;
+                --border-hover: #94a3b8 !important;
             }
             .metric-card, .dashboard-panel, .prod-card, .data-table-card, .data-op-card, .login-card {
-                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.55) !important;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
             }
         `;
     } else if (bgType === 'color') {
         dynamicCss = `
-            :root, body.light-theme {
+            :root {
                 --bg-card: ${bgColor} !important;
                 --bg-card-hover: ${bgHover} !important;
             }
