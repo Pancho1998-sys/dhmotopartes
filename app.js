@@ -54,6 +54,8 @@ function ensureStateProperties(loadedState) {
     } else {
         loadedState.products.forEach(p => {
             if (p.priceDiscount === undefined) p.priceDiscount = 0;
+            if (p.isCombo === undefined) p.isCombo = false;
+            if (!p.components) p.components = [];
         });
     }
     if (!loadedState.cart) loadedState.cart = [];
@@ -1322,6 +1324,20 @@ function setupEventListeners() {
         document.getElementById('product-form').reset();
         document.getElementById('prod-sku').readOnly = false;
 
+        // Reset simple/combo product type UI
+        const typeSimple = document.getElementById('prod-type-simple');
+        if (typeSimple) typeSimple.checked = true;
+        const typeCombo = document.getElementById('prod-type-combo');
+        if (typeCombo) typeCombo.checked = false;
+        const stockInput = document.getElementById('prod-stock');
+        if (stockInput) {
+            stockInput.readOnly = false;
+        }
+        const comboSection = document.getElementById('combo-components-section');
+        if (comboSection) comboSection.style.display = 'none';
+        tempComboComponents = [];
+        window.updateComboComponentsTable();
+
         // Reset image selector UI
         tempProductImageBase64 = "";
         const fileRadio = document.getElementById('prod-image-src-file');
@@ -1339,6 +1355,52 @@ function setupEventListeners() {
     });
 
     document.getElementById('product-form').addEventListener('submit', saveProduct);
+
+    // Combo Type Switcher Listeners
+    const typeSimple = document.getElementById('prod-type-simple');
+    const typeCombo = document.getElementById('prod-type-combo');
+    const stockInput = document.getElementById('prod-stock');
+    const comboSection = document.getElementById('combo-components-section');
+
+    if (typeSimple && typeCombo) {
+        const toggleType = () => {
+            if (typeCombo.checked) {
+                if (stockInput) {
+                    stockInput.value = 0;
+                    stockInput.readOnly = true;
+                }
+                if (comboSection) comboSection.style.display = 'block';
+                window.updateComboComponentsTable();
+            } else {
+                if (stockInput) {
+                    stockInput.readOnly = false;
+                }
+                if (comboSection) comboSection.style.display = 'none';
+            }
+        };
+        typeSimple.addEventListener('change', toggleType);
+        typeCombo.addEventListener('change', toggleType);
+    }
+
+    // Combo Components Search Listener
+    const comboSearchInput = document.getElementById('combo-search-input');
+    if (comboSearchInput) {
+        comboSearchInput.addEventListener('input', window.handleComboSearch);
+    }
+
+    // Combo Apply Suggested Prices
+    const applyBtn = document.getElementById('combo-apply-suggested-btn');
+    if (applyBtn) {
+        applyBtn.addEventListener('click', () => {
+            const cost = parseFloat(applyBtn.dataset.cost) || 0;
+            const price = parseFloat(applyBtn.dataset.price) || 0;
+            const discount = parseFloat(applyBtn.dataset.discount) || 0;
+            document.getElementById('prod-cost').value = cost.toFixed(2);
+            document.getElementById('prod-price').value = price.toFixed(2);
+            document.getElementById('prod-price-discount').value = discount.toFixed(2);
+        });
+    }
+
     const debouncedRenderInventoryTable = debounce(renderInventoryTable, 150);
     document.getElementById('inventory-search').addEventListener('input', debouncedRenderInventoryTable);
     document.getElementById('inventory-filter-category').addEventListener('change', renderInventoryTable);
@@ -2509,7 +2571,8 @@ window.addCartItem = function(prodId, shouldRender = true) {
     const existingInCart = state.cart.find(item => item.id === prodId);
     const cartQty = existingInCart ? existingInCart.quantity : 0;
 
-    if (cartQty >= product.stock) {
+    const maxStockAvailable = product.isCombo ? window.getComboStock(product) : product.stock;
+    if (cartQty >= maxStockAvailable) {
         playScanSound('fail');
         alert(`No hay más stock disponible de "${product.name}".`);
         return;
@@ -2784,7 +2847,18 @@ async function processCheckout() {
     state.cart.forEach(cartItem => {
         const prod = state.products.find(p => p.id === cartItem.id);
         if (prod) {
-            prod.stock = Math.max(0, prod.stock - cartItem.quantity);
+            if (prod.isCombo && prod.components) {
+                // Deduct stock of components
+                prod.components.forEach(comp => {
+                    const compProd = state.products.find(p => p.id === comp.id);
+                    if (compProd) {
+                        compProd.stock = Math.max(0, compProd.stock - (comp.quantity * cartItem.quantity));
+                    }
+                });
+            } else {
+                // Deduct stock of simple product
+                prod.stock = Math.max(0, prod.stock - cartItem.quantity);
+            }
         }
     });
 
@@ -2950,20 +3024,25 @@ function renderInventoryTable() {
         const discountPrice = parseFloat(p.priceDiscount) || 0;
         const marginL3 = discountPrice > 0 ? ((discountPrice - p.cost) / discountPrice) * 100 : 0;
 
+        const stock = p.isCombo ? window.getComboStock(p) : p.stock;
         let stockBadge = 'ok';
-        let stockText = `${p.stock} U.`;
-        if (p.stock <= 0) {
+        let stockText = `${stock} U.`;
+        if (stock <= 0) {
             stockBadge = 'out';
             stockText = 'Sin Stock';
-        } else if (p.stock <= p.stockMin) {
+        } else if (stock <= p.stockMin) {
             stockBadge = 'low';
-            stockText = `${p.stock} (Bajo)`;
+            stockText = `${stock} (Bajo)`;
         }
+
+        const nameCell = p.isCombo 
+            ? `<div class="flex-align-center" style="gap: 6px; display: inline-flex;">${p.name} <span class="badge badge-primary" style="font-size: 10px; padding: 2px 6px; background-color: var(--primary); color: #fff; border-radius: var(--radius-sm); font-weight: bold; margin-left: 6px;">Combo</span></div>`
+            : p.name;
 
         rowsHtml += `
             <tr>
                 <td style="font-weight: 700;">${p.sku}</td>
-                <td style="font-weight: 500;">${p.name}</td>
+                <td style="font-weight: 500;">${nameCell}</td>
                 <td>${p.category}</td>
                 <td class="text-right">${state.settings.currency}${p.cost.toFixed(2)}</td>
                 <td class="text-right" style="font-weight: 700;">${state.settings.currency}${p.price.toFixed(2)}</td>
@@ -3020,6 +3099,9 @@ function saveProduct(e) {
     const isFileMode = document.getElementById('prod-image-src-file').checked;
     const image = isFileMode ? tempProductImageBase64 : document.getElementById('prod-image').value.trim();
 
+    const isCombo = document.getElementById('prod-type-combo').checked;
+    const finalStock = isCombo ? 0 : stock;
+
     // Check SKU duplicate on creation
     if (!id) {
         const skuExists = state.products.find(p => p.sku === sku);
@@ -3030,7 +3112,11 @@ function saveProduct(e) {
 
         state.products.push({
             id: `p_${Date.now()}`,
-            sku, name, category, cost, price, priceDiscount, stock, stockMin, image
+            sku, name, category, cost, price, priceDiscount, 
+            stock: finalStock, 
+            stockMin, image,
+            isCombo,
+            components: isCombo ? [...tempComboComponents] : []
         });
     } else {
         const product = state.products.find(p => p.id === id);
@@ -3041,7 +3127,11 @@ function saveProduct(e) {
             product.cost = cost;
             product.price = price;
             product.priceDiscount = priceDiscount;
-            product.stock = stock;
+            product.isCombo = isCombo;
+            product.components = isCombo ? [...tempComboComponents] : [];
+            if (!isCombo) {
+                product.stock = stock;
+            }
             product.stockMin = stockMin;
             product.image = image;
         }
@@ -3066,8 +3156,31 @@ window.editProduct = function (id) {
     document.getElementById('prod-cost').value = p.cost;
     document.getElementById('prod-price').value = p.price;
     document.getElementById('prod-price-discount').value = p.priceDiscount || 0;
-    document.getElementById('prod-stock').value = p.stock;
     document.getElementById('prod-stock-min').value = p.stockMin;
+
+    const isCombo = p.isCombo || false;
+    document.getElementById('prod-type-simple').checked = !isCombo;
+    document.getElementById('prod-type-combo').checked = isCombo;
+
+    const stockInput = document.getElementById('prod-stock');
+    const comboSection = document.getElementById('combo-components-section');
+
+    if (isCombo) {
+        if (stockInput) {
+            stockInput.value = window.getComboStock(p);
+            stockInput.readOnly = true;
+        }
+        if (comboSection) comboSection.style.display = 'block';
+        tempComboComponents = [...(p.components || [])];
+    } else {
+        if (stockInput) {
+            stockInput.value = p.stock;
+            stockInput.readOnly = false;
+        }
+        if (comboSection) comboSection.style.display = 'none';
+        tempComboComponents = [];
+    }
+    window.updateComboComponentsTable();
 
     // Reset image uploader UI first
     tempProductImageBase64 = "";
@@ -3857,7 +3970,16 @@ function voidSale() {
         sale.items.forEach(item => {
             const prod = state.products.find(p => p.id === item.id);
             if (prod) {
-                prod.stock += item.quantity;
+                if (prod.isCombo && prod.components) {
+                    prod.components.forEach(comp => {
+                        const compProd = state.products.find(p => p.id === comp.id);
+                        if (compProd) {
+                            compProd.stock += comp.quantity * item.quantity;
+                        }
+                    });
+                } else {
+                    prod.stock += item.quantity;
+                }
             }
         });
 
@@ -4841,6 +4963,8 @@ function confirmExcelImport() {
                 priceDiscount: p.priceDiscount,
                 stock: p.stock,
                 stockMin: p.stockMin,
+                isCombo: false,
+                components: [],
                 image: ''
             });
             created++;
@@ -4852,7 +4976,9 @@ function confirmExcelImport() {
                 prod.cost = p.cost;
                 prod.price = p.price;
                 prod.priceDiscount = p.priceDiscount;
-                prod.stock = p.stock;
+                if (!prod.isCombo) {
+                    prod.stock = p.stock;
+                }
                 prod.stockMin = p.stockMin;
                 updated++;
             }
@@ -5406,4 +5532,166 @@ window.sendCatalogOrder = function (e) {
     document.getElementById('catalog-checkout-form').reset();
 
     alert("¡Pedido generado con éxito! Se ha abierto una pestaña para enviar el mensaje por WhatsApp.");
+};
+
+// ==========================================================================
+// COMBOS & BUNDLES UTILITIES & EVENT HANDLERS
+// ==========================================================================
+let tempComboComponents = [];
+
+window.getComboStock = function(comboProduct) {
+    if (!comboProduct.components || comboProduct.components.length === 0) return 0;
+    let minStock = Infinity;
+    comboProduct.components.forEach(comp => {
+        const realProduct = state.products.find(p => p.id === comp.id);
+        if (realProduct) {
+            const maxCombosFromComp = Math.floor(realProduct.stock / comp.quantity);
+            if (maxCombosFromComp < minStock) {
+                minStock = maxCombosFromComp;
+            }
+        } else {
+            minStock = 0; // component product missing
+        }
+    });
+    return minStock === Infinity ? 0 : minStock;
+};
+
+window.updateComboComponentsTable = function() {
+    const tbody = document.getElementById('combo-components-tbody');
+    const currency = state.settings.currency || '$';
+    if (!tbody) return;
+
+    if (tempComboComponents.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center text-muted" style="padding: 15px;">
+                    No hay componentes agregados a este combo.
+                </td>
+            </tr>
+        `;
+        document.getElementById('combo-suggested-prices').textContent = "Componentes sumados: L2 Costo $0.00 | L1 Público $0.00";
+        return;
+    }
+
+    let html = '';
+    let totalCost = 0;
+    let totalPrice = 0;
+
+    tempComboComponents.forEach((comp, idx) => {
+        const itemTotalCost = comp.cost * comp.quantity;
+        const itemTotalPrice = comp.price * comp.quantity;
+        totalCost += itemTotalCost;
+        totalPrice += itemTotalPrice;
+
+        html += `
+            <tr>
+                <td style="font-weight: 700;">${comp.sku}</td>
+                <td>${comp.name}</td>
+                <td class="text-center">
+                    <input type="number" min="1" value="${comp.quantity}" style="width: 60px; padding: 4px; text-align: center; margin: 0;" onchange="updateComboComponentQty(${idx}, this.value)">
+                </td>
+                <td class="text-right">${currency}${comp.price.toFixed(2)}</td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-icon" style="color: var(--danger); padding: 4px;" onclick="removeComboComponent(${idx})">
+                        <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+    document.getElementById('combo-suggested-prices').textContent = `Componentes sumados: L2 Costo ${currency}${totalCost.toFixed(2)} | L1 Público ${currency}${totalPrice.toFixed(2)}`;
+    
+    const applyBtn = document.getElementById('combo-apply-suggested-btn');
+    if (applyBtn) {
+        applyBtn.dataset.cost = totalCost;
+        applyBtn.dataset.price = totalPrice;
+        applyBtn.dataset.discount = totalPrice * 0.9;
+    }
+
+    if (window.lucide) lucide.createIcons();
+};
+
+window.updateComboComponentQty = function(idx, val) {
+    const qty = parseInt(val) || 1;
+    if (tempComboComponents[idx]) {
+        tempComboComponents[idx].quantity = qty;
+        window.updateComboComponentsTable();
+    }
+};
+
+window.removeComboComponent = function(idx) {
+    tempComboComponents.splice(idx, 1);
+    window.updateComboComponentsTable();
+};
+
+window.handleComboSearch = function(e) {
+    const query = e.target.value.toLowerCase().trim();
+    const resultsContainer = document.getElementById('combo-search-results');
+    if (!resultsContainer) return;
+
+    if (!query) {
+        resultsContainer.innerHTML = '';
+        resultsContainer.style.display = 'none';
+        return;
+    }
+
+    const currentProdId = document.getElementById('product-id-field').value;
+
+    const matches = state.products.filter(p => {
+        return !p.isCombo && 
+               p.id !== currentProdId && 
+               (p.name.toLowerCase().includes(query) || p.sku.toLowerCase().includes(query));
+    });
+
+    if (matches.length === 0) {
+        resultsContainer.innerHTML = '<div style="padding: 10px; color: var(--text-muted); font-size: 13px;">No se encontraron productos simples.</div>';
+        resultsContainer.style.display = 'block';
+        return;
+    }
+
+    let html = '';
+    matches.slice(0, 5).forEach(p => {
+        html += `
+            <div class="search-result-item" style="padding: 10px; cursor: pointer; border-bottom: 1px solid var(--border-color); font-size: 13px; display: flex; justify-content: space-between; align-items: center;" onclick="addComboComponentById('${p.id}')" onmouseover="this.style.background='rgba(31,41,55,0.8)'" onmouseout="this.style.background='transparent'">
+                <div>
+                    <span style="font-weight: 700;">${p.sku}</span> - <span>${p.name}</span>
+                </div>
+                <span style="font-weight: 600; color: var(--primary);">${state.settings.currency}${p.price.toFixed(2)}</span>
+            </div>
+        `;
+    });
+    
+    resultsContainer.innerHTML = html;
+    resultsContainer.style.display = 'block';
+};
+
+window.addComboComponentById = function(prodId) {
+    const p = state.products.find(prod => prod.id === prodId);
+    if (!p) return;
+
+    const exists = tempComboComponents.find(comp => comp.id === prodId);
+    if (exists) {
+        exists.quantity += 1;
+    } else {
+        tempComboComponents.push({
+            id: p.id,
+            sku: p.sku,
+            name: p.name,
+            price: p.price,
+            cost: p.cost,
+            quantity: 1
+        });
+    }
+
+    const searchInput = document.getElementById('combo-search-input');
+    if (searchInput) searchInput.value = '';
+    const resultsContainer = document.getElementById('combo-search-results');
+    if (resultsContainer) {
+        resultsContainer.innerHTML = '';
+        resultsContainer.style.display = 'none';
+    }
+
+    window.updateComboComponentsTable();
 };

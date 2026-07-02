@@ -1398,6 +1398,19 @@
             <form id="product-form">
                 <input type="hidden" id="product-id-field">
                 <div class="modal-body">
+                    <div class="form-group">
+                        <label>Tipo de Registro</label>
+                        <div style="display: flex; gap: 20px; margin-top: 6px; margin-bottom: 12px;">
+                            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; cursor: pointer;">
+                                <input type="radio" name="prod-type" id="prod-type-simple" value="simple" checked>
+                                Repuesto / Herramienta (Simple)
+                            </label>
+                            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; cursor: pointer;">
+                                <input type="radio" name="prod-type" id="prod-type-combo" value="combo">
+                                Combo / Kit de Artículos
+                            </label>
+                        </div>
+                    </div>
                     <div class="form-row">
                         <div class="form-group col-6">
                             <label for="prod-sku">SKU / Código Único *</label>
@@ -1488,6 +1501,43 @@
                                     <i data-lucide="trash-2" style="width: 15px; height: 15px;"></i>
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Combo Components Section -->
+                    <div id="combo-components-section" style="display: none; border-top: 1px solid var(--border-color); margin-top: 16px; padding-top: 16px;">
+                        <h4 style="font-family: var(--font-title); font-size: 14px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                            <i data-lucide="package-plus" style="width: 16px; height: 16px; color: var(--primary);"></i>
+                            Componentes del Combo
+                        </h4>
+                        <div class="form-group" style="position: relative;">
+                            <label for="combo-search-input">Buscar productos para agregar al combo</label>
+                            <input type="text" id="combo-search-input" placeholder="Buscar por SKU o descripción..." style="margin-bottom: 0;">
+                            <div id="combo-search-results" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: #1f2937; border: 1px solid var(--border-color); border-radius: var(--radius-sm); z-index: 100; max-height: 180px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.25);">
+                                <!-- Results -->
+                            </div>
+                        </div>
+                        
+                        <div class="table-responsive" style="margin-top: 12px; max-height: 200px; overflow-y: auto;">
+                            <table class="data-table" style="font-size: 12px;" id="combo-components-table">
+                                <thead>
+                                    <tr>
+                                        <th>SKU</th>
+                                        <th>Nombre</th>
+                                        <th style="width: 80px;" class="text-center">Cant.</th>
+                                        <th class="text-right">Precio L1</th>
+                                        <th class="text-center">Quitar</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="combo-components-tbody">
+                                    <!-- Components -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; background: rgba(var(--primary-rgb), 0.05); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid rgba(var(--primary-rgb), 0.15);">
+                            <span class="small text-muted" id="combo-suggested-prices" style="font-size: 11px;">Componentes sumados: L2 Costo $0.00 | L1 Público $0.00</span>
+                            <button type="button" class="btn btn-secondary small" id="combo-apply-suggested-btn" style="padding: 4px 8px; font-size: 11px;">Usar Precios Sugeridos</button>
                         </div>
                     </div>
                 </div>
