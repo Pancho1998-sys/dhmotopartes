@@ -1369,7 +1369,16 @@ function setupEventListeners() {
                     stockInput.value = 0;
                     stockInput.readOnly = true;
                 }
-                if (comboSection) comboSection.style.display = 'block';
+                if (comboSection) {
+                    comboSection.style.display = 'block';
+                    // Scroll to bottom of modal-body to reveal search magnifying glass
+                    const modalBody = comboSection.closest('.modal-body');
+                    if (modalBody) {
+                        setTimeout(() => {
+                            modalBody.scrollTop = modalBody.scrollHeight;
+                        }, 150);
+                    }
+                }
                 window.updateComboComponentsTable();
             } else {
                 if (stockInput) {
