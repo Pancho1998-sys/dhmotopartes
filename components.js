@@ -167,17 +167,21 @@ window.hideChartTooltip = function() {
  * @param {string} currency - Store currency symbol
  * @returns {string} HTML string
  */
-function createPOSProductCard(product, currency = '$') {
-    const isOutOfStock = product.stock <= 0;
+function createPOSProductCard(product, currency = '$', priceKey = 'price') {
+    const stock = (product.isCombo && typeof window.getComboStock === 'function') 
+        ? window.getComboStock(product) 
+        : product.stock;
+        
+    const isOutOfStock = stock <= 0;
     const cardClass = isOutOfStock ? 'prod-card out-of-stock' : 'prod-card';
     
     let stockClass = 'stock-badge-ok';
-    let stockText = `${product.stock} disp.`;
+    let stockText = `${stock} disp.`;
     
-    if (product.stock <= 0) {
+    if (stock <= 0) {
         stockClass = 'stock-badge-out';
         stockText = 'Agotado';
-    } else if (product.stock <= product.stockMin) {
+    } else if (stock <= product.stockMin) {
         stockClass = 'stock-badge-low';
         stockText = 'Stock Bajo';
     }
@@ -188,8 +192,18 @@ function createPOSProductCard(product, currency = '$') {
     
     const iconStyle = product.image ? 'display: none;' : '';
 
+    let displayedPrice = product.price;
+    if (priceKey === 'priceDiscount') {
+        displayedPrice = parseFloat(product.priceDiscount) || product.price;
+    } else if (priceKey === 'cost') {
+        displayedPrice = product.cost;
+    }
+
+    const comboBadge = product.isCombo ? `<span class="badge badge-primary" style="position: absolute; top: 8px; right: 8px; font-size: 10px; z-index: 10; padding: 2px 6px; background-color: var(--primary); color: #fff; border-radius: var(--radius-sm); font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">Combo</span>` : '';
+
     return `
-        <div class="${cardClass}" data-id="${product.id}" onclick="${isOutOfStock ? '' : `addCartItem('${product.id}')`}">
+        <div class="${cardClass}" data-id="${product.id}" onclick="${isOutOfStock ? '' : `addCartItem('${product.id}')`}" style="position: relative;">
+            ${comboBadge}
             <span class="prod-card-sku">${product.sku}</span>
             <div class="prod-card-image">
                 ${imagePlaceholder}
@@ -201,7 +215,7 @@ function createPOSProductCard(product, currency = '$') {
                 <span class="prod-card-cat">${product.category}</span>
                 <h4 class="prod-card-title" title="${product.name}">${product.name}</h4>
                 <div class="prod-card-footer">
-                    <span class="prod-card-price">${currency}${product.price.toFixed(2)}</span>
+                    <span class="prod-card-price">${currency}${displayedPrice.toFixed(2)}</span>
                     <span class="prod-card-stock ${stockClass}">${stockText}</span>
                 </div>
             </div>

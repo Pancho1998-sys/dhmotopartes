@@ -49,7 +49,15 @@ function resetStateToDefault() {
 
 function ensureStateProperties(loadedState) {
     if (!loadedState) return JSON.parse(JSON.stringify(DEFAULT_STATE));
-    if (!loadedState.products) loadedState.products = [];
+    if (!loadedState.products) {
+        loadedState.products = [];
+    } else {
+        loadedState.products.forEach(p => {
+            if (p.priceDiscount === undefined) p.priceDiscount = 0;
+            if (p.isCombo === undefined) p.isCombo = false;
+            if (!p.components) p.components = [];
+        });
+    }
     if (!loadedState.cart) loadedState.cart = [];
     if (!loadedState.sales) loadedState.sales = [];
     if (!loadedState.customers) loadedState.customers = [];
@@ -1222,6 +1230,25 @@ function setupEventListeners() {
     document.getElementById('cart-apply-discount-btn').addEventListener('click', () => openModal('modal-discount'));
     document.getElementById('cart-checkout-btn').addEventListener('click', openCheckoutModal);
 
+    // Price List and Customer selection auto-switch listeners in POS
+    const cartPriceListSelect = document.getElementById('cart-price-list-select');
+    if (cartPriceListSelect) {
+        cartPriceListSelect.addEventListener('change', window.changeCartPriceList);
+    }
+    const cartCustomerSelect = document.getElementById('cart-customer-select');
+    if (cartCustomerSelect) {
+        cartCustomerSelect.addEventListener('change', () => {
+            const customerId = cartCustomerSelect.value;
+            if (customerId !== "0") {
+                const customer = state.customers.find(c => c.id === customerId);
+                if (customer && customer.defaultPriceList && cartPriceListSelect) {
+                    cartPriceListSelect.value = customer.defaultPriceList;
+                    window.changeCartPriceList();
+                }
+            }
+        });
+    }
+
     // Discount Save
     document.getElementById('discount-save-btn').addEventListener('click', applyCartDiscount);
 
@@ -1297,6 +1324,20 @@ function setupEventListeners() {
         document.getElementById('product-form').reset();
         document.getElementById('prod-sku').readOnly = false;
 
+        // Reset simple/combo product type UI
+        const typeSimple = document.getElementById('prod-type-simple');
+        if (typeSimple) typeSimple.checked = true;
+        const typeCombo = document.getElementById('prod-type-combo');
+        if (typeCombo) typeCombo.checked = false;
+        const stockInput = document.getElementById('prod-stock');
+        if (stockInput) {
+            stockInput.readOnly = false;
+        }
+        const comboSection = document.getElementById('combo-components-section');
+        if (comboSection) comboSection.style.display = 'none';
+        tempComboComponents = [];
+        window.updateComboComponentsTable();
+
         // Reset image selector UI
         tempProductImageBase64 = "";
         const fileRadio = document.getElementById('prod-image-src-file');
@@ -1314,6 +1355,61 @@ function setupEventListeners() {
     });
 
     document.getElementById('product-form').addEventListener('submit', saveProduct);
+
+    // Combo Type Switcher Listeners
+    const typeSimple = document.getElementById('prod-type-simple');
+    const typeCombo = document.getElementById('prod-type-combo');
+    const stockInput = document.getElementById('prod-stock');
+    const comboSection = document.getElementById('combo-components-section');
+
+    if (typeSimple && typeCombo) {
+        const toggleType = () => {
+            if (typeCombo.checked) {
+                if (stockInput) {
+                    stockInput.value = 0;
+                    stockInput.readOnly = true;
+                }
+                if (comboSection) {
+                    comboSection.style.display = 'block';
+                    // Scroll to bottom of modal-body to reveal search magnifying glass
+                    const modalBody = comboSection.closest('.modal-body');
+                    if (modalBody) {
+                        setTimeout(() => {
+                            modalBody.scrollTop = modalBody.scrollHeight;
+                        }, 150);
+                    }
+                }
+                window.updateComboComponentsTable();
+            } else {
+                if (stockInput) {
+                    stockInput.readOnly = false;
+                }
+                if (comboSection) comboSection.style.display = 'none';
+            }
+        };
+        typeSimple.addEventListener('change', toggleType);
+        typeCombo.addEventListener('change', toggleType);
+    }
+
+    // Combo Components Search Listener
+    const comboSearchInput = document.getElementById('combo-search-input');
+    if (comboSearchInput) {
+        comboSearchInput.addEventListener('input', window.handleComboSearch);
+    }
+
+    // Combo Apply Suggested Prices
+    const applyBtn = document.getElementById('combo-apply-suggested-btn');
+    if (applyBtn) {
+        applyBtn.addEventListener('click', () => {
+            const cost = parseFloat(applyBtn.dataset.cost) || 0;
+            const price = parseFloat(applyBtn.dataset.price) || 0;
+            const discount = parseFloat(applyBtn.dataset.discount) || 0;
+            document.getElementById('prod-cost').value = cost.toFixed(2);
+            document.getElementById('prod-price').value = price.toFixed(2);
+            document.getElementById('prod-price-discount').value = discount.toFixed(2);
+        });
+    }
+
     const debouncedRenderInventoryTable = debounce(renderInventoryTable, 150);
     document.getElementById('inventory-search').addEventListener('input', debouncedRenderInventoryTable);
     document.getElementById('inventory-filter-category').addEventListener('change', renderInventoryTable);
@@ -2440,9 +2536,12 @@ function renderPOSProductGrid() {
         `;
         if (posPagination) posPagination.style.display = 'none';
     } else {
+        const priceListSelect = document.getElementById('cart-price-list-select');
+        const priceKey = priceListSelect ? priceListSelect.value : 'price';
+
         let cardsHtml = '';
         pageItems.forEach(p => {
-            cardsHtml += createPOSProductCard(p, state.settings.currency);
+            cardsHtml += createPOSProductCard(p, state.settings.currency, priceKey);
         });
         grid.innerHTML = cardsHtml;
         
@@ -2481,20 +2580,31 @@ window.addCartItem = function(prodId, shouldRender = true) {
     const existingInCart = state.cart.find(item => item.id === prodId);
     const cartQty = existingInCart ? existingInCart.quantity : 0;
 
-    if (cartQty >= product.stock) {
+    const maxStockAvailable = product.isCombo ? window.getComboStock(product) : product.stock;
+    if (cartQty >= maxStockAvailable) {
         playScanSound('fail');
         alert(`No hay más stock disponible de "${product.name}".`);
         return;
     }
 
+    const priceListSelect = document.getElementById('cart-price-list-select');
+    const priceKey = priceListSelect ? priceListSelect.value : 'price';
+    let itemPrice = product.price;
+    if (priceKey === 'priceDiscount') {
+        itemPrice = parseFloat(product.priceDiscount) || product.price;
+    } else if (priceKey === 'cost') {
+        itemPrice = product.cost;
+    }
+
     if (existingInCart) {
         existingInCart.quantity += 1;
+        existingInCart.price = itemPrice;
     } else {
         state.cart.push({
             id: product.id,
             name: product.name,
             sku: product.sku,
-            price: product.price,
+            price: itemPrice,
             quantity: 1
         });
     }
@@ -2503,6 +2613,28 @@ window.addCartItem = function(prodId, shouldRender = true) {
     if (shouldRender) {
         renderCart();
     }
+};
+
+window.changeCartPriceList = function() {
+    const priceListSelect = document.getElementById('cart-price-list-select');
+    if (!priceListSelect) return;
+    const priceKey = priceListSelect.value;
+
+    state.cart.forEach(item => {
+        const product = state.products.find(p => p.id === item.id);
+        if (product) {
+            if (priceKey === 'priceDiscount') {
+                item.price = parseFloat(product.priceDiscount) || product.price;
+            } else if (priceKey === 'cost') {
+                item.price = product.cost;
+            } else {
+                item.price = product.price;
+            }
+        }
+    });
+
+    renderCart();
+    renderPOSProductGrid();
 };
 
 window.modifyCartItemQty = function (prodId, delta) {
@@ -2724,7 +2856,18 @@ async function processCheckout() {
     state.cart.forEach(cartItem => {
         const prod = state.products.find(p => p.id === cartItem.id);
         if (prod) {
-            prod.stock = Math.max(0, prod.stock - cartItem.quantity);
+            if (prod.isCombo && prod.components) {
+                // Deduct stock of components
+                prod.components.forEach(comp => {
+                    const compProd = state.products.find(p => p.id === comp.id);
+                    if (compProd) {
+                        compProd.stock = Math.max(0, compProd.stock - (comp.quantity * cartItem.quantity));
+                    }
+                });
+            } else {
+                // Deduct stock of simple product
+                prod.stock = Math.max(0, prod.stock - cartItem.quantity);
+            }
         }
     });
 
@@ -2886,26 +3029,35 @@ function renderInventoryTable() {
 
     let rowsHtml = '';
     pageItems.forEach(p => {
-        const margin = p.price > 0 ? ((p.price - p.cost) / p.price) * 100 : 0;
+        const marginL1 = p.price > 0 ? ((p.price - p.cost) / p.price) * 100 : 0;
+        const discountPrice = parseFloat(p.priceDiscount) || 0;
+        const marginL3 = discountPrice > 0 ? ((discountPrice - p.cost) / discountPrice) * 100 : 0;
 
+        const stock = p.isCombo ? window.getComboStock(p) : p.stock;
         let stockBadge = 'ok';
-        let stockText = `${p.stock} U.`;
-        if (p.stock <= 0) {
+        let stockText = `${stock} U.`;
+        if (stock <= 0) {
             stockBadge = 'out';
             stockText = 'Sin Stock';
-        } else if (p.stock <= p.stockMin) {
+        } else if (stock <= p.stockMin) {
             stockBadge = 'low';
-            stockText = `${p.stock} (Bajo)`;
+            stockText = `${stock} (Bajo)`;
         }
+
+        const nameCell = p.isCombo 
+            ? `<div class="flex-align-center" style="gap: 6px; display: inline-flex;">${p.name} <span class="badge badge-primary" style="font-size: 10px; padding: 2px 6px; background-color: var(--primary); color: #fff; border-radius: var(--radius-sm); font-weight: bold; margin-left: 6px;">Combo</span></div>`
+            : p.name;
 
         rowsHtml += `
             <tr>
                 <td style="font-weight: 700;">${p.sku}</td>
-                <td style="font-weight: 500;">${p.name}</td>
+                <td style="font-weight: 500;">${nameCell}</td>
                 <td>${p.category}</td>
                 <td class="text-right">${state.settings.currency}${p.cost.toFixed(2)}</td>
                 <td class="text-right" style="font-weight: 700;">${state.settings.currency}${p.price.toFixed(2)}</td>
-                <td class="text-center text-emerald" style="font-weight: 600;">${margin.toFixed(0)}%</td>
+                <td class="text-right">${state.settings.currency}${discountPrice.toFixed(2)}</td>
+                <td class="text-center text-emerald" style="font-weight: 600;">${marginL1.toFixed(0)}%</td>
+                <td class="text-center text-amber" style="font-weight: 600;">${marginL3.toFixed(0)}%</td>
                 <td class="text-center">
                     <span class="stock-pill ${stockBadge}">${stockText}</span>
                 </td>
@@ -2949,11 +3101,15 @@ function saveProduct(e) {
     const category = document.getElementById('prod-category').value;
     const cost = parseFloat(document.getElementById('prod-cost').value) || 0;
     const price = parseFloat(document.getElementById('prod-price').value) || 0;
+    const priceDiscount = parseFloat(document.getElementById('prod-price-discount').value) || 0;
     const stock = parseInt(document.getElementById('prod-stock').value) || 0;
     const stockMin = parseInt(document.getElementById('prod-stock-min').value) || 5;
 
     const isFileMode = document.getElementById('prod-image-src-file').checked;
     const image = isFileMode ? tempProductImageBase64 : document.getElementById('prod-image').value.trim();
+
+    const isCombo = document.getElementById('prod-type-combo').checked;
+    const finalStock = isCombo ? 0 : stock;
 
     // Check SKU duplicate on creation
     if (!id) {
@@ -2965,7 +3121,11 @@ function saveProduct(e) {
 
         state.products.push({
             id: `p_${Date.now()}`,
-            sku, name, category, cost, price, stock, stockMin, image
+            sku, name, category, cost, price, priceDiscount, 
+            stock: finalStock, 
+            stockMin, image,
+            isCombo,
+            components: isCombo ? [...tempComboComponents] : []
         });
     } else {
         const product = state.products.find(p => p.id === id);
@@ -2975,7 +3135,12 @@ function saveProduct(e) {
             product.category = category;
             product.cost = cost;
             product.price = price;
-            product.stock = stock;
+            product.priceDiscount = priceDiscount;
+            product.isCombo = isCombo;
+            product.components = isCombo ? [...tempComboComponents] : [];
+            if (!isCombo) {
+                product.stock = stock;
+            }
             product.stockMin = stockMin;
             product.image = image;
         }
@@ -2999,8 +3164,32 @@ window.editProduct = function (id) {
     document.getElementById('prod-category').value = p.category;
     document.getElementById('prod-cost').value = p.cost;
     document.getElementById('prod-price').value = p.price;
-    document.getElementById('prod-stock').value = p.stock;
+    document.getElementById('prod-price-discount').value = p.priceDiscount || 0;
     document.getElementById('prod-stock-min').value = p.stockMin;
+
+    const isCombo = p.isCombo || false;
+    document.getElementById('prod-type-simple').checked = !isCombo;
+    document.getElementById('prod-type-combo').checked = isCombo;
+
+    const stockInput = document.getElementById('prod-stock');
+    const comboSection = document.getElementById('combo-components-section');
+
+    if (isCombo) {
+        if (stockInput) {
+            stockInput.value = window.getComboStock(p);
+            stockInput.readOnly = true;
+        }
+        if (comboSection) comboSection.style.display = 'block';
+        tempComboComponents = [...(p.components || [])];
+    } else {
+        if (stockInput) {
+            stockInput.value = p.stock;
+            stockInput.readOnly = false;
+        }
+        if (comboSection) comboSection.style.display = 'none';
+        tempComboComponents = [];
+    }
+    window.updateComboComponentsTable();
 
     // Reset image uploader UI first
     tempProductImageBase64 = "";
@@ -3164,6 +3353,7 @@ function saveCustomer(e) {
     const points = parseInt(document.getElementById('cust-points').value) || 0;
     const docTipo = parseInt(document.getElementById('cust-doc-tipo').value) || 96;
     const condIva = parseInt(document.getElementById('cust-iva-condition').value) || 5;
+    const defaultPriceList = document.getElementById('cust-price-list').value;
 
     const compiledName = `${firstName} ${lastName}`;
 
@@ -3180,6 +3370,7 @@ function saveCustomer(e) {
             points,
             doc_tipo: docTipo,
             cond_iva_receptor: condIva,
+            defaultPriceList,
             dateRegistered: new Date().toISOString().split('T')[0]
         });
     } else {
@@ -3195,6 +3386,7 @@ function saveCustomer(e) {
             customer.points = points;
             customer.doc_tipo = docTipo;
             customer.cond_iva_receptor = condIva;
+            customer.defaultPriceList = defaultPriceList;
         }
     }
 
@@ -3230,6 +3422,8 @@ window.editCustomer = function (id) {
 
     if (docTipoSelect) docTipoSelect.value = c.doc_tipo || '96';
     if (ivaSelect) ivaSelect.value = c.cond_iva_receptor || '5';
+    const priceListSelect = document.getElementById('cust-price-list');
+    if (priceListSelect) priceListSelect.value = c.defaultPriceList || 'price';
 
     if (docTipoSelect && dniInput) {
         if (docTipoSelect.value === '99') {
@@ -3785,7 +3979,16 @@ function voidSale() {
         sale.items.forEach(item => {
             const prod = state.products.find(p => p.id === item.id);
             if (prod) {
-                prod.stock += item.quantity;
+                if (prod.isCombo && prod.components) {
+                    prod.components.forEach(comp => {
+                        const compProd = state.products.find(p => p.id === comp.id);
+                        if (compProd) {
+                            compProd.stock += comp.quantity * item.quantity;
+                        }
+                    });
+                } else {
+                    prod.stock += item.quantity;
+                }
             }
         });
 
@@ -4039,44 +4242,61 @@ function applyBrandSettings() {
 
     if (bgType === 'glass') {
         dynamicCss = `
-            :root, body.light-theme {
-                --bg-card: rgba(255, 255, 255, 0.03) !important;
-                --bg-card-hover: rgba(255, 255, 255, 0.07) !important;
+            :root {
+                --bg-card: rgba(30, 41, 59, 0.75) !important;
+                --bg-card-hover: rgba(30, 41, 59, 0.85) !important;
                 --border-color: rgba(255, 255, 255, 0.08) !important;
+            }
+            body.light-theme {
+                --bg-card: rgba(255, 255, 255, 0.8) !important;
+                --bg-card-hover: rgba(255, 255, 255, 0.9) !important;
+                --border-color: rgba(15, 23, 42, 0.08) !important;
             }
             .metric-card, .dashboard-panel, .prod-card, .data-table-card, .data-op-card, .login-card {
                 backdrop-filter: blur(14px) !important;
                 -webkit-backdrop-filter: blur(14px) !important;
-                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
             }
         `;
     } else if (bgType === 'aurora') {
         dynamicCss = `
-            :root, body.light-theme {
-                --bg-card: linear-gradient(135deg, rgba(31, 41, 55, 0.9) 0%, rgba(99, 102, 241, 0.12) 100%) !important;
-                --bg-card-hover: linear-gradient(135deg, rgba(38, 53, 74, 0.9) 0%, rgba(99, 102, 241, 0.18) 100%) !important;
-                --border-color: rgba(99, 102, 241, 0.3) !important;
-                --border-hover: rgba(99, 102, 241, 0.5) !important;
+            :root {
+                --bg-card: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(249, 115, 22, 0.06) 100%) !important;
+                --bg-card-hover: linear-gradient(135deg, rgba(38, 53, 74, 0.95) 0%, rgba(249, 115, 22, 0.1) 100%) !important;
+                --border-color: rgba(249, 115, 22, 0.25) !important;
+                --border-hover: rgba(249, 115, 22, 0.45) !important;
+            }
+            body.light-theme {
+                --bg-card: linear-gradient(135deg, #ffffff 0%, rgba(249, 115, 22, 0.04) 100%) !important;
+                --bg-card-hover: linear-gradient(135deg, #f8fafc 0%, rgba(249, 115, 22, 0.08) 100%) !important;
+                --border-color: rgba(249, 115, 22, 0.18) !important;
+                --border-hover: rgba(249, 115, 22, 0.35) !important;
             }
             .metric-card, .dashboard-panel, .prod-card, .data-table-card, .data-op-card, .login-card {
-                box-shadow: 0 4px 20px rgba(99, 102, 241, 0.1) !important;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
             }
         `;
     } else if (bgType === 'carbon') {
         dynamicCss = `
-            :root, body.light-theme {
-                --bg-card: linear-gradient(135deg, #151a22 0%, #0a0c10 100%) !important;
-                --bg-card-hover: linear-gradient(135deg, #1b222c 0%, #101319 100%) !important;
-                --border-color: rgba(255, 255, 255, 0.04) !important;
-                --border-hover: rgba(255, 255, 255, 0.08) !important;
+            :root {
+                --bg-card: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
+                --bg-card-hover: linear-gradient(135deg, #273549 0%, #162030 100%) !important;
+                --border-color: rgba(255, 255, 255, 0.05) !important;
+                --border-hover: rgba(255, 255, 255, 0.1) !important;
+            }
+            body.light-theme {
+                --bg-card: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%) !important;
+                --bg-card-hover: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
+                --border-color: #cbd5e1 !important;
+                --border-hover: #94a3b8 !important;
             }
             .metric-card, .dashboard-panel, .prod-card, .data-table-card, .data-op-card, .login-card {
-                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.55) !important;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
             }
         `;
     } else if (bgType === 'color') {
         dynamicCss = `
-            :root, body.light-theme {
+            :root {
                 --bg-card: ${bgColor} !important;
                 --bg-card-hover: ${bgHover} !important;
             }
@@ -4606,6 +4826,7 @@ async function handleExcelImport(e) {
             const catIdx = findExcelColumnIndex(headers, ['categoria', 'category']);
             const costIdx = findExcelColumnIndex(headers, ['costo', 'cost', 'compra', 'precio compra']);
             const priceIdx = findExcelColumnIndex(headers, ['precio', 'price', 'venta', 'precio venta']);
+            const priceDiscountIdx = findExcelColumnIndex(headers, ['descuento', 'discount', 'precio descuento', 'precio lista 3', 'lista 3', 'lista3']);
             const stockIdx = findExcelColumnIndex(headers, ['stock', 'cantidad', 'cant']);
             const minIdx = findExcelColumnIndex(headers, ['stockmin', 'stock minimo', 'minimo', 'alerta']);
 
@@ -4648,6 +4869,10 @@ async function handleExcelImport(e) {
                     ? parseFloat(row[priceIdx]) || 0
                     : (exists ? exists.price : 0);
 
+                const priceDiscount = priceDiscountIdx !== -1 && row[priceDiscountIdx] !== undefined && row[priceDiscountIdx] !== null
+                    ? parseFloat(row[priceDiscountIdx]) || 0
+                    : (exists ? (exists.priceDiscount || 0) : 0);
+
                 const stock = stockIdx !== -1 && row[stockIdx] !== undefined && row[stockIdx] !== null
                     ? parseInt(row[stockIdx]) || 0
                     : (exists ? exists.stock : 0);
@@ -4657,7 +4882,7 @@ async function handleExcelImport(e) {
                     : (exists ? exists.stockMin : 5);
 
                 tempExcelProducts.push({
-                    sku, name, category, cost, price, stock, stockMin,
+                    sku, name, category, cost, price, priceDiscount, stock, stockMin,
                     isNew: !exists,
                     existingProduct: exists || null
                 });
@@ -4706,6 +4931,7 @@ function showExcelImportPreview() {
                 <td>${p.category}</td>
                 <td class="text-right">${currency}${p.cost.toFixed(2)}</td>
                 <td class="text-right" style="font-weight: 700;">${currency}${p.price.toFixed(2)}</td>
+                <td class="text-right">${currency}${p.priceDiscount.toFixed(2)}</td>
                 <td class="text-center" style="font-weight: 700;">${p.stock}</td>
                 <td><span class="badge ${badgeClass}">${badgeText}</span></td>
             </tr>
@@ -4715,7 +4941,7 @@ function showExcelImportPreview() {
     if (totalCount > 5) {
         rowsHtml += `
             <tr>
-                <td colspan="7" class="text-center text-muted" style="padding: 12px; font-weight: 500;">
+                <td colspan="8" class="text-center text-muted" style="padding: 12px; font-weight: 500;">
                     ... y ${totalCount - 5} productos más en el archivo ...
                   </td>
             </tr>
@@ -4743,8 +4969,11 @@ function confirmExcelImport() {
                 category: p.category,
                 cost: p.cost,
                 price: p.price,
+                priceDiscount: p.priceDiscount,
                 stock: p.stock,
                 stockMin: p.stockMin,
+                isCombo: false,
+                components: [],
                 image: ''
             });
             created++;
@@ -4755,7 +4984,10 @@ function confirmExcelImport() {
                 prod.category = p.category;
                 prod.cost = p.cost;
                 prod.price = p.price;
-                prod.stock = p.stock;
+                prod.priceDiscount = p.priceDiscount;
+                if (!prod.isCombo) {
+                    prod.stock = p.stock;
+                }
                 prod.stockMin = p.stockMin;
                 updated++;
             }
@@ -4783,13 +5015,13 @@ async function downloadExcelTemplate() {
     }
 
     // Columns
-    const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio', 'Stock', 'Stock Minimo'];
+    const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio', 'Precio Descuento', 'Stock', 'Stock Minimo'];
 
     // Sample items for motorcycle spare parts store
     const rows = [
-        ['REP-FIL-NAF', 'Filtro de Nafta Universal Motocicleta', 'Repuestos de Motor', 150.00, 320.00, 50, 10],
-        ['REP-BUJ-NGK-D8EA', 'Bujía NGK D8EA (Motos 110cc-150cc)', 'Sistema Eléctrico', 420.00, 800.00, 100, 15],
-        ['REP-TRA-CAD-DID', 'Cadena DID 428H-118L Reforzada', 'Transmisión', 3500.00, 5900.00, 15, 5]
+        ['REP-FIL-NAF', 'Filtro de Nafta Universal Motocicleta', 'Repuestos de Motor', 150.00, 320.00, 280.00, 50, 10],
+        ['REP-BUJ-NGK-D8EA', 'Bujía NGK D8EA (Motos 110cc-150cc)', 'Sistema Eléctrico', 420.00, 800.00, 700.00, 100, 15],
+        ['REP-TRA-CAD-DID', 'Cadena DID 428H-118L Reforzada', 'Transmisión', 3500.00, 5900.00, 5200.00, 15, 5]
     ];
 
     const data = [headers, ...rows];
@@ -4822,7 +5054,7 @@ async function exportInventoryExcel() {
     }
     
     // Headers
-    const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio', 'Stock', 'Stock Minimo'];
+    const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio', 'Precio Descuento', 'Stock', 'Stock Minimo'];
 
     // Data Rows
     const rows = state.products.map(p => [
@@ -4831,6 +5063,7 @@ async function exportInventoryExcel() {
         p.category,
         p.cost,
         p.price,
+        p.priceDiscount || 0,
         p.stock,
         p.stockMin
     ]);
@@ -5308,4 +5541,166 @@ window.sendCatalogOrder = function (e) {
     document.getElementById('catalog-checkout-form').reset();
 
     alert("¡Pedido generado con éxito! Se ha abierto una pestaña para enviar el mensaje por WhatsApp.");
+};
+
+// ==========================================================================
+// COMBOS & BUNDLES UTILITIES & EVENT HANDLERS
+// ==========================================================================
+let tempComboComponents = [];
+
+window.getComboStock = function(comboProduct) {
+    if (!comboProduct.components || comboProduct.components.length === 0) return 0;
+    let minStock = Infinity;
+    comboProduct.components.forEach(comp => {
+        const realProduct = state.products.find(p => p.id === comp.id);
+        if (realProduct) {
+            const maxCombosFromComp = Math.floor(realProduct.stock / comp.quantity);
+            if (maxCombosFromComp < minStock) {
+                minStock = maxCombosFromComp;
+            }
+        } else {
+            minStock = 0; // component product missing
+        }
+    });
+    return minStock === Infinity ? 0 : minStock;
+};
+
+window.updateComboComponentsTable = function() {
+    const tbody = document.getElementById('combo-components-tbody');
+    const currency = state.settings.currency || '$';
+    if (!tbody) return;
+
+    if (tempComboComponents.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center text-muted" style="padding: 15px;">
+                    No hay componentes agregados a este combo.
+                </td>
+            </tr>
+        `;
+        document.getElementById('combo-suggested-prices').textContent = "Componentes sumados: L2 Costo $0.00 | L1 Público $0.00";
+        return;
+    }
+
+    let html = '';
+    let totalCost = 0;
+    let totalPrice = 0;
+
+    tempComboComponents.forEach((comp, idx) => {
+        const itemTotalCost = comp.cost * comp.quantity;
+        const itemTotalPrice = comp.price * comp.quantity;
+        totalCost += itemTotalCost;
+        totalPrice += itemTotalPrice;
+
+        html += `
+            <tr>
+                <td style="font-weight: 700;">${comp.sku}</td>
+                <td>${comp.name}</td>
+                <td class="text-center">
+                    <input type="number" min="1" value="${comp.quantity}" style="width: 60px; padding: 4px; text-align: center; margin: 0;" onchange="updateComboComponentQty(${idx}, this.value)">
+                </td>
+                <td class="text-right">${currency}${comp.price.toFixed(2)}</td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-icon" style="color: var(--danger); padding: 4px;" onclick="removeComboComponent(${idx})">
+                        <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+    document.getElementById('combo-suggested-prices').textContent = `Componentes sumados: L2 Costo ${currency}${totalCost.toFixed(2)} | L1 Público ${currency}${totalPrice.toFixed(2)}`;
+    
+    const applyBtn = document.getElementById('combo-apply-suggested-btn');
+    if (applyBtn) {
+        applyBtn.dataset.cost = totalCost;
+        applyBtn.dataset.price = totalPrice;
+        applyBtn.dataset.discount = totalPrice * 0.9;
+    }
+
+    if (window.lucide) lucide.createIcons();
+};
+
+window.updateComboComponentQty = function(idx, val) {
+    const qty = parseInt(val) || 1;
+    if (tempComboComponents[idx]) {
+        tempComboComponents[idx].quantity = qty;
+        window.updateComboComponentsTable();
+    }
+};
+
+window.removeComboComponent = function(idx) {
+    tempComboComponents.splice(idx, 1);
+    window.updateComboComponentsTable();
+};
+
+window.handleComboSearch = function(e) {
+    const query = e.target.value.toLowerCase().trim();
+    const resultsContainer = document.getElementById('combo-search-results');
+    if (!resultsContainer) return;
+
+    if (!query) {
+        resultsContainer.innerHTML = '';
+        resultsContainer.style.display = 'none';
+        return;
+    }
+
+    const currentProdId = document.getElementById('product-id-field').value;
+
+    const matches = state.products.filter(p => {
+        return !p.isCombo && 
+               p.id !== currentProdId && 
+               (p.name.toLowerCase().includes(query) || p.sku.toLowerCase().includes(query));
+    });
+
+    if (matches.length === 0) {
+        resultsContainer.innerHTML = '<div style="padding: 10px; color: var(--text-muted); font-size: 13px;">No se encontraron productos simples.</div>';
+        resultsContainer.style.display = 'block';
+        return;
+    }
+
+    let html = '';
+    matches.slice(0, 5).forEach(p => {
+        html += `
+            <div class="search-result-item" style="padding: 10px; cursor: pointer; border-bottom: 1px solid var(--border-color); font-size: 13px; display: flex; justify-content: space-between; align-items: center;" onclick="addComboComponentById('${p.id}')" onmouseover="this.style.background='rgba(31,41,55,0.8)'" onmouseout="this.style.background='transparent'">
+                <div>
+                    <span style="font-weight: 700;">${p.sku}</span> - <span>${p.name}</span>
+                </div>
+                <span style="font-weight: 600; color: var(--primary);">${state.settings.currency}${p.price.toFixed(2)}</span>
+            </div>
+        `;
+    });
+    
+    resultsContainer.innerHTML = html;
+    resultsContainer.style.display = 'block';
+};
+
+window.addComboComponentById = function(prodId) {
+    const p = state.products.find(prod => prod.id === prodId);
+    if (!p) return;
+
+    const exists = tempComboComponents.find(comp => comp.id === prodId);
+    if (exists) {
+        exists.quantity += 1;
+    } else {
+        tempComboComponents.push({
+            id: p.id,
+            sku: p.sku,
+            name: p.name,
+            price: p.price,
+            cost: p.cost,
+            quantity: 1
+        });
+    }
+
+    const searchInput = document.getElementById('combo-search-input');
+    if (searchInput) searchInput.value = '';
+    const resultsContainer = document.getElementById('combo-search-results');
+    if (resultsContainer) {
+        resultsContainer.innerHTML = '';
+        resultsContainer.style.display = 'none';
+    }
+
+    window.updateComboComponentsTable();
 };

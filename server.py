@@ -87,6 +87,10 @@ class DHMotopartesRequestHandler(SimpleHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
+        super().end_headers()
+
     # Reduce log noise by only logging database API and error requests
     def log_message(self, format, *args):
         if '/api/' in self.path or args[1] in ['404', '500']:

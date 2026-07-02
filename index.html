@@ -447,6 +447,16 @@
                                 </button>
                             </div>
 
+                            <!-- Price List Selection -->
+                            <div class="cart-price-list-section" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border-color); gap: 12px;">
+                                <span style="font-size: 13px; font-weight: 500; color: var(--text-muted);">Lista de Precios:</span>
+                                <select id="cart-price-list-select" style="flex: 1; padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background-color: var(--input-bg); color: var(--text-color); font-size: 13px; font-weight: 600; cursor: pointer;">
+                                    <option value="price">Lista 1: Público (Minorista)</option>
+                                    <option value="priceDiscount">Lista 3: Descuento</option>
+                                    <option value="cost">Lista 2: Costo Mayorista</option>
+                                </select>
+                            </div>
+
                             <!-- Cart Items List -->
                             <div class="cart-items-wrapper">
                                 <div class="cart-items-header">
@@ -538,9 +548,11 @@
                                         <th>SKU</th>
                                         <th>Descripción / Repuesto</th>
                                         <th>Categoría</th>
-                                        <th class="text-right">Costo</th>
-                                        <th class="text-right">Precio Venta</th>
-                                        <th class="text-center">Margen</th>
+                                        <th class="text-right">L2: Costo (Compra)</th>
+                                        <th class="text-right">L1: Público (Minorista)</th>
+                                        <th class="text-right">L3: Descuento</th>
+                                        <th class="text-center">Margen L1</th>
+                                        <th class="text-center">Margen L3</th>
                                         <th class="text-center">Stock</th>
                                         <th class="text-center">Stock Mín.</th>
                                         <th class="text-center">Acciones</th>
@@ -814,7 +826,7 @@
                         <!-- Store Details Card -->
                         <div class="dashboard-panel">
                             <div class="panel-header">
-                                <h3 class="panel-title"><i data-lucide="store" class="text-primary icon-inline"></i> Datos del Comercio</h3>
+                                <h3 class="panel-title"><i data-lucide="store" class="text-muted icon-inline"></i> Datos del Comercio</h3>
                             </div>
                             <div class="panel-body">
                                 <form id="settings-store-form" class="settings-form">
@@ -864,7 +876,7 @@
                         <!-- Category Management Card -->
                         <div class="dashboard-panel">
                             <div class="panel-header">
-                                <h3 class="panel-title"><i data-lucide="tags" class="text-primary icon-inline"></i> Gestión de Categorías</h3>
+                                <h3 class="panel-title"><i data-lucide="tags" class="text-muted icon-inline"></i> Gestión de Categorías</h3>
                             </div>
                             <div class="panel-body">
                                 <div class="settings-form">
@@ -886,7 +898,7 @@
                         <!-- System Customization Card -->
                         <div class="dashboard-panel">
                             <div class="panel-header">
-                                <h3 class="panel-title"><i data-lucide="palette" class="text-primary icon-inline"></i> Personalización Visual & Marca</h3>
+                                <h3 class="panel-title"><i data-lucide="palette" class="text-muted icon-inline"></i> Personalización Visual & Marca</h3>
                             </div>
                             <div class="panel-body">
                                 <div class="settings-form">
@@ -998,7 +1010,7 @@
                         <!-- Fiscal Configuration Card (ARCA) -->
                         <div class="dashboard-panel" id="config-fiscal-panel">
                             <div class="panel-header">
-                                <h3 class="panel-title"><i data-lucide="file-text" class="text-primary icon-inline"></i> Facturación Electrónica ARCA (AFIP)</h3>
+                                <h3 class="panel-title"><i data-lucide="file-text" class="text-muted icon-inline"></i> Facturación Electrónica ARCA (AFIP)</h3>
                             </div>
                             <div class="panel-body">
                                 <form id="settings-fiscal-form" class="settings-form">
@@ -1044,7 +1056,7 @@
                         <!-- Data Operations & Database Cards -->
                         <div class="dashboard-panel col-span-2" id="config-respaldo-panel">
                             <div class="panel-header">
-                                <h3 class="panel-title"><i data-lucide="database" class="text-primary icon-inline"></i> Respaldo & Operaciones de Datos</h3>
+                                <h3 class="panel-title"><i data-lucide="database" class="text-muted icon-inline"></i> Respaldo & Operaciones de Datos</h3>
                             </div>
                             <div class="panel-body">
                                 <div class="data-operations-grid">
@@ -1059,7 +1071,7 @@
                                     <div class="data-op-card">
                                         <h4>Exportar/Importar Respaldo</h4>
                                         <p class="text-muted small">Crea una copia de seguridad en formato JSON de todo tu inventario, ventas y clientes, o restáurala.</p>
-                                        <div class="flex-gap-10">
+                                        <div class="flex-gap-10" style="flex-wrap: wrap;">
                                             <button class="btn btn-secondary flex-1" id="data-export-btn">
                                                 <i data-lucide="download"></i> Exportar JSON
                                             </button>
@@ -1092,7 +1104,7 @@
                         <!-- Cajeros / Admins Panel (Only visible for superadmin) -->
                         <div class="dashboard-panel col-span-2" id="superadmin-cajeros-panel" style="display: none;">
                             <div class="panel-header">
-                                <h3 class="panel-title"><i data-lucide="users" class="text-primary icon-inline"></i> Control de Cajeros / Operadores</h3>
+                                <h3 class="panel-title"><i data-lucide="users" class="text-muted icon-inline"></i> Control de Cajeros / Operadores</h3>
                             </div>
                             <div class="panel-body">
                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;" class="cajeros-grid">
@@ -1173,7 +1185,7 @@
 
                     <div class="dashboard-panel">
                         <div class="panel-header">
-                            <h3 class="panel-title"><i data-lucide="building" class="text-primary icon-inline"></i> Empresas Registradas (SaaS)</h3>
+                            <h3 class="panel-title"><i data-lucide="building" class="text-muted icon-inline"></i> Empresas Registradas (SaaS)</h3>
                         </div>
                         <div class="panel-body">
                             <div class="table-responsive">
@@ -1386,6 +1398,19 @@
             <form id="product-form">
                 <input type="hidden" id="product-id-field">
                 <div class="modal-body">
+                    <div class="form-group">
+                        <label>Tipo de Registro</label>
+                        <div style="display: flex; gap: 20px; margin-top: 6px; margin-bottom: 12px;">
+                            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; cursor: pointer;">
+                                <input type="radio" name="prod-type" id="prod-type-simple" value="simple" checked>
+                                Repuesto / Herramienta (Simple)
+                            </label>
+                            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; cursor: pointer;">
+                                <input type="radio" name="prod-type" id="prod-type-combo" value="combo">
+                                Combo / Kit de Artículos
+                            </label>
+                        </div>
+                    </div>
                     <div class="form-row">
                         <div class="form-group col-6">
                             <label for="prod-sku">SKU / Código Único *</label>
@@ -1412,13 +1437,17 @@
                     </div>
                     
                     <div class="form-row">
-                        <div class="form-group col-6">
-                            <label for="prod-cost">Precio de Compra (Costo) *</label>
+                        <div class="form-group col-4">
+                            <label for="prod-cost">L2: Costo (Compra) *</label>
                             <input type="number" id="prod-cost" required min="0" step="0.01" placeholder="0.00">
                         </div>
-                        <div class="form-group col-6">
-                            <label for="prod-price">Precio de Venta *</label>
+                        <div class="form-group col-4">
+                            <label for="prod-price">L1: Público (Minorista) *</label>
                             <input type="number" id="prod-price" required min="0" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="form-group col-4">
+                            <label for="prod-price-discount">L3: Precio Descuento *</label>
+                            <input type="number" id="prod-price-discount" required min="0" step="0.01" placeholder="0.00">
                         </div>
                     </div>
 
@@ -1472,6 +1501,46 @@
                                     <i data-lucide="trash-2" style="width: 15px; height: 15px;"></i>
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Combo Components Section -->
+                    <div id="combo-components-section" style="display: none; border-top: 1px solid var(--border-color); margin-top: 16px; padding-top: 16px;">
+                        <h4 style="font-family: var(--font-title); font-size: 14px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                            <i data-lucide="package-plus" style="width: 16px; height: 16px; color: var(--primary);"></i>
+                            Componentes del Combo
+                        </h4>
+                        <div class="form-group" style="position: relative;">
+                            <label for="combo-search-input">Buscar productos para agregar al combo</label>
+                            <div style="position: relative; display: flex; align-items: center;">
+                                <i data-lucide="search" style="position: absolute; left: 12px; width: 16px; height: 16px; color: var(--text-muted); pointer-events: none;"></i>
+                                <input type="text" id="combo-search-input" placeholder="Buscar por SKU o descripción..." style="padding-left: 36px; margin-bottom: 0; width: 100%;">
+                            </div>
+                            <div id="combo-search-results" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: #1f2937; border: 1px solid var(--border-color); border-radius: var(--radius-sm); z-index: 100; max-height: 180px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.25);">
+                                <!-- Results -->
+                            </div>
+                        </div>
+                        
+                        <div class="table-responsive" style="margin-top: 12px; max-height: 200px; overflow-y: auto;">
+                            <table class="data-table" style="font-size: 12px;" id="combo-components-table">
+                                <thead>
+                                    <tr>
+                                        <th>SKU</th>
+                                        <th>Nombre</th>
+                                        <th style="width: 80px;" class="text-center">Cant.</th>
+                                        <th class="text-right">Precio L1</th>
+                                        <th class="text-center">Quitar</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="combo-components-tbody">
+                                    <!-- Components -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; background: rgba(var(--primary-rgb), 0.05); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid rgba(var(--primary-rgb), 0.15);">
+                            <span class="small text-muted" id="combo-suggested-prices" style="font-size: 11px;">Componentes sumados: L2 Costo $0.00 | L1 Público $0.00</span>
+                            <button type="button" class="btn btn-secondary small" id="combo-apply-suggested-btn" style="padding: 4px 8px; font-size: 11px;">Usar Precios Sugeridos</button>
                         </div>
                     </div>
                 </div>
@@ -1537,6 +1606,14 @@
                     <div class="form-group">
                         <label for="cust-points">Puntos de Fidelidad Iniciales</label>
                         <input type="number" id="cust-points" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="cust-price-list">Lista de Precios Predeterminada</label>
+                        <select id="cust-price-list">
+                            <option value="price">Lista 1: Público (Minorista)</option>
+                            <option value="priceDiscount">Lista 3: Descuento</option>
+                            <option value="cost">Lista 2: Costo Mayorista</option>
+                        </select>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1720,7 +1797,8 @@
                                     <th>Nombre / Descripción</th>
                                     <th>Categoría</th>
                                     <th class="text-right">Costo</th>
-                                    <th class="text-right">Precio</th>
+                                    <th class="text-right">Precio Público</th>
+                                    <th class="text-right">Precio Desc.</th>
                                     <th class="text-center">Stock</th>
                                     <th>Acción</th>
                                 </tr>
@@ -1752,7 +1830,7 @@
     <div class="modal-backdrop" id="modal-catalog-cart">
         <div class="modal-box modal-medium">
             <div class="modal-header">
-                <h3 class="modal-title"><i data-lucide="shopping-cart" class="text-primary icon-inline"></i> Mi Carrito de Compras</h3>
+                <h3 class="modal-title"><i data-lucide="shopping-cart" class="text-muted icon-inline"></i> Mi Carrito de Compras</h3>
                 <button class="btn-icon modal-close-btn" data-close-modal="modal-catalog-cart"><i data-lucide="x"></i></button>
             </div>
             <div class="modal-body" style="padding: 0; display: flex; flex-direction: column; max-height: 70vh;">
@@ -1782,7 +1860,7 @@
     <div class="modal-backdrop" id="modal-catalog-checkout">
         <div class="modal-box modal-medium">
             <div class="modal-header">
-                <h3 class="modal-title"><i data-lucide="shopping-bag" class="text-primary icon-inline"></i> Datos de Entrega y Pago</h3>
+                <h3 class="modal-title"><i data-lucide="shopping-bag" class="text-muted icon-inline"></i> Datos de Entrega y Pago</h3>
                 <button class="btn-icon modal-close-btn" data-close-modal="modal-catalog-checkout"><i data-lucide="x"></i></button>
             </div>
             <div class="modal-body">
