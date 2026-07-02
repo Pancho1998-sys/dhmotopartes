@@ -167,7 +167,7 @@ window.hideChartTooltip = function() {
  * @param {string} currency - Store currency symbol
  * @returns {string} HTML string
  */
-function createPOSProductCard(product, currency = '$') {
+function createPOSProductCard(product, currency = '$', priceKey = 'price') {
     const isOutOfStock = product.stock <= 0;
     const cardClass = isOutOfStock ? 'prod-card out-of-stock' : 'prod-card';
     
@@ -188,6 +188,13 @@ function createPOSProductCard(product, currency = '$') {
     
     const iconStyle = product.image ? 'display: none;' : '';
 
+    let displayedPrice = product.price;
+    if (priceKey === 'priceDiscount') {
+        displayedPrice = parseFloat(product.priceDiscount) || product.price;
+    } else if (priceKey === 'cost') {
+        displayedPrice = product.cost;
+    }
+
     return `
         <div class="${cardClass}" data-id="${product.id}" onclick="${isOutOfStock ? '' : `addCartItem('${product.id}')`}">
             <span class="prod-card-sku">${product.sku}</span>
@@ -201,7 +208,7 @@ function createPOSProductCard(product, currency = '$') {
                 <span class="prod-card-cat">${product.category}</span>
                 <h4 class="prod-card-title" title="${product.name}">${product.name}</h4>
                 <div class="prod-card-footer">
-                    <span class="prod-card-price">${currency}${product.price.toFixed(2)}</span>
+                    <span class="prod-card-price">${currency}${displayedPrice.toFixed(2)}</span>
                     <span class="prod-card-stock ${stockClass}">${stockText}</span>
                 </div>
             </div>

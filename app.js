@@ -49,7 +49,13 @@ function resetStateToDefault() {
 
 function ensureStateProperties(loadedState) {
     if (!loadedState) return JSON.parse(JSON.stringify(DEFAULT_STATE));
-    if (!loadedState.products) loadedState.products = [];
+    if (!loadedState.products) {
+        loadedState.products = [];
+    } else {
+        loadedState.products.forEach(p => {
+            if (p.priceDiscount === undefined) p.priceDiscount = 0;
+        });
+    }
     if (!loadedState.cart) loadedState.cart = [];
     if (!loadedState.sales) loadedState.sales = [];
     if (!loadedState.customers) loadedState.customers = [];
@@ -1221,6 +1227,25 @@ function setupEventListeners() {
     document.getElementById('cart-clear-btn').addEventListener('click', clearCart);
     document.getElementById('cart-apply-discount-btn').addEventListener('click', () => openModal('modal-discount'));
     document.getElementById('cart-checkout-btn').addEventListener('click', openCheckoutModal);
+
+    // Price List and Customer selection auto-switch listeners in POS
+    const cartPriceListSelect = document.getElementById('cart-price-list-select');
+    if (cartPriceListSelect) {
+        cartPriceListSelect.addEventListener('change', window.changeCartPriceList);
+    }
+    const cartCustomerSelect = document.getElementById('cart-customer-select');
+    if (cartCustomerSelect) {
+        cartCustomerSelect.addEventListener('change', () => {
+            const customerId = cartCustomerSelect.value;
+            if (customerId !== "0") {
+                const customer = state.customers.find(c => c.id === customerId);
+                if (customer && customer.defaultPriceList && cartPriceListSelect) {
+                    cartPriceListSelect.value = customer.defaultPriceList;
+                    window.changeCartPriceList();
+                }
+            }
+        });
+    }
 
     // Discount Save
     document.getElementById('discount-save-btn').addEventListener('click', applyCartDiscount);
@@ -2440,9 +2465,12 @@ function renderPOSProductGrid() {
         `;
         if (posPagination) posPagination.style.display = 'none';
     } else {
+        const priceListSelect = document.getElementById('cart-price-list-select');
+        const priceKey = priceListSelect ? priceListSelect.value : 'price';
+
         let cardsHtml = '';
         pageItems.forEach(p => {
-            cardsHtml += createPOSProductCard(p, state.settings.currency);
+            cardsHtml += createPOSProductCard(p, state.settings.currency, priceKey);
         });
         grid.innerHTML = cardsHtml;
         
@@ -2487,14 +2515,24 @@ window.addCartItem = function(prodId, shouldRender = true) {
         return;
     }
 
+    const priceListSelect = document.getElementById('cart-price-list-select');
+    const priceKey = priceListSelect ? priceListSelect.value : 'price';
+    let itemPrice = product.price;
+    if (priceKey === 'priceDiscount') {
+        itemPrice = parseFloat(product.priceDiscount) || product.price;
+    } else if (priceKey === 'cost') {
+        itemPrice = product.cost;
+    }
+
     if (existingInCart) {
         existingInCart.quantity += 1;
+        existingInCart.price = itemPrice;
     } else {
         state.cart.push({
             id: product.id,
             name: product.name,
             sku: product.sku,
-            price: product.price,
+            price: itemPrice,
             quantity: 1
         });
     }
@@ -2503,6 +2541,28 @@ window.addCartItem = function(prodId, shouldRender = true) {
     if (shouldRender) {
         renderCart();
     }
+};
+
+window.changeCartPriceList = function() {
+    const priceListSelect = document.getElementById('cart-price-list-select');
+    if (!priceListSelect) return;
+    const priceKey = priceListSelect.value;
+
+    state.cart.forEach(item => {
+        const product = state.products.find(p => p.id === item.id);
+        if (product) {
+            if (priceKey === 'priceDiscount') {
+                item.price = parseFloat(product.priceDiscount) || product.price;
+            } else if (priceKey === 'cost') {
+                item.price = product.cost;
+            } else {
+                item.price = product.price;
+            }
+        }
+    });
+
+    renderCart();
+    renderPOSProductGrid();
 };
 
 window.modifyCartItemQty = function (prodId, delta) {
@@ -2886,7 +2946,9 @@ function renderInventoryTable() {
 
     let rowsHtml = '';
     pageItems.forEach(p => {
-        const margin = p.price > 0 ? ((p.price - p.cost) / p.price) * 100 : 0;
+        const marginL1 = p.price > 0 ? ((p.price - p.cost) / p.price) * 100 : 0;
+        const discountPrice = parseFloat(p.priceDiscount) || 0;
+        const marginL3 = discountPrice > 0 ? ((discountPrice - p.cost) / discountPrice) * 100 : 0;
 
         let stockBadge = 'ok';
         let stockText = `${p.stock} U.`;
@@ -2905,7 +2967,9 @@ function renderInventoryTable() {
                 <td>${p.category}</td>
                 <td class="text-right">${state.settings.currency}${p.cost.toFixed(2)}</td>
                 <td class="text-right" style="font-weight: 700;">${state.settings.currency}${p.price.toFixed(2)}</td>
-                <td class="text-center text-emerald" style="font-weight: 600;">${margin.toFixed(0)}%</td>
+                <td class="text-right">${state.settings.currency}${discountPrice.toFixed(2)}</td>
+                <td class="text-center text-emerald" style="font-weight: 600;">${marginL1.toFixed(0)}%</td>
+                <td class="text-center text-amber" style="font-weight: 600;">${marginL3.toFixed(0)}%</td>
                 <td class="text-center">
                     <span class="stock-pill ${stockBadge}">${stockText}</span>
                 </td>
@@ -2949,6 +3013,7 @@ function saveProduct(e) {
     const category = document.getElementById('prod-category').value;
     const cost = parseFloat(document.getElementById('prod-cost').value) || 0;
     const price = parseFloat(document.getElementById('prod-price').value) || 0;
+    const priceDiscount = parseFloat(document.getElementById('prod-price-discount').value) || 0;
     const stock = parseInt(document.getElementById('prod-stock').value) || 0;
     const stockMin = parseInt(document.getElementById('prod-stock-min').value) || 5;
 
@@ -2965,7 +3030,7 @@ function saveProduct(e) {
 
         state.products.push({
             id: `p_${Date.now()}`,
-            sku, name, category, cost, price, stock, stockMin, image
+            sku, name, category, cost, price, priceDiscount, stock, stockMin, image
         });
     } else {
         const product = state.products.find(p => p.id === id);
@@ -2975,6 +3040,7 @@ function saveProduct(e) {
             product.category = category;
             product.cost = cost;
             product.price = price;
+            product.priceDiscount = priceDiscount;
             product.stock = stock;
             product.stockMin = stockMin;
             product.image = image;
@@ -2999,6 +3065,7 @@ window.editProduct = function (id) {
     document.getElementById('prod-category').value = p.category;
     document.getElementById('prod-cost').value = p.cost;
     document.getElementById('prod-price').value = p.price;
+    document.getElementById('prod-price-discount').value = p.priceDiscount || 0;
     document.getElementById('prod-stock').value = p.stock;
     document.getElementById('prod-stock-min').value = p.stockMin;
 
@@ -3164,6 +3231,7 @@ function saveCustomer(e) {
     const points = parseInt(document.getElementById('cust-points').value) || 0;
     const docTipo = parseInt(document.getElementById('cust-doc-tipo').value) || 96;
     const condIva = parseInt(document.getElementById('cust-iva-condition').value) || 5;
+    const defaultPriceList = document.getElementById('cust-price-list').value;
 
     const compiledName = `${firstName} ${lastName}`;
 
@@ -3180,6 +3248,7 @@ function saveCustomer(e) {
             points,
             doc_tipo: docTipo,
             cond_iva_receptor: condIva,
+            defaultPriceList,
             dateRegistered: new Date().toISOString().split('T')[0]
         });
     } else {
@@ -3195,6 +3264,7 @@ function saveCustomer(e) {
             customer.points = points;
             customer.doc_tipo = docTipo;
             customer.cond_iva_receptor = condIva;
+            customer.defaultPriceList = defaultPriceList;
         }
     }
 
@@ -3230,6 +3300,8 @@ window.editCustomer = function (id) {
 
     if (docTipoSelect) docTipoSelect.value = c.doc_tipo || '96';
     if (ivaSelect) ivaSelect.value = c.cond_iva_receptor || '5';
+    const priceListSelect = document.getElementById('cust-price-list');
+    if (priceListSelect) priceListSelect.value = c.defaultPriceList || 'price';
 
     if (docTipoSelect && dniInput) {
         if (docTipoSelect.value === '99') {
@@ -4623,6 +4695,7 @@ async function handleExcelImport(e) {
             const catIdx = findExcelColumnIndex(headers, ['categoria', 'category']);
             const costIdx = findExcelColumnIndex(headers, ['costo', 'cost', 'compra', 'precio compra']);
             const priceIdx = findExcelColumnIndex(headers, ['precio', 'price', 'venta', 'precio venta']);
+            const priceDiscountIdx = findExcelColumnIndex(headers, ['descuento', 'discount', 'precio descuento', 'precio lista 3', 'lista 3', 'lista3']);
             const stockIdx = findExcelColumnIndex(headers, ['stock', 'cantidad', 'cant']);
             const minIdx = findExcelColumnIndex(headers, ['stockmin', 'stock minimo', 'minimo', 'alerta']);
 
@@ -4665,6 +4738,10 @@ async function handleExcelImport(e) {
                     ? parseFloat(row[priceIdx]) || 0
                     : (exists ? exists.price : 0);
 
+                const priceDiscount = priceDiscountIdx !== -1 && row[priceDiscountIdx] !== undefined && row[priceDiscountIdx] !== null
+                    ? parseFloat(row[priceDiscountIdx]) || 0
+                    : (exists ? (exists.priceDiscount || 0) : 0);
+
                 const stock = stockIdx !== -1 && row[stockIdx] !== undefined && row[stockIdx] !== null
                     ? parseInt(row[stockIdx]) || 0
                     : (exists ? exists.stock : 0);
@@ -4674,7 +4751,7 @@ async function handleExcelImport(e) {
                     : (exists ? exists.stockMin : 5);
 
                 tempExcelProducts.push({
-                    sku, name, category, cost, price, stock, stockMin,
+                    sku, name, category, cost, price, priceDiscount, stock, stockMin,
                     isNew: !exists,
                     existingProduct: exists || null
                 });
@@ -4723,6 +4800,7 @@ function showExcelImportPreview() {
                 <td>${p.category}</td>
                 <td class="text-right">${currency}${p.cost.toFixed(2)}</td>
                 <td class="text-right" style="font-weight: 700;">${currency}${p.price.toFixed(2)}</td>
+                <td class="text-right">${currency}${p.priceDiscount.toFixed(2)}</td>
                 <td class="text-center" style="font-weight: 700;">${p.stock}</td>
                 <td><span class="badge ${badgeClass}">${badgeText}</span></td>
             </tr>
@@ -4732,7 +4810,7 @@ function showExcelImportPreview() {
     if (totalCount > 5) {
         rowsHtml += `
             <tr>
-                <td colspan="7" class="text-center text-muted" style="padding: 12px; font-weight: 500;">
+                <td colspan="8" class="text-center text-muted" style="padding: 12px; font-weight: 500;">
                     ... y ${totalCount - 5} productos más en el archivo ...
                   </td>
             </tr>
@@ -4760,6 +4838,7 @@ function confirmExcelImport() {
                 category: p.category,
                 cost: p.cost,
                 price: p.price,
+                priceDiscount: p.priceDiscount,
                 stock: p.stock,
                 stockMin: p.stockMin,
                 image: ''
@@ -4772,6 +4851,7 @@ function confirmExcelImport() {
                 prod.category = p.category;
                 prod.cost = p.cost;
                 prod.price = p.price;
+                prod.priceDiscount = p.priceDiscount;
                 prod.stock = p.stock;
                 prod.stockMin = p.stockMin;
                 updated++;
@@ -4800,13 +4880,13 @@ async function downloadExcelTemplate() {
     }
 
     // Columns
-    const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio', 'Stock', 'Stock Minimo'];
+    const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio', 'Precio Descuento', 'Stock', 'Stock Minimo'];
 
     // Sample items for motorcycle spare parts store
     const rows = [
-        ['REP-FIL-NAF', 'Filtro de Nafta Universal Motocicleta', 'Repuestos de Motor', 150.00, 320.00, 50, 10],
-        ['REP-BUJ-NGK-D8EA', 'Bujía NGK D8EA (Motos 110cc-150cc)', 'Sistema Eléctrico', 420.00, 800.00, 100, 15],
-        ['REP-TRA-CAD-DID', 'Cadena DID 428H-118L Reforzada', 'Transmisión', 3500.00, 5900.00, 15, 5]
+        ['REP-FIL-NAF', 'Filtro de Nafta Universal Motocicleta', 'Repuestos de Motor', 150.00, 320.00, 280.00, 50, 10],
+        ['REP-BUJ-NGK-D8EA', 'Bujía NGK D8EA (Motos 110cc-150cc)', 'Sistema Eléctrico', 420.00, 800.00, 700.00, 100, 15],
+        ['REP-TRA-CAD-DID', 'Cadena DID 428H-118L Reforzada', 'Transmisión', 3500.00, 5900.00, 5200.00, 15, 5]
     ];
 
     const data = [headers, ...rows];
@@ -4839,7 +4919,7 @@ async function exportInventoryExcel() {
     }
     
     // Headers
-    const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio', 'Stock', 'Stock Minimo'];
+    const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio', 'Precio Descuento', 'Stock', 'Stock Minimo'];
 
     // Data Rows
     const rows = state.products.map(p => [
@@ -4848,6 +4928,7 @@ async function exportInventoryExcel() {
         p.category,
         p.cost,
         p.price,
+        p.priceDiscount || 0,
         p.stock,
         p.stockMin
     ]);

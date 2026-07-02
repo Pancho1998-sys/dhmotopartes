@@ -447,6 +447,16 @@
                                 </button>
                             </div>
 
+                            <!-- Price List Selection -->
+                            <div class="cart-price-list-section" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border-color); gap: 12px;">
+                                <span style="font-size: 13px; font-weight: 500; color: var(--text-muted);">Lista de Precios:</span>
+                                <select id="cart-price-list-select" style="flex: 1; padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background-color: var(--input-bg); color: var(--text-color); font-size: 13px; font-weight: 600; cursor: pointer;">
+                                    <option value="price">Lista 1: Público (Minorista)</option>
+                                    <option value="priceDiscount">Lista 3: Descuento</option>
+                                    <option value="cost">Lista 2: Costo Mayorista</option>
+                                </select>
+                            </div>
+
                             <!-- Cart Items List -->
                             <div class="cart-items-wrapper">
                                 <div class="cart-items-header">
@@ -538,9 +548,11 @@
                                         <th>SKU</th>
                                         <th>Descripción / Repuesto</th>
                                         <th>Categoría</th>
-                                        <th class="text-right">Costo</th>
-                                        <th class="text-right">Precio Venta</th>
-                                        <th class="text-center">Margen</th>
+                                        <th class="text-right">L2: Costo (Compra)</th>
+                                        <th class="text-right">L1: Público (Minorista)</th>
+                                        <th class="text-right">L3: Descuento</th>
+                                        <th class="text-center">Margen L1</th>
+                                        <th class="text-center">Margen L3</th>
                                         <th class="text-center">Stock</th>
                                         <th class="text-center">Stock Mín.</th>
                                         <th class="text-center">Acciones</th>
@@ -1412,13 +1424,17 @@
                     </div>
                     
                     <div class="form-row">
-                        <div class="form-group col-6">
-                            <label for="prod-cost">Precio de Compra (Costo) *</label>
+                        <div class="form-group col-4">
+                            <label for="prod-cost">L2: Costo (Compra) *</label>
                             <input type="number" id="prod-cost" required min="0" step="0.01" placeholder="0.00">
                         </div>
-                        <div class="form-group col-6">
-                            <label for="prod-price">Precio de Venta *</label>
+                        <div class="form-group col-4">
+                            <label for="prod-price">L1: Público (Minorista) *</label>
                             <input type="number" id="prod-price" required min="0" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="form-group col-4">
+                            <label for="prod-price-discount">L3: Precio Descuento *</label>
+                            <input type="number" id="prod-price-discount" required min="0" step="0.01" placeholder="0.00">
                         </div>
                     </div>
 
@@ -1537,6 +1553,14 @@
                     <div class="form-group">
                         <label for="cust-points">Puntos de Fidelidad Iniciales</label>
                         <input type="number" id="cust-points" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="cust-price-list">Lista de Precios Predeterminada</label>
+                        <select id="cust-price-list">
+                            <option value="price">Lista 1: Público (Minorista)</option>
+                            <option value="priceDiscount">Lista 3: Descuento</option>
+                            <option value="cost">Lista 2: Costo Mayorista</option>
+                        </select>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1720,7 +1744,8 @@
                                     <th>Nombre / Descripción</th>
                                     <th>Categoría</th>
                                     <th class="text-right">Costo</th>
-                                    <th class="text-right">Precio</th>
+                                    <th class="text-right">Precio Público</th>
+                                    <th class="text-right">Precio Desc.</th>
                                     <th class="text-center">Stock</th>
                                     <th>Acción</th>
                                 </tr>
