@@ -193,10 +193,8 @@ function createPOSProductCard(product, currency = '$', priceKey = 'price') {
     const iconStyle = product.image ? 'display: none;' : '';
 
     let displayedPrice = product.price;
-    if (priceKey === 'priceDiscount') {
-        displayedPrice = parseFloat(product.priceDiscount) || product.price;
-    } else if (priceKey === 'cost') {
-        displayedPrice = product.cost;
+    if (priceKey === 'priceWholesale') {
+        displayedPrice = parseFloat(product.priceWholesale) || product.price;
     }
 
     const comboBadge = product.isCombo ? `<span class="badge badge-primary" style="position: absolute; top: 8px; right: 8px; font-size: 10px; z-index: 10; padding: 2px 6px; background-color: var(--primary); color: #fff; border-radius: var(--radius-sm); font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">Combo</span>` : '';

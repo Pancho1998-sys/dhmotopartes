@@ -53,7 +53,12 @@ function ensureStateProperties(loadedState) {
         loadedState.products = [];
     } else {
         loadedState.products.forEach(p => {
-            if (p.priceDiscount === undefined) p.priceDiscount = 0;
+            if (p.priceWholesale === undefined) {
+                p.priceWholesale = p.priceDiscount !== undefined ? p.priceDiscount : 0;
+            }
+            if (p.priceDiscount === undefined) {
+                p.priceDiscount = p.priceWholesale;
+            }
             if (p.isCombo === undefined) p.isCombo = false;
             if (!p.components) p.components = [];
         });
@@ -235,22 +240,73 @@ async function setupAuthentication() {
 
     if (loginBtnLocal) {
         loginBtnLocal.onclick = () => {
-            if (isExecutable) {
-                alert("Acceso denegado: El modo local no está permitido en esta aplicación compilada.");
-                return;
+            // Hide standard login form, show local role selection
+            const loginForm = document.getElementById('login-form');
+            const localLoginSection = document.getElementById('local-login-section');
+            if (loginForm && localLoginSection) {
+                loginForm.style.display = 'none';
+                localLoginSection.style.display = 'block';
             }
+        };
+    }
+
+    const localLoginConfirmBtn = document.getElementById('local-login-confirm-btn');
+    if (localLoginConfirmBtn) {
+        localLoginConfirmBtn.onclick = async () => {
+            const roleSelect = document.getElementById('local-role-select');
+            currentUserRole = roleSelect ? roleSelect.value : 'superadmin';
+            
+            // Set dummy user profile locally
+            currentUserProfile = {
+                first_name: "Usuario",
+                last_name: "Local",
+                dni: "",
+                role: currentUserRole,
+                store_id: null
+            };
+            myStoreId = null;
+
             if (loginOverlay) {
                 loginOverlay.classList.remove('active');
                 loginOverlay.style.display = 'none';
             }
-            const params = new URLSearchParams(window.location.search);
-            if (params.get('t') === 'saas_admin') {
-                currentUserRole = 'saas_admin';
+
+            // Show/hide navigation tabs
+            const allNavIds = ['nav-dashboard', 'nav-pos', 'nav-inventario', 'nav-clientes', 'nav-proveedores', 'nav-historial', 'nav-caja', 'nav-configuracion'];
+            allNavIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el && el.parentElement) el.parentElement.style.display = 'block';
+            });
+
+            if (currentUserRole === 'cajero') {
+                const navItemsToHide = ['nav-dashboard', 'nav-inventario', 'nav-clientes', 'nav-proveedores', 'nav-historial', 'nav-caja', 'nav-configuracion'];
+                navItemsToHide.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el && el.parentElement) el.parentElement.style.display = 'none';
+                });
+                if (window.location.hash === '#dashboard' || window.location.hash === '') {
+                    window.location.hash = '#pos';
+                }
             } else {
-                currentUserRole = 'superadmin';
+                if (window.location.hash === '' || window.location.hash === '#pos') {
+                    window.location.hash = '#dashboard';
+                }
             }
-            loadDatabase(); // Loads local/demo data
+
+            await loadDatabase();
             renderApp();
+        };
+    }
+
+    const localLoginBackBtn = document.getElementById('local-login-back-btn');
+    if (localLoginBackBtn) {
+        localLoginBackBtn.onclick = () => {
+            const loginForm = document.getElementById('login-form');
+            const localLoginSection = document.getElementById('local-login-section');
+            if (loginForm && localLoginSection) {
+                loginForm.style.display = 'block';
+                localLoginSection.style.display = 'none';
+            }
         };
     }
 
@@ -318,22 +374,15 @@ async function setupAuthentication() {
         loginStatus.textContent = "Ingresa tus credenciales para acceder a la base de datos remota.";
     }
 
-    // Ocultar siempre el botón de modo local cuando Supabase está configurado o si es el ejecutable (.exe).
-    // Solo tiene sentido en entorno de desarrollo sin Supabase.
+    // Mostrar siempre el botón de modo local para permitir trabajo sin conexión
     if (loginBtnLocal) {
-        if (isExecutable || supabaseInitialized) {
-            loginBtnLocal.style.display = 'none';
-        } else {
-            loginBtnLocal.style.display = 'block';
-        }
+        loginBtnLocal.style.display = 'block';
     }
 
-    // Set up Supabase auth state listener
     supabaseClient.auth.onAuthStateChange(async (event, session) => {
         if (session && session.user) {
             const user = session.user;
             console.log("Usuario autenticado en Supabase:", user.email);
-
             try {
                 // Fetch profile and check role
                 let { data: profile, error } = await supabaseClient
@@ -341,21 +390,56 @@ async function setupAuthentication() {
                     .select('first_name, last_name, dni, role, store_id, stores (name)')
                     .eq('id', user.id)
                     .single();
-
+ 
                 if (error || !profile) {
                     console.error("Error al obtener perfil, reintentando...", error);
-                    await new Promise(r => setTimeout(r, 800));
-                    const { data: retryProfile } = await supabaseClient
-                        .from('user_profiles')
-                        .select('first_name, last_name, dni, role, store_id, stores (name)')
-                        .eq('id', user.id)
-                        .single();
-                    if (!retryProfile) {
-                        alert("Error al cargar perfil de usuario en la base de datos.");
-                        await supabaseClient.auth.signOut();
-                        return;
+                    // Check if we are offline or if it is a fetch connection error
+                    const isOfflineError = !window.navigator.onLine || error?.message?.includes('Fetch') || error?.code === 'PGRST102' || error?.status === 0;
+                    if (isOfflineError) {
+                        const cached = localStorage.getItem('dhmotopartes_cached_profile');
+                        if (cached) {
+                            try {
+                                profile = JSON.parse(cached);
+                                console.log("Modo offline: Usando perfil de usuario cacheado.");
+                            } catch (e) {
+                                console.error("Error parsing cached profile:", e);
+                            }
+                        }
                     }
-                    profile = retryProfile;
+                    
+                    if (!profile) {
+                        await new Promise(r => setTimeout(r, 800));
+                        const { data: retryProfile } = await supabaseClient
+                            .from('user_profiles')
+                            .select('first_name, last_name, dni, role, store_id, stores (name)')
+                            .eq('id', user.id)
+                            .single();
+                        if (!retryProfile) {
+                            // Check cache one more time
+                            const cached = localStorage.getItem('dhmotopartes_cached_profile');
+                            if (cached) {
+                                try {
+                                    profile = JSON.parse(cached);
+                                    console.log("Modo offline (reintento): Usando perfil de usuario cacheado.");
+                                } catch (e) {
+                                    console.error("Error parsing cached profile:", e);
+                                }
+                            }
+                            
+                            if (!profile) {
+                                alert("Error al cargar perfil de usuario en la base de datos.");
+                                await supabaseClient.auth.signOut();
+                                return;
+                            }
+                        } else {
+                            profile = retryProfile;
+                        }
+                    }
+                }
+
+                // Cache profile if successfully retrieved or read
+                if (profile) {
+                    localStorage.setItem('dhmotopartes_cached_profile', JSON.stringify(profile));
                 }
 
                 // Authorize
@@ -407,21 +491,15 @@ async function setupAuthentication() {
                     if (window.location.hash === '#dashboard' || window.location.hash === '') {
                         window.location.hash = '#pos';
                     }
-                } else if (currentUserRole === 'superadmin' || currentUserRole === 'saas_admin') {
-                    const navItemsToHide = ['nav-pos', 'nav-inventario', 'nav-clientes', 'nav-proveedores', 'nav-caja'];
-                    if (currentUserRole === 'saas_admin') {
-                        navItemsToHide.push('nav-configuracion');
-                    }
+                } else if (currentUserRole === 'saas_admin') {
+                    const navItemsToHide = ['nav-pos', 'nav-inventario', 'nav-clientes', 'nav-proveedores', 'nav-caja', 'nav-configuracion'];
                     navItemsToHide.forEach(id => {
                         const el = document.getElementById(id);
                         if (el && el.parentElement) el.parentElement.style.display = 'none';
                     });
                     const targetView = window.location.hash.replace('#', '');
-                    const forbiddenViewsForAdmins = ['pos', 'inventario', 'clientes', 'proveedores', 'caja'];
-                    if (currentUserRole === 'saas_admin') {
-                        forbiddenViewsForAdmins.push('configuracion');
-                    }
-                    if (window.location.hash === '' || forbiddenViewsForAdmins.includes(targetView)) {
+                    const forbiddenViewsForSaaSAdmin = ['pos', 'inventario', 'clientes', 'proveedores', 'caja', 'configuracion'];
+                    if (window.location.hash === '' || forbiddenViewsForSaaSAdmin.includes(targetView)) {
                         window.location.hash = '#dashboard';
                     }
                 }
@@ -760,21 +838,44 @@ async function loadDatabase() {
     }
 
     updateSidebarStatus('offline', "Modo Local");
-    const localData = localStorage.getItem(getStorageKey());
-    if (localData) {
-        try {
-            state = ensureStateProperties(JSON.parse(localData));
-        } catch (e) {
-            console.error("Error parsing local database. Using empty data.", e);
+    let loadedLocal = false;
+    
+    // First try to fetch from local Python server API (/api/db)
+    try {
+        const response = await fetch('/api/db', {
+            method: 'GET',
+            headers: { 'Cache-Control': 'no-cache' }
+        });
+        if (response.ok) {
+            const serverDb = await response.json();
+            if (serverDb && (serverDb.products || serverDb.sales)) {
+                state = ensureStateProperties(serverDb);
+                localStorage.setItem(getStorageKey(), JSON.stringify(state));
+                console.log("Base de datos cargada con éxito desde el servidor local API (/api/db)");
+                loadedLocal = true;
+            }
+        }
+    } catch (err) {
+        console.warn("Servidor local API no disponible. Usando LocalStorage:", err);
+    }
+
+    if (!loadedLocal) {
+        const localData = localStorage.getItem(getStorageKey());
+        if (localData) {
+            try {
+                state = ensureStateProperties(JSON.parse(localData));
+            } catch (e) {
+                console.error("Error al procesar base de datos local. Usando datos vacíos.", e);
+                state = ensureStateProperties(null);
+                if (!myStoreId) {
+                    loadDemoData();
+                }
+            }
+        } else {
             state = ensureStateProperties(null);
             if (!myStoreId) {
                 loadDemoData();
             }
-        }
-    } else {
-        state = ensureStateProperties(null);
-        if (!myStoreId) {
-            loadDemoData();
         }
     }
     syncSettingsInputs();
@@ -1030,21 +1131,20 @@ function handleRoute() {
         return;
     }
 
-    // Route protection for superadmin or saas_admin
-    const forbiddenViewsForAdmins = ['pos', 'inventario', 'clientes', 'proveedores', 'caja'];
+    // Route protection for saas_admin
     if (currentUserRole === 'saas_admin') {
-        forbiddenViewsForAdmins.push('configuracion');
-    }
-    if ((currentUserRole === 'superadmin' || currentUserRole === 'saas_admin') && forbiddenViewsForAdmins.includes(targetView)) {
-        window.location.hash = '#dashboard';
-        return;
+        const forbiddenViewsForSaaSAdmin = ['pos', 'inventario', 'clientes', 'proveedores', 'caja', 'configuracion'];
+        if (forbiddenViewsForSaaSAdmin.includes(targetView)) {
+            window.location.hash = '#dashboard';
+            return;
+        }
     }
 
     // Hide/Show backups configuration panel dynamically based on role
     if (targetView === 'configuracion') {
         const backupPanel = document.getElementById('config-respaldo-panel');
         if (backupPanel) {
-            if (currentUserRole === 'superadmin' || currentUserRole === 'saas_admin') {
+            if (currentUserRole === 'saas_admin') {
                 backupPanel.style.display = 'none';
             } else {
                 backupPanel.style.display = ''; // Restore default
@@ -1242,7 +1342,9 @@ function setupEventListeners() {
             if (customerId !== "0") {
                 const customer = state.customers.find(c => c.id === customerId);
                 if (customer && customer.defaultPriceList && cartPriceListSelect) {
-                    cartPriceListSelect.value = customer.defaultPriceList;
+                    let defaultList = customer.defaultPriceList;
+                    if (defaultList === 'priceDiscount') defaultList = 'priceWholesale';
+                    cartPriceListSelect.value = defaultList;
                     window.changeCartPriceList();
                 }
             }
@@ -1403,10 +1505,10 @@ function setupEventListeners() {
         applyBtn.addEventListener('click', () => {
             const cost = parseFloat(applyBtn.dataset.cost) || 0;
             const price = parseFloat(applyBtn.dataset.price) || 0;
-            const discount = parseFloat(applyBtn.dataset.discount) || 0;
+            const wholesale = parseFloat(applyBtn.dataset.wholesale) || 0;
             document.getElementById('prod-cost').value = cost.toFixed(2);
             document.getElementById('prod-price').value = price.toFixed(2);
-            document.getElementById('prod-price-discount').value = discount.toFixed(2);
+            document.getElementById('prod-price-wholesale').value = wholesale.toFixed(2);
         });
     }
 
@@ -2590,10 +2692,8 @@ window.addCartItem = function(prodId, shouldRender = true) {
     const priceListSelect = document.getElementById('cart-price-list-select');
     const priceKey = priceListSelect ? priceListSelect.value : 'price';
     let itemPrice = product.price;
-    if (priceKey === 'priceDiscount') {
-        itemPrice = parseFloat(product.priceDiscount) || product.price;
-    } else if (priceKey === 'cost') {
-        itemPrice = product.cost;
+    if (priceKey === 'priceWholesale') {
+        itemPrice = parseFloat(product.priceWholesale) || product.price;
     }
 
     if (existingInCart) {
@@ -2623,10 +2723,8 @@ window.changeCartPriceList = function() {
     state.cart.forEach(item => {
         const product = state.products.find(p => p.id === item.id);
         if (product) {
-            if (priceKey === 'priceDiscount') {
-                item.price = parseFloat(product.priceDiscount) || product.price;
-            } else if (priceKey === 'cost') {
-                item.price = product.cost;
+            if (priceKey === 'priceWholesale') {
+                item.price = parseFloat(product.priceWholesale) || product.price;
             } else {
                 item.price = product.price;
             }
@@ -3030,8 +3128,8 @@ function renderInventoryTable() {
     let rowsHtml = '';
     pageItems.forEach(p => {
         const marginL1 = p.price > 0 ? ((p.price - p.cost) / p.price) * 100 : 0;
-        const discountPrice = parseFloat(p.priceDiscount) || 0;
-        const marginL3 = discountPrice > 0 ? ((discountPrice - p.cost) / discountPrice) * 100 : 0;
+        const wholesalePrice = parseFloat(p.priceWholesale) || 0;
+        const marginL2 = wholesalePrice > 0 ? ((wholesalePrice - p.cost) / wholesalePrice) * 100 : 0;
 
         const stock = p.isCombo ? window.getComboStock(p) : p.stock;
         let stockBadge = 'ok';
@@ -3055,9 +3153,9 @@ function renderInventoryTable() {
                 <td>${p.category}</td>
                 <td class="text-right">${state.settings.currency}${p.cost.toFixed(2)}</td>
                 <td class="text-right" style="font-weight: 700;">${state.settings.currency}${p.price.toFixed(2)}</td>
-                <td class="text-right">${state.settings.currency}${discountPrice.toFixed(2)}</td>
+                <td class="text-right">${state.settings.currency}${wholesalePrice.toFixed(2)}</td>
                 <td class="text-center text-emerald" style="font-weight: 600;">${marginL1.toFixed(0)}%</td>
-                <td class="text-center text-amber" style="font-weight: 600;">${marginL3.toFixed(0)}%</td>
+                <td class="text-center text-amber" style="font-weight: 600;">${marginL2.toFixed(0)}%</td>
                 <td class="text-center">
                     <span class="stock-pill ${stockBadge}">${stockText}</span>
                 </td>
@@ -3101,7 +3199,7 @@ function saveProduct(e) {
     const category = document.getElementById('prod-category').value;
     const cost = parseFloat(document.getElementById('prod-cost').value) || 0;
     const price = parseFloat(document.getElementById('prod-price').value) || 0;
-    const priceDiscount = parseFloat(document.getElementById('prod-price-discount').value) || 0;
+    const priceWholesale = parseFloat(document.getElementById('prod-price-wholesale').value) || 0;
     const stock = parseInt(document.getElementById('prod-stock').value) || 0;
     const stockMin = parseInt(document.getElementById('prod-stock-min').value) || 5;
 
@@ -3121,7 +3219,8 @@ function saveProduct(e) {
 
         state.products.push({
             id: `p_${Date.now()}`,
-            sku, name, category, cost, price, priceDiscount, 
+            sku, name, category, cost, price, priceWholesale, 
+            priceDiscount: priceWholesale, // mantener por compatibilidad
             stock: finalStock, 
             stockMin, image,
             isCombo,
@@ -3135,7 +3234,8 @@ function saveProduct(e) {
             product.category = category;
             product.cost = cost;
             product.price = price;
-            product.priceDiscount = priceDiscount;
+            product.priceWholesale = priceWholesale;
+            product.priceDiscount = priceWholesale; // mantener por compatibilidad
             product.isCombo = isCombo;
             product.components = isCombo ? [...tempComboComponents] : [];
             if (!isCombo) {
@@ -3164,7 +3264,7 @@ window.editProduct = function (id) {
     document.getElementById('prod-category').value = p.category;
     document.getElementById('prod-cost').value = p.cost;
     document.getElementById('prod-price').value = p.price;
-    document.getElementById('prod-price-discount').value = p.priceDiscount || 0;
+    document.getElementById('prod-price-wholesale').value = p.priceWholesale || p.priceDiscount || 0;
     document.getElementById('prod-stock-min').value = p.stockMin;
 
     const isCombo = p.isCombo || false;
@@ -3423,7 +3523,11 @@ window.editCustomer = function (id) {
     if (docTipoSelect) docTipoSelect.value = c.doc_tipo || '96';
     if (ivaSelect) ivaSelect.value = c.cond_iva_receptor || '5';
     const priceListSelect = document.getElementById('cust-price-list');
-    if (priceListSelect) priceListSelect.value = c.defaultPriceList || 'price';
+    if (priceListSelect) {
+        let defaultList = c.defaultPriceList || 'price';
+        if (defaultList === 'priceDiscount') defaultList = 'priceWholesale';
+        priceListSelect.value = defaultList;
+    }
 
     if (docTipoSelect && dniInput) {
         if (docTipoSelect.value === '99') {
@@ -4826,7 +4930,7 @@ async function handleExcelImport(e) {
             const catIdx = findExcelColumnIndex(headers, ['categoria', 'category']);
             const costIdx = findExcelColumnIndex(headers, ['costo', 'cost', 'compra', 'precio compra']);
             const priceIdx = findExcelColumnIndex(headers, ['precio', 'price', 'venta', 'precio venta']);
-            const priceDiscountIdx = findExcelColumnIndex(headers, ['descuento', 'discount', 'precio descuento', 'precio lista 3', 'lista 3', 'lista3']);
+            const priceWholesaleIdx = findExcelColumnIndex(headers, ['mayorista', 'wholesale', 'precio mayorista', 'lista 2', 'descuento', 'discount', 'precio descuento']);
             const stockIdx = findExcelColumnIndex(headers, ['stock', 'cantidad', 'cant']);
             const minIdx = findExcelColumnIndex(headers, ['stockmin', 'stock minimo', 'minimo', 'alerta']);
 
@@ -4869,9 +4973,9 @@ async function handleExcelImport(e) {
                     ? parseFloat(row[priceIdx]) || 0
                     : (exists ? exists.price : 0);
 
-                const priceDiscount = priceDiscountIdx !== -1 && row[priceDiscountIdx] !== undefined && row[priceDiscountIdx] !== null
-                    ? parseFloat(row[priceDiscountIdx]) || 0
-                    : (exists ? (exists.priceDiscount || 0) : 0);
+                const priceWholesale = priceWholesaleIdx !== -1 && row[priceWholesaleIdx] !== undefined && row[priceWholesaleIdx] !== null
+                    ? parseFloat(row[priceWholesaleIdx]) || 0
+                    : (exists ? (exists.priceWholesale || exists.priceDiscount || 0) : 0);
 
                 const stock = stockIdx !== -1 && row[stockIdx] !== undefined && row[stockIdx] !== null
                     ? parseInt(row[stockIdx]) || 0
@@ -4882,7 +4986,7 @@ async function handleExcelImport(e) {
                     : (exists ? exists.stockMin : 5);
 
                 tempExcelProducts.push({
-                    sku, name, category, cost, price, priceDiscount, stock, stockMin,
+                    sku, name, category, cost, price, priceWholesale, stock, stockMin,
                     isNew: !exists,
                     existingProduct: exists || null
                 });
@@ -4931,7 +5035,7 @@ function showExcelImportPreview() {
                 <td>${p.category}</td>
                 <td class="text-right">${currency}${p.cost.toFixed(2)}</td>
                 <td class="text-right" style="font-weight: 700;">${currency}${p.price.toFixed(2)}</td>
-                <td class="text-right">${currency}${p.priceDiscount.toFixed(2)}</td>
+                <td class="text-right">${currency}${p.priceWholesale.toFixed(2)}</td>
                 <td class="text-center" style="font-weight: 700;">${p.stock}</td>
                 <td><span class="badge ${badgeClass}">${badgeText}</span></td>
             </tr>
@@ -4969,7 +5073,8 @@ function confirmExcelImport() {
                 category: p.category,
                 cost: p.cost,
                 price: p.price,
-                priceDiscount: p.priceDiscount,
+                priceWholesale: p.priceWholesale,
+                priceDiscount: p.priceWholesale, // mantener sincronizado
                 stock: p.stock,
                 stockMin: p.stockMin,
                 isCombo: false,
@@ -4984,7 +5089,8 @@ function confirmExcelImport() {
                 prod.category = p.category;
                 prod.cost = p.cost;
                 prod.price = p.price;
-                prod.priceDiscount = p.priceDiscount;
+                prod.priceWholesale = p.priceWholesale;
+                prod.priceDiscount = p.priceWholesale; // mantener sincronizado
                 if (!prod.isCombo) {
                     prod.stock = p.stock;
                 }
@@ -5015,7 +5121,7 @@ async function downloadExcelTemplate() {
     }
 
     // Columns
-    const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio', 'Precio Descuento', 'Stock', 'Stock Minimo'];
+    const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio Minorista', 'Precio Mayorista', 'Stock', 'Stock Minimo'];
 
     // Sample items for motorcycle spare parts store
     const rows = [
@@ -5054,7 +5160,7 @@ async function exportInventoryExcel() {
     }
     
     // Headers
-    const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio', 'Precio Descuento', 'Stock', 'Stock Minimo'];
+    const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio Minorista', 'Precio Mayorista', 'Stock', 'Stock Minimo'];
 
     // Data Rows
     const rows = state.products.map(p => [
@@ -5063,7 +5169,7 @@ async function exportInventoryExcel() {
         p.category,
         p.cost,
         p.price,
-        p.priceDiscount || 0,
+        p.priceWholesale || 0,
         p.stock,
         p.stockMin
     ]);
@@ -5616,7 +5722,7 @@ window.updateComboComponentsTable = function() {
     if (applyBtn) {
         applyBtn.dataset.cost = totalCost;
         applyBtn.dataset.price = totalPrice;
-        applyBtn.dataset.discount = totalPrice * 0.9;
+        applyBtn.dataset.wholesale = totalPrice * 0.9;
     }
 
     if (window.lucide) lucide.createIcons();

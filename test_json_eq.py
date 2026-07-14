@@ -3,7 +3,7 @@ import time
 from supabase import create_client, Client
 
 url = "https://wkgxssfbzgahkztdjzmo.supabase.co"
-key = "sb_publishable_jwKdrvQXfD3PnddXDJcBhw_iIHXs7yL"
+key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrZ3hzc2ZiemdhaGt6dGRqem1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0NzI4MjcsImV4cCI6MjA5NjA0ODgyN30.BNlE6dOMlbMlERR7ri4c4QIKqVXCJPHcZviTNunku44"
 supabase: Client = create_client(url, key)
 
 response = supabase.auth.sign_in_with_password({
