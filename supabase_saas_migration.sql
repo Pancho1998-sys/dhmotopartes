@@ -187,6 +187,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.store_states;
 -- ==============================================================================
 -- Esta función permite a la web pública leer únicamente los productos (catálogo)
 -- sin exponer las ventas ni los datos de clientes que están en el mismo JSON.
+-- Filtra además los productos que son marcados como fraccionables (isFractional = true)
 
 CREATE OR REPLACE FUNCTION public.get_public_catalog(target_store_id UUID)
 RETURNS JSONB
@@ -194,17 +195,30 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-  result JSONB;
+  filtered_products JSONB;
+  categories JSONB;
 BEGIN
-  -- Extraemos el arreglo de 'products' y 'categories' del JSON de estado
-  SELECT jsonb_build_object(
-    'products', COALESCE(state->'products', '[]'::jsonb),
-    'categories', COALESCE(state->'settings'->'categories', '[]'::jsonb)
-  ) INTO result
+  -- Filtramos la lista de productos excluyendo aquellos que tienen isFractional = true
+  SELECT COALESCE(
+    (
+      SELECT jsonb_agg(elem)
+      FROM jsonb_array_elements(COALESCE(state->'products', '[]'::jsonb)) AS elem
+      WHERE COALESCE((elem->>'isFractional')::boolean, false) = false
+    ),
+    '[]'::jsonb
+  ) INTO filtered_products
   FROM public.store_states
   WHERE store_id = target_store_id;
 
-  -- Si no existe o es nulo, devolvemos un objeto por defecto
-  RETURN COALESCE(result, '{"products":[], "categories":[]}'::jsonb);
+  -- Extraemos las categorías del JSON de estado
+  SELECT COALESCE(state->'settings'->'categories', '[]'::jsonb) INTO categories
+  FROM public.store_states
+  WHERE store_id = target_store_id;
+
+  -- Devolvemos el JSON de catálogo
+  RETURN jsonb_build_object(
+    'products', COALESCE(filtered_products, '[]'::jsonb),
+    'categories', COALESCE(categories, '[]'::jsonb)
+  );
 END;
 $$;

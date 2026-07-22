@@ -473,6 +473,15 @@
                                 </select>
                             </div>
 
+                            <!-- Stock Source Selection -->
+                            <div class="cart-stock-source-section" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border-color); gap: 12px;">
+                                <span style="font-size: 13px; font-weight: 500; color: var(--text-muted);">Origen de Stock:</span>
+                                <select id="cart-stock-source-select" style="flex: 1; padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background-color: var(--input-bg); color: var(--text-color); font-size: 13px; font-weight: 600; cursor: pointer;">
+                                    <option value="local">Stock Local</option>
+                                    <option value="wholesale">Stock Mayorista</option>
+                                </select>
+                            </div>
+
                             <!-- Cart Items List -->
                             <div class="cart-items-wrapper">
                                 <div class="cart-items-header">
@@ -569,8 +578,10 @@
                                         <th class="text-right">L2: Precio Mayorista</th>
                                         <th class="text-center">Margen L1</th>
                                         <th class="text-center">Margen L2 (Mayorista)</th>
-                                        <th class="text-center">Stock</th>
-                                        <th class="text-center">Stock Mín.</th>
+                                        <th class="text-center">Stock Local</th>
+                                        <th class="text-center">Mín. Local</th>
+                                        <th class="text-center">Stock Mayorista</th>
+                                        <th class="text-center">Mín. Mayorista</th>
                                         <th class="text-center">Acciones</th>
                                     </tr>
                                 </thead>
@@ -801,18 +812,31 @@
                                 <option value="voided">Anulaciones en Efectivo</option>
                             </select>
                         </div>
-                        <div class="flex-gap-10">
+                        <div class="flex-gap-10 flex-wrap">
                             <button class="btn btn-emerald" id="caja-add-inflow-btn">
                                 <i data-lucide="plus-circle"></i> Registrar Ingreso
                             </button>
                             <button class="btn btn-danger" id="caja-add-outflow-btn">
                                 <i data-lucide="minus-circle"></i> Registrar Egreso
                             </button>
+                            <button class="btn btn-primary" id="caja-do-close-btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; font-weight: 700;">
+                                <i data-lucide="lock"></i> Realizar Cierre de Caja
+                            </button>
                         </div>
                     </div>
 
-                    <!-- Cash Movements Table Card -->
-                    <div class="data-table-card">
+                    <!-- Caja View Mode Tabs -->
+                    <div class="caja-view-tabs flex-align-center" style="gap: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                        <button class="btn btn-secondary btn-sm active-tab" id="caja-tab-movements-btn" onclick="switchCajaViewTab('movements')">
+                            <i data-lucide="list" style="width:14px; height:14px; margin-right:4px;"></i> Turno Actual
+                        </button>
+                        <button class="btn btn-secondary btn-sm" id="caja-tab-closures-btn" onclick="switchCajaViewTab('closures')">
+                            <i data-lucide="history" style="width:14px; height:14px; margin-right:4px;"></i> Historial de Cierres de Caja
+                        </button>
+                    </div>
+
+                    <!-- Cash Movements Table Card (Turno Actual) -->
+                    <div class="data-table-card" id="caja-movements-card">
                         <div class="table-responsive">
                             <table class="data-table" id="caja-table">
                                 <thead>
@@ -830,6 +854,32 @@
                             </table>
                         </div>
                         <div class="table-footer-pagination" id="caja-pagination">
+                            <!-- Pagination information -->
+                        </div>
+                    </div>
+
+                    <!-- Cash Closures Table Card (Historial) -->
+                    <div class="data-table-card" id="caja-closures-card" style="display: none;">
+                        <div class="table-responsive">
+                            <table class="data-table" id="closures-table">
+                                <thead>
+                                    <tr>
+                                        <th># Cierre</th>
+                                        <th>Fecha y Hora</th>
+                                        <th>Cajero</th>
+                                        <th class="text-right">Esperado</th>
+                                        <th class="text-right">Real</th>
+                                        <th class="text-right">Diferencia</th>
+                                        <th class="text-center">Correo</th>
+                                        <th class="text-center">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="closures-table-body">
+                                    <!-- Cash closures rows rendered here -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="table-footer-pagination" id="closures-pagination">
                             <!-- Pagination information -->
                         </div>
                     </div>
@@ -871,6 +921,11 @@
                                     <div class="form-group">
                                         <label for="set-store-description">Descripción de Marca para Clientes</label>
                                         <textarea id="set-store-description" placeholder="Escribe una breve descripción de tu marca o tienda que verán los clientes..." rows="3"></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="set-store-alias">Alias de Pago (Mercado Pago / CVU / CBU)</label>
+                                        <input type="text" id="set-store-alias" value="dhmotopartes.mp" placeholder="Ej: dhmotopartes.mp">
+                                        <span class="small text-muted">Se mostrará a los clientes en el catálogo web para pagos por transferencia (sin código QR).</span>
                                     </div>
                                     <div class="form-row">
                                         <div class="form-group col-6">
@@ -1469,12 +1524,32 @@
 
                     <div class="form-row">
                         <div class="form-group col-6">
-                            <label for="prod-stock">Stock Inicial *</label>
-                            <input type="number" id="prod-stock" required min="0" placeholder="0">
+                            <label for="prod-stock">Stock Local Inicial *</label>
+                            <input type="number" id="prod-stock" required min="0" step="any" placeholder="0">
                         </div>
                         <div class="form-group col-6">
-                            <label for="prod-stock-min">Stock Mínimo (Alerta) *</label>
-                            <input type="number" id="prod-stock-min" required min="0" placeholder="5">
+                            <label for="prod-stock-min">Mínimo Local (Alerta) *</label>
+                            <input type="number" id="prod-stock-min" required min="0" step="any" placeholder="5">
+                        </div>
+                    </div>
+
+                    <div class="form-row" id="wholesale-stock-row">
+                        <div class="form-group col-6">
+                            <label for="prod-stock-wholesale">Stock Mayorista Inicial *</label>
+                            <input type="number" id="prod-stock-wholesale" required min="0" step="any" placeholder="0">
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="prod-stock-wholesale-min">Mínimo Mayorista (Alerta) *</label>
+                            <input type="number" id="prod-stock-wholesale-min" required min="0" step="any" placeholder="5">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group col-12">
+                            <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; cursor: pointer; user-select: none; margin-bottom: 12px;">
+                                <input type="checkbox" id="prod-is-fractional" style="width: 16px; height: 16px;">
+                                <span>Producto Fraccionable (permite decimales y se oculta en la web)</span>
+                            </label>
                         </div>
                     </div>
 
@@ -1773,6 +1848,123 @@
         </div>
     </div>
 
+    <!-- 6.5. CIERRE DE CAJA MODAL -->
+    <div class="modal-backdrop" id="modal-cierre-caja">
+        <div class="modal-box modal-medium">
+            <div class="modal-header" style="background: linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(5,150,105,0.05) 100%);">
+                <div>
+                    <h3 class="modal-title" style="color: #10b981; font-weight: 700;">
+                        <i data-lucide="lock" style="width:20px; height:20px; vertical-align: middle; margin-right: 6px;"></i>
+                        Realizar Cierre de Caja (Arqueo de Turno)
+                    </h3>
+                    <span class="small text-muted" id="cierre-shift-period-text">Turno actual</span>
+                </div>
+                <button class="btn-icon modal-close-btn" data-close-modal="modal-cierre-caja"><i data-lucide="x"></i></button>
+            </div>
+            <form id="cierre-caja-form">
+                <div class="modal-body">
+                    <!-- Resumen Teórico de Operaciones -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px;">
+                        <h4 style="font-size: 13px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;">Resumen del Turno</h4>
+                        
+                        <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
+                            <span>Monto Inicial / Apertura:</span>
+                            <strong id="cierre-initial-balance-display">$0.00</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; color: var(--emerald);">
+                            <span>(+) Ventas en Efectivo:</span>
+                            <strong id="cierre-cash-sales-display">+$0.00</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; color: var(--emerald);">
+                            <span>(+) Otros Ingresos Manuales:</span>
+                            <strong id="cierre-inflows-display">+$0.00</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; color: var(--danger);">
+                            <span>(-) Egresos / Retiros Manuales:</span>
+                            <strong id="cierre-outflows-display">-$0.00</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; color: var(--danger);">
+                            <span>(-) Anulaciones en Efectivo:</span>
+                            <strong id="cierre-voids-display">-$0.00</strong>
+                        </div>
+                        
+                        <div style="border-top: 1px dashed var(--border-color); padding-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 700; font-size: 14px; color: var(--primary);">EFECTIVO TEÓRICO ESPERADO:</span>
+                            <h3 style="font-size: 22px; font-weight: 800; color: var(--primary); margin: 0;" id="cierre-expected-display">$0.00</h3>
+                        </div>
+                    </div>
+
+                    <!-- Conteo de Efectivo Real -->
+                    <div class="form-group">
+                        <label for="cierre-actual-cash" style="font-weight: 700; font-size: 14px;">
+                            Conteo de Efectivo Real en Caja ($) *
+                        </label>
+                        <input type="number" id="cierre-actual-cash" required min="0" step="0.01" placeholder="Ingrese el dinero físico contado" class="input-large-text" style="font-size: 20px; font-weight: 800; color: #10b981;">
+                        <span class="small text-muted">Ingrese la cantidad exacta de dinero en efectivo contado en la caja física.</span>
+                    </div>
+
+                    <!-- Indicador dinámico de diferencia -->
+                    <div id="cierre-diff-badge-container" style="margin-bottom: 16px; text-align: center;">
+                        <div class="badge" id="cierre-diff-badge" style="display: inline-block; padding: 8px 16px; font-size: 14px; font-weight: 700; border-radius: 20px; background: rgba(16,185,129,0.15); color: #10b981;">
+                            Caja Cuadrada ($0.00)
+                        </div>
+                    </div>
+
+                    <!-- Desglose de Ventas por Otros Medios -->
+                    <div style="font-size: 12px; color: var(--text-muted); background: rgba(99,102,241,0.06); padding: 10px; border-radius: var(--radius-sm); margin-bottom: 16px;">
+                        <i data-lucide="info" style="width: 14px; height: 14px; vertical-align: middle;"></i>
+                        Ventas totales del turno en otros medios de pago (Transferencias / Tarjetas): <strong id="cierre-other-sales-display" style="color: var(--text-main);">$0.00</strong>
+                    </div>
+
+                    <!-- Correo electrónico de destino -->
+                    <div class="form-group">
+                        <label for="cierre-target-email" style="font-weight: 600;">
+                            Enviar Informe de Cierre al Correo *
+                        </label>
+                        <div style="position: relative;">
+                            <input type="email" id="cierre-target-email" required value="dhmotopartes@gmail.com" placeholder="dhmotopartes@gmail.com">
+                        </div>
+                        <span class="small text-muted">Se enviará el resumen completo de este cierre a esta dirección.</span>
+                    </div>
+
+                    <!-- Observaciones -->
+                    <div class="form-group">
+                        <label for="cierre-notes">Notas / Observaciones del Cierre</label>
+                        <textarea id="cierre-notes" rows="2" placeholder="Ej. Faltante aclarado con recibo X, sin novedades..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-outline" data-close-modal="modal-cierre-caja">Cancelar</button>
+                    <button type="submit" class="btn btn-emerald" id="cierre-submit-btn" style="background: #10b981; color: white; font-weight: 700;">
+                        <i data-lucide="send"></i> Confirmar Cierre y Enviar Correo
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 6.6. DETALLE / TICKET DE CIERRE DE CAJA MODAL -->
+    <div class="modal-backdrop" id="modal-cierre-detail">
+        <div class="modal-box modal-medium">
+            <div class="modal-header hide-on-print">
+                <h3 class="modal-title" id="cierre-detail-title">Comprobante de Cierre de Caja</h3>
+                <button class="btn-icon modal-close-btn" data-close-modal="modal-cierre-detail"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body" id="cierre-detail-content">
+                <!-- Detailed closure ticket rendered dynamically -->
+            </div>
+            <div class="modal-footer hide-on-print">
+                <button class="btn btn-secondary btn-outline" data-close-modal="modal-cierre-detail">Cerrar</button>
+                <button class="btn btn-primary" id="cierre-resend-email-btn" style="margin-left: auto;">
+                    <i data-lucide="mail"></i> Reenviar por Correo
+                </button>
+                <button class="btn btn-emerald" id="cierre-print-btn">
+                    <i data-lucide="printer"></i> Imprimir Ticket
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- 7. EXCEL PREVIEW MODAL -->
     <div class="modal-backdrop" id="modal-excel-preview">
         <div class="modal-box modal-large">
@@ -1900,6 +2092,20 @@
                             <option value="Transferencia Bancaria / CVU">Transferencia Bancaria / CVU</option>
                             <option value="Mercado Pago / Enlace de pago">Mercado Pago / Enlace de pago</option>
                         </select>
+                    </div>
+
+                    <!-- Info Box for Transfer / Mercado Pago Alias (No QR) -->
+                    <div id="catalog-checkout-transfer-info" style="display: none; background: rgba(99, 102, 241, 0.08); border: 1px dashed var(--primary); border-radius: var(--radius-md); padding: 12px; margin-top: 12px; text-align: center;">
+                        <div style="font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 4px;">
+                            <i data-lucide="smartphone" class="icon-inline"></i> Datos para Transferir (Sin QR)
+                        </div>
+                        <p style="font-size: 12px; color: var(--text-muted); margin: 4px 0 8px 0;">Alias para transferencia o Mercado Pago:</p>
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;">
+                            <span id="cat-display-alias" style="font-family: monospace; font-size: 16px; font-weight: 800; background: var(--bg-card); padding: 6px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); color: var(--text-main); user-select: all;">dhmotopartes.mp</span>
+                            <button type="button" class="btn btn-secondary small" id="copy-alias-btn" onclick="copyStoreAlias()" style="padding: 6px 12px;">
+                                <i data-lucide="copy" style="width: 14px; height: 14px;"></i> <span id="copy-alias-text">Copiar Alias</span>
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="checkout-summary-box" style="margin-top: 15px; margin-bottom: 0;">

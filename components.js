@@ -167,10 +167,10 @@ window.hideChartTooltip = function() {
  * @param {string} currency - Store currency symbol
  * @returns {string} HTML string
  */
-function createPOSProductCard(product, currency = '$', priceKey = 'price') {
+function createPOSProductCard(product, currency = '$', priceKey = 'price', stockSource = 'local') {
     const stock = (product.isCombo && typeof window.getComboStock === 'function') 
-        ? window.getComboStock(product) 
-        : product.stock;
+        ? window.getComboStock(product, stockSource) 
+        : (stockSource === 'wholesale' ? (product.stockWholesale || 0) : product.stock);
         
     const isOutOfStock = stock <= 0;
     const cardClass = isOutOfStock ? 'prod-card out-of-stock' : 'prod-card';
@@ -178,10 +178,14 @@ function createPOSProductCard(product, currency = '$', priceKey = 'price') {
     let stockClass = 'stock-badge-ok';
     let stockText = `${stock} disp.`;
     
+    const minThreshold = stockSource === 'wholesale' 
+        ? (product.stockMinWholesale !== undefined ? product.stockMinWholesale : 5) 
+        : product.stockMin;
+
     if (stock <= 0) {
         stockClass = 'stock-badge-out';
         stockText = 'Agotado';
-    } else if (stock <= product.stockMin) {
+    } else if (stock <= minThreshold) {
         stockClass = 'stock-badge-low';
         stockText = 'Stock Bajo';
     }

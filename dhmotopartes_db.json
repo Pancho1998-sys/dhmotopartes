@@ -373,5 +373,6 @@
         "cardBgColor": "#1f2937",
         "cardBgColorHover": "#26354a",
         "cardBgImage": ""
-    }
+    },
+    "cashClosures": []
 }

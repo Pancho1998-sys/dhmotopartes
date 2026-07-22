@@ -2679,3 +2679,11 @@ body.catalog-fullscreen .content-container {
     background-clip: text;
     display: inline-block;
 }
+
+/* Caja View Mode Tabs */
+.caja-view-tabs .btn-secondary.active-tab {
+    background-color: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary);
+}
+

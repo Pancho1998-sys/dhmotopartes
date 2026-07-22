@@ -10,10 +10,12 @@ const DEFAULT_STATE = {
     customers: [],
     suppliers: [],
     cashMovements: [],
+    cashClosures: [],
     settings: {
         storeName: "Bigtech",
         storeAddress: "Av. Libertador 2450, Ciudad",
         storePhone: "+54 9 11 5555-1234",
+        storeAlias: "dhmotopartes.mp",
         currency: "$",
         storeTax: 15,
         categories: ['Sistema Eléctrico', 'Repuestos de Motor', 'Frenos', 'Transmisión', 'Herramientas', 'Accesorios', 'Aceites'],
@@ -61,6 +63,8 @@ function ensureStateProperties(loadedState) {
             }
             if (p.isCombo === undefined) p.isCombo = false;
             if (!p.components) p.components = [];
+            if (p.stockWholesale === undefined) p.stockWholesale = 0;
+            if (p.stockMinWholesale === undefined) p.stockMinWholesale = 5;
         });
     }
     if (!loadedState.cart) loadedState.cart = [];
@@ -68,6 +72,7 @@ function ensureStateProperties(loadedState) {
     if (!loadedState.customers) loadedState.customers = [];
     if (!loadedState.suppliers) loadedState.suppliers = [];
     if (!loadedState.cashMovements) loadedState.cashMovements = [];
+    if (!loadedState.cashClosures) loadedState.cashClosures = [];
     if (!loadedState.settings) {
         loadedState.settings = JSON.parse(JSON.stringify(DEFAULT_STATE.settings));
     } else {
@@ -77,6 +82,9 @@ function ensureStateProperties(loadedState) {
                 loadedState.settings[key] = defaultSettings[key];
             }
         }
+    }
+    if (!loadedState.settings.storeAlias) {
+        loadedState.settings.storeAlias = "dhmotopartes.mp";
     }
     // Ensure 'Aceites' is in the categories list
     if (loadedState.settings.categories && !loadedState.settings.categories.includes('Aceites')) {
@@ -964,7 +972,14 @@ async function saveDatabase(retryCount = 0) {
                         if(sale.items) {
                             for (let item of sale.items) {
                                 let prod = mergedState.products.find(p => p.id === item.id);
-                                if (prod) prod.stock -= item.quantity;
+                                if (prod) {
+                                    const saleStockSource = sale.stockSource || 'local';
+                                    if (saleStockSource === 'wholesale') {
+                                        prod.stockWholesale = Math.max(0, Math.round(((prod.stockWholesale || 0) - item.quantity) * 1000) / 1000);
+                                    } else {
+                                        prod.stock = Math.max(0, Math.round((prod.stock - item.quantity) * 1000) / 1000);
+                                    }
+                                }
                             }
                         }
                     }
@@ -1332,9 +1347,24 @@ function setupEventListeners() {
 
     // Price List and Customer selection auto-switch listeners in POS
     const cartPriceListSelect = document.getElementById('cart-price-list-select');
+    const cartStockSourceSelect = document.getElementById('cart-stock-source-select');
+
     if (cartPriceListSelect) {
-        cartPriceListSelect.addEventListener('change', window.changeCartPriceList);
+        cartPriceListSelect.addEventListener('change', () => {
+            if (cartStockSourceSelect) {
+                cartStockSourceSelect.value = cartPriceListSelect.value === 'priceWholesale' ? 'wholesale' : 'local';
+            }
+            window.changeCartPriceList();
+        });
     }
+
+    if (cartStockSourceSelect) {
+        cartStockSourceSelect.addEventListener('change', () => {
+            renderCart();
+            renderPOSProductGrid();
+        });
+    }
+
     const cartCustomerSelect = document.getElementById('cart-customer-select');
     if (cartCustomerSelect) {
         cartCustomerSelect.addEventListener('change', () => {
@@ -1345,6 +1375,9 @@ function setupEventListeners() {
                     let defaultList = customer.defaultPriceList;
                     if (defaultList === 'priceDiscount') defaultList = 'priceWholesale';
                     cartPriceListSelect.value = defaultList;
+                    if (cartStockSourceSelect) {
+                        cartStockSourceSelect.value = defaultList === 'priceWholesale' ? 'wholesale' : 'local';
+                    }
                     window.changeCartPriceList();
                 }
             }
@@ -1435,6 +1468,10 @@ function setupEventListeners() {
         if (stockInput) {
             stockInput.readOnly = false;
         }
+        const stockWholesaleInput = document.getElementById('prod-stock-wholesale');
+        if (stockWholesaleInput) {
+            stockWholesaleInput.readOnly = false;
+        }
         const comboSection = document.getElementById('combo-components-section');
         if (comboSection) comboSection.style.display = 'none';
         tempComboComponents = [];
@@ -1462,6 +1499,7 @@ function setupEventListeners() {
     const typeSimple = document.getElementById('prod-type-simple');
     const typeCombo = document.getElementById('prod-type-combo');
     const stockInput = document.getElementById('prod-stock');
+    const stockWholesaleInput = document.getElementById('prod-stock-wholesale');
     const comboSection = document.getElementById('combo-components-section');
 
     if (typeSimple && typeCombo) {
@@ -1470,6 +1508,10 @@ function setupEventListeners() {
                 if (stockInput) {
                     stockInput.value = 0;
                     stockInput.readOnly = true;
+                }
+                if (stockWholesaleInput) {
+                    stockWholesaleInput.value = 0;
+                    stockWholesaleInput.readOnly = true;
                 }
                 if (comboSection) {
                     comboSection.style.display = 'block';
@@ -1485,6 +1527,9 @@ function setupEventListeners() {
             } else {
                 if (stockInput) {
                     stockInput.readOnly = false;
+                }
+                if (stockWholesaleInput) {
+                    stockWholesaleInput.readOnly = false;
                 }
                 if (comboSection) comboSection.style.display = 'none';
             }
@@ -1627,6 +1672,20 @@ function setupEventListeners() {
         cajaPage = 1;
         renderCaja();
     });
+
+    // Cierre de Caja Listeners
+    const doCloseBtn = document.getElementById('caja-do-close-btn');
+    if (doCloseBtn) {
+        doCloseBtn.addEventListener('click', openCierreCajaModal);
+    }
+    const actualCashInput = document.getElementById('cierre-actual-cash');
+    if (actualCashInput) {
+        actualCashInput.addEventListener('input', updateCierreDifferenceBadge);
+    }
+    const cierreForm = document.getElementById('cierre-caja-form');
+    if (cierreForm) {
+        cierreForm.addEventListener('submit', processCierreCaja);
+    }
 
     // Excel Import/Export Listeners
     document.getElementById('inventory-import-excel').addEventListener('change', handleExcelImport);
@@ -1979,7 +2038,13 @@ function processBarcodeScan(code) {
     const product = state.products.find(p => p.sku.toUpperCase() === code.toUpperCase());
 
     if (product) {
-        if (product.stock <= 0) {
+        const stockSourceSelect = document.getElementById('cart-stock-source-select');
+        const stockSource = stockSourceSelect ? stockSourceSelect.value : 'local';
+        const currentStock = product.isCombo 
+            ? window.getComboStock(product, stockSource) 
+            : (stockSource === 'wholesale' ? (product.stockWholesale || 0) : product.stock);
+
+        if (currentStock <= 0) {
             playScanSound('fail');
             alert(`El repuesto "${product.name}" no cuenta con stock disponible.`);
             return;
@@ -2187,11 +2252,38 @@ function renderDashboard() {
     // Total products and stocks
     const totalProducts = state.products.length;
     const totalStockQty = state.products.reduce((sum, p) => sum + p.stock, 0);
+    const totalStockWholesaleQty = state.products.reduce((sum, p) => sum + (p.stockWholesale || 0), 0);
     document.getElementById('metric-total-products').textContent = totalProducts;
-    document.getElementById('metric-total-stock').textContent = `${totalStockQty} unidades físicas`;
+    document.getElementById('metric-total-stock').textContent = `${totalStockQty} Loc. / ${totalStockWholesaleQty} May.`;
 
     // Low stock warnings
-    const lowStockList = state.products.filter(p => p.stock <= p.stockMin);
+    const lowStockList = [];
+    state.products.forEach(p => {
+        const isLocLow = p.stock <= p.stockMin;
+        const wholesMin = p.stockMinWholesale !== undefined ? p.stockMinWholesale : 5;
+        const isWholesLow = (p.stockWholesale || 0) <= wholesMin;
+
+        if (isLocLow || isWholesLow) {
+            let detail = '';
+            let isCrit = false;
+            if (isLocLow && isWholesLow) {
+                detail = `L: ${p.stock} | M: ${p.stockWholesale || 0}`;
+                isCrit = p.stock === 0 || (p.stockWholesale || 0) === 0;
+            } else if (isLocLow) {
+                detail = `Local: ${p.stock}`;
+                isCrit = p.stock === 0;
+            } else {
+                detail = `Mayorista: ${p.stockWholesale || 0}`;
+                isCrit = (p.stockWholesale || 0) === 0;
+            }
+            lowStockList.push({
+                product: p,
+                detail: detail,
+                isCritical: isCrit
+            });
+        }
+    });
+
     const lowStockCount = lowStockList.length;
     document.getElementById('metric-low-stock-count').textContent = lowStockCount;
 
@@ -2214,8 +2306,9 @@ function renderDashboard() {
     } else {
         let listHtml = '';
         // Display top 4 low stock items
-        lowStockList.slice(0, 4).forEach(p => {
-            const stockColor = p.stock === 0 ? 'text-danger' : 'text-warning';
+        lowStockList.slice(0, 4).forEach(item => {
+            const p = item.product;
+            const stockColor = item.isCritical ? 'text-danger' : 'text-warning';
             listHtml += `
                 <div class="feed-item">
                     <div class="feed-item-left">
@@ -2227,9 +2320,8 @@ function renderDashboard() {
                             <p class="feed-item-subtext">SKU: ${p.sku}</p>
                         </div>
                     </div>
-                    <div class="feed-item-right">
-                        <span class="feed-item-value ${stockColor}">${p.stock} unidades</span>
-                        <p class="feed-item-subtext">Mín: ${p.stockMin}</p>
+                    <div class="feed-item-right" style="text-align: right;">
+                        <span class="feed-item-value ${stockColor}" style="font-size: 13px; font-weight: 600;">${item.detail}</span>
                     </div>
                 </div>
             `;
@@ -2433,11 +2525,38 @@ async function onSaasStoreSelected(storeId) {
         // Total products and stocks
         const totalProducts = products.length;
         const totalStockQty = products.reduce((sum, p) => sum + p.stock, 0);
+        const totalStockWholesaleQty = products.reduce((sum, p) => sum + (p.stockWholesale || 0), 0);
         document.getElementById('saas-metric-total-products').textContent = totalProducts;
-        document.getElementById('saas-metric-total-stock').textContent = `${totalStockQty} unidades físicas`;
+        document.getElementById('saas-metric-total-stock').textContent = `${totalStockQty} Loc. / ${totalStockWholesaleQty} May.`;
 
         // Low stock warnings
-        const lowStockList = products.filter(p => p.stock <= p.stockMin);
+        const lowStockList = [];
+        products.forEach(p => {
+            const isLocLow = p.stock <= p.stockMin;
+            const wholesMin = p.stockMinWholesale !== undefined ? p.stockMinWholesale : 5;
+            const isWholesLow = (p.stockWholesale || 0) <= wholesMin;
+
+            if (isLocLow || isWholesLow) {
+                let detail = '';
+                let isCrit = false;
+                if (isLocLow && isWholesLow) {
+                    detail = `L: ${p.stock} | M: ${p.stockWholesale || 0}`;
+                    isCrit = p.stock === 0 || (p.stockWholesale || 0) === 0;
+                } else if (isLocLow) {
+                    detail = `Local: ${p.stock}`;
+                    isCrit = p.stock === 0;
+                } else {
+                    detail = `Mayorista: ${p.stockWholesale || 0}`;
+                    isCrit = (p.stockWholesale || 0) === 0;
+                }
+                lowStockList.push({
+                    product: p,
+                    detail: detail,
+                    isCritical: isCrit
+                });
+            }
+        });
+
         const lowStockCount = lowStockList.length;
         document.getElementById('saas-metric-low-stock-count').textContent = lowStockCount;
 
@@ -2462,8 +2581,9 @@ async function onSaasStoreSelected(storeId) {
                 `;
             } else {
                 let listHtml = '';
-                lowStockList.slice(0, 4).forEach(p => {
-                    const stockColor = p.stock === 0 ? 'text-danger' : 'text-warning';
+                lowStockList.slice(0, 4).forEach(item => {
+                    const p = item.product;
+                    const stockColor = item.isCritical ? 'text-danger' : 'text-warning';
                     listHtml += `
                         <div class="feed-item">
                             <div class="feed-item-left">
@@ -2475,9 +2595,8 @@ async function onSaasStoreSelected(storeId) {
                                     <p class="feed-item-subtext">SKU: ${p.sku}</p>
                                 </div>
                             </div>
-                            <div class="feed-item-right">
-                                <span class="feed-item-value ${stockColor}">${p.stock} unidades</span>
-                                <p class="feed-item-subtext">Mín: ${p.stockMin}</p>
+                            <div class="feed-item-right" style="text-align: right;">
+                                <span class="feed-item-value ${stockColor}" style="font-size: 13px; font-weight: 600;">${item.detail}</span>
                             </div>
                         </div>
                     `;
@@ -2640,10 +2759,12 @@ function renderPOSProductGrid() {
     } else {
         const priceListSelect = document.getElementById('cart-price-list-select');
         const priceKey = priceListSelect ? priceListSelect.value : 'price';
+        const stockSourceSelect = document.getElementById('cart-stock-source-select');
+        const stockSource = stockSourceSelect ? stockSourceSelect.value : (priceKey === 'priceWholesale' ? 'wholesale' : 'local');
 
         let cardsHtml = '';
         pageItems.forEach(p => {
-            cardsHtml += createPOSProductCard(p, state.settings.currency, priceKey);
+            cardsHtml += createPOSProductCard(p, state.settings.currency, priceKey, stockSource);
         });
         grid.innerHTML = cardsHtml;
         
@@ -2682,7 +2803,12 @@ window.addCartItem = function(prodId, shouldRender = true) {
     const existingInCart = state.cart.find(item => item.id === prodId);
     const cartQty = existingInCart ? existingInCart.quantity : 0;
 
-    const maxStockAvailable = product.isCombo ? window.getComboStock(product) : product.stock;
+    const stockSourceSelect = document.getElementById('cart-stock-source-select');
+    const stockSource = stockSourceSelect ? stockSourceSelect.value : 'local';
+    const maxStockAvailable = product.isCombo 
+        ? window.getComboStock(product, stockSource) 
+        : (stockSource === 'wholesale' ? (product.stockWholesale || 0) : product.stock);
+
     if (cartQty >= maxStockAvailable) {
         playScanSound('fail');
         alert(`No hay más stock disponible de "${product.name}".`);
@@ -2696,8 +2822,25 @@ window.addCartItem = function(prodId, shouldRender = true) {
         itemPrice = parseFloat(product.priceWholesale) || product.price;
     }
 
+    let addedQty = 1;
+    if (product.isFractional) {
+        const qtyInput = prompt(`Ingrese la cantidad a vender de "${product.name}" (Fraccionable):`, "1");
+        if (qtyInput === null) return; // cancelado
+        const parsedQty = parseFloat(qtyInput);
+        if (isNaN(parsedQty) || parsedQty <= 0) {
+            alert("Por favor, ingrese una cantidad válida mayor a 0.");
+            return;
+        }
+        if (cartQty + parsedQty > maxStockAvailable) {
+            playScanSound('fail');
+            alert(`No hay suficiente stock disponible. Stock máximo restante: ${maxStockAvailable - cartQty}`);
+            return;
+        }
+        addedQty = parsedQty;
+    }
+
     if (existingInCart) {
-        existingInCart.quantity += 1;
+        existingInCart.quantity = Math.round((existingInCart.quantity + addedQty) * 1000) / 1000;
         existingInCart.price = itemPrice;
     } else {
         state.cart.push({
@@ -2705,7 +2848,7 @@ window.addCartItem = function(prodId, shouldRender = true) {
             name: product.name,
             sku: product.sku,
             price: itemPrice,
-            quantity: 1
+            quantity: addedQty
         });
     }
 
@@ -2742,17 +2885,56 @@ window.modifyCartItemQty = function (prodId, delta) {
     const product = state.products.find(p => p.id === prodId);
     if (!product) return;
 
-    if (delta > 0 && cartItem.quantity >= product.stock) {
+    const stockSourceSelect = document.getElementById('cart-stock-source-select');
+    const stockSource = stockSourceSelect ? stockSourceSelect.value : 'local';
+    const maxStockAvailable = product.isCombo 
+        ? window.getComboStock(product, stockSource) 
+        : (stockSource === 'wholesale' ? (product.stockWholesale || 0) : product.stock);
+
+    if (delta > 0 && cartItem.quantity + delta > maxStockAvailable) {
         playScanSound('fail');
         alert("Stock máximo alcanzado.");
         return;
     }
 
-    cartItem.quantity += delta;
+    cartItem.quantity = Math.round((cartItem.quantity + delta) * 1000) / 1000;
     if (cartItem.quantity <= 0) {
         state.cart = state.cart.filter(item => item.id !== prodId);
     }
 
+    renderCart();
+};
+
+window.promptCartItemQty = function(prodId) {
+    const cartItem = state.cart.find(item => item.id === prodId);
+    if (!cartItem) return;
+
+    const product = state.products.find(p => p.id === prodId);
+    if (!product) return;
+
+    const defaultValue = cartItem.quantity;
+    const qtyInput = prompt(`Ingrese la cantidad para "${product.name}":`, defaultValue);
+    if (qtyInput === null) return; // cancelado
+
+    const parsedQty = parseFloat(qtyInput);
+    if (isNaN(parsedQty) || parsedQty <= 0) {
+        alert("Por favor ingrese una cantidad válida mayor a 0.");
+        return;
+    }
+
+    const stockSourceSelect = document.getElementById('cart-stock-source-select');
+    const stockSource = stockSourceSelect ? stockSourceSelect.value : 'local';
+    const maxStockAvailable = product.isCombo 
+        ? window.getComboStock(product, stockSource) 
+        : (stockSource === 'wholesale' ? (product.stockWholesale || 0) : product.stock);
+
+    if (parsedQty > maxStockAvailable) {
+        playScanSound('fail');
+        alert(`No hay suficiente stock disponible. Stock máximo: ${maxStockAvailable}`);
+        return;
+    }
+
+    cartItem.quantity = product.isFractional ? parsedQty : Math.round(parsedQty);
     renderCart();
 };
 
@@ -2799,7 +2981,7 @@ function renderCart() {
                 </div>
                 <div class="cart-item-qty">
                     <button class="qty-btn" onclick="modifyCartItemQty('${item.id}', -1)">-</button>
-                    <span class="qty-val">${item.quantity}</span>
+                    <span class="qty-val" style="min-width: 24px; width: auto; padding: 0 4px; cursor: pointer;" title="Haga clic para editar cantidad" onclick="promptCartItemQty('${item.id}')">${item.quantity}</span>
                     <button class="qty-btn" onclick="modifyCartItemQty('${item.id}', 1)">+</button>
                 </div>
                 <div class="cart-item-price">
@@ -2951,6 +3133,9 @@ async function processCheckout() {
     const total = taxableAmount + tax;
 
     // Deduct stock in catalog database
+    const stockSourceSelect = document.getElementById('cart-stock-source-select');
+    const stockSource = stockSourceSelect ? stockSourceSelect.value : 'local';
+
     state.cart.forEach(cartItem => {
         const prod = state.products.find(p => p.id === cartItem.id);
         if (prod) {
@@ -2959,12 +3144,20 @@ async function processCheckout() {
                 prod.components.forEach(comp => {
                     const compProd = state.products.find(p => p.id === comp.id);
                     if (compProd) {
-                        compProd.stock = Math.max(0, compProd.stock - (comp.quantity * cartItem.quantity));
+                        if (stockSource === 'wholesale') {
+                            compProd.stockWholesale = Math.max(0, Math.round(((compProd.stockWholesale || 0) - (comp.quantity * cartItem.quantity)) * 1000) / 1000);
+                        } else {
+                            compProd.stock = Math.max(0, Math.round((compProd.stock - (comp.quantity * cartItem.quantity)) * 1000) / 1000);
+                        }
                     }
                 });
             } else {
                 // Deduct stock of simple product
-                prod.stock = Math.max(0, prod.stock - cartItem.quantity);
+                if (stockSource === 'wholesale') {
+                    prod.stockWholesale = Math.max(0, Math.round(((prod.stockWholesale || 0) - cartItem.quantity) * 1000) / 1000);
+                } else {
+                    prod.stock = Math.max(0, Math.round((prod.stock - cartItem.quantity) * 1000) / 1000);
+                }
             }
         }
     });
@@ -2992,7 +3185,8 @@ async function processCheckout() {
         paymentMethod: activeMethod,
         amountReceived: received,
         changeReturned: Math.max(0, change),
-        status: "completed"
+        status: "completed",
+        stockSource: stockSource
     };
 
     // Check if electronic invoice is requested
@@ -3092,12 +3286,16 @@ function renderInventoryTable() {
         const matchesCategory = !catVal || p.category === catVal;
 
         let matchesStock = true;
+        const stockLocal = p.isCombo ? window.getComboStock(p, 'local') : p.stock;
+        const stockWholesale = p.isCombo ? window.getComboStock(p, 'wholesale') : (p.stockWholesale || 0);
+        const minWholesale = p.stockMinWholesale !== undefined ? p.stockMinWholesale : 5;
+
         if (stockVal === 'low') {
-            matchesStock = p.stock > 0 && p.stock <= p.stockMin;
+            matchesStock = (stockLocal > 0 && stockLocal <= p.stockMin) || (stockWholesale > 0 && stockWholesale <= minWholesale);
         } else if (stockVal === 'out') {
-            matchesStock = p.stock <= 0;
+            matchesStock = stockLocal <= 0 || stockWholesale <= 0;
         } else if (stockVal === 'ok') {
-            matchesStock = p.stock > p.stockMin;
+            matchesStock = stockLocal > p.stockMin && stockWholesale > minWholesale;
         }
 
         return matchesSearch && matchesCategory && matchesStock;
@@ -3116,7 +3314,7 @@ function renderInventoryTable() {
     if (pageItems.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="10" class="text-center text-muted" style="padding: 40px;">
+                <td colspan="13" class="text-center text-muted" style="padding: 40px;">
                     No se registran productos con los filtros seleccionados.
                 </td>
             </tr>
@@ -3131,15 +3329,27 @@ function renderInventoryTable() {
         const wholesalePrice = parseFloat(p.priceWholesale) || 0;
         const marginL2 = wholesalePrice > 0 ? ((wholesalePrice - p.cost) / wholesalePrice) * 100 : 0;
 
-        const stock = p.isCombo ? window.getComboStock(p) : p.stock;
-        let stockBadge = 'ok';
-        let stockText = `${stock} U.`;
-        if (stock <= 0) {
-            stockBadge = 'out';
-            stockText = 'Sin Stock';
-        } else if (stock <= p.stockMin) {
-            stockBadge = 'low';
-            stockText = `${stock} (Bajo)`;
+        const stockLocal = p.isCombo ? window.getComboStock(p, 'local') : p.stock;
+        let stockLocalBadge = 'ok';
+        let stockLocalText = p.isFractional ? `${stockLocal}` : `${stockLocal} U.`;
+        if (stockLocal <= 0) {
+            stockLocalBadge = 'out';
+            stockLocalText = 'Sin Stock';
+        } else if (stockLocal <= p.stockMin) {
+            stockLocalBadge = 'low';
+            stockLocalText = `${stockLocal} (Bajo)`;
+        }
+
+        const stockWholesale = p.isCombo ? window.getComboStock(p, 'wholesale') : (p.stockWholesale || 0);
+        let stockWholesaleBadge = 'ok';
+        let stockWholesaleText = p.isFractional ? `${stockWholesale}` : `${stockWholesale} U.`;
+        const minWholesale = p.stockMinWholesale !== undefined ? p.stockMinWholesale : 5;
+        if (stockWholesale <= 0) {
+            stockWholesaleBadge = 'out';
+            stockWholesaleText = 'Sin Stock';
+        } else if (stockWholesale <= minWholesale) {
+            stockWholesaleBadge = 'low';
+            stockWholesaleText = `${stockWholesale} (Bajo)`;
         }
 
         const nameCell = p.isCombo 
@@ -3157,9 +3367,13 @@ function renderInventoryTable() {
                 <td class="text-center text-emerald" style="font-weight: 600;">${marginL1.toFixed(0)}%</td>
                 <td class="text-center text-amber" style="font-weight: 600;">${marginL2.toFixed(0)}%</td>
                 <td class="text-center">
-                    <span class="stock-pill ${stockBadge}">${stockText}</span>
+                    <span class="stock-pill ${stockLocalBadge}">${stockLocalText}</span>
                 </td>
                 <td class="text-center text-muted">${p.stockMin}</td>
+                <td class="text-center">
+                    <span class="stock-pill ${stockWholesaleBadge}">${stockWholesaleText}</span>
+                </td>
+                <td class="text-center text-muted">${minWholesale}</td>
                 <td class="text-center">
                     <div class="table-action-btn-group">
                         <button class="btn btn-secondary btn-icon-only" onclick="editProduct('${p.id}')" title="Editar"><i data-lucide="edit-3" style="width:14px; height:14px;"></i></button>
@@ -3200,14 +3414,20 @@ function saveProduct(e) {
     const cost = parseFloat(document.getElementById('prod-cost').value) || 0;
     const price = parseFloat(document.getElementById('prod-price').value) || 0;
     const priceWholesale = parseFloat(document.getElementById('prod-price-wholesale').value) || 0;
-    const stock = parseInt(document.getElementById('prod-stock').value) || 0;
-    const stockMin = parseInt(document.getElementById('prod-stock-min').value) || 5;
+    
+    const isFractional = document.getElementById('prod-is-fractional').checked;
+    const stock = isFractional ? (parseFloat(document.getElementById('prod-stock').value) || 0) : (parseInt(document.getElementById('prod-stock').value) || 0);
+    const stockMin = isFractional ? (parseFloat(document.getElementById('prod-stock-min').value) || 0) : (parseInt(document.getElementById('prod-stock-min').value) || 5);
+
+    const stockWholesale = isFractional ? (parseFloat(document.getElementById('prod-stock-wholesale').value) || 0) : (parseInt(document.getElementById('prod-stock-wholesale').value) || 0);
+    const stockMinWholesale = isFractional ? (parseFloat(document.getElementById('prod-stock-wholesale-min').value) || 0) : (parseInt(document.getElementById('prod-stock-wholesale-min').value) || 5);
 
     const isFileMode = document.getElementById('prod-image-src-file').checked;
     const image = isFileMode ? tempProductImageBase64 : document.getElementById('prod-image').value.trim();
 
     const isCombo = document.getElementById('prod-type-combo').checked;
     const finalStock = isCombo ? 0 : stock;
+    const finalStockWholesale = isCombo ? 0 : stockWholesale;
 
     // Check SKU duplicate on creation
     if (!id) {
@@ -3222,8 +3442,12 @@ function saveProduct(e) {
             sku, name, category, cost, price, priceWholesale, 
             priceDiscount: priceWholesale, // mantener por compatibilidad
             stock: finalStock, 
-            stockMin, image,
+            stockMin,
+            stockWholesale: finalStockWholesale,
+            stockMinWholesale,
+            image,
             isCombo,
+            isFractional,
             components: isCombo ? [...tempComboComponents] : []
         });
     } else {
@@ -3237,11 +3461,17 @@ function saveProduct(e) {
             product.priceWholesale = priceWholesale;
             product.priceDiscount = priceWholesale; // mantener por compatibilidad
             product.isCombo = isCombo;
+            product.isFractional = isFractional;
             product.components = isCombo ? [...tempComboComponents] : [];
             if (!isCombo) {
                 product.stock = stock;
+                product.stockWholesale = stockWholesale;
+            } else {
+                product.stock = 0;
+                product.stockWholesale = 0;
             }
             product.stockMin = stockMin;
+            product.stockMinWholesale = stockMinWholesale;
             product.image = image;
         }
     }
@@ -3266,18 +3496,25 @@ window.editProduct = function (id) {
     document.getElementById('prod-price').value = p.price;
     document.getElementById('prod-price-wholesale').value = p.priceWholesale || p.priceDiscount || 0;
     document.getElementById('prod-stock-min').value = p.stockMin;
+    document.getElementById('prod-stock-wholesale-min').value = p.stockMinWholesale !== undefined ? p.stockMinWholesale : 5;
+    document.getElementById('prod-is-fractional').checked = p.isFractional || false;
 
     const isCombo = p.isCombo || false;
     document.getElementById('prod-type-simple').checked = !isCombo;
     document.getElementById('prod-type-combo').checked = isCombo;
 
     const stockInput = document.getElementById('prod-stock');
+    const stockWholesaleInput = document.getElementById('prod-stock-wholesale');
     const comboSection = document.getElementById('combo-components-section');
 
     if (isCombo) {
         if (stockInput) {
-            stockInput.value = window.getComboStock(p);
+            stockInput.value = window.getComboStock(p, 'local');
             stockInput.readOnly = true;
+        }
+        if (stockWholesaleInput) {
+            stockWholesaleInput.value = window.getComboStock(p, 'wholesale');
+            stockWholesaleInput.readOnly = true;
         }
         if (comboSection) comboSection.style.display = 'block';
         tempComboComponents = [...(p.components || [])];
@@ -3285,6 +3522,10 @@ window.editProduct = function (id) {
         if (stockInput) {
             stockInput.value = p.stock;
             stockInput.readOnly = false;
+        }
+        if (stockWholesaleInput) {
+            stockWholesaleInput.value = p.stockWholesale !== undefined ? p.stockWholesale : 0;
+            stockWholesaleInput.readOnly = false;
         }
         if (comboSection) comboSection.style.display = 'none';
         tempComboComponents = [];
@@ -4087,11 +4328,11 @@ function voidSale() {
                     prod.components.forEach(comp => {
                         const compProd = state.products.find(p => p.id === comp.id);
                         if (compProd) {
-                            compProd.stock += comp.quantity * item.quantity;
+                            compProd.stock = Math.round((compProd.stock + (comp.quantity * item.quantity)) * 1000) / 1000;
                         }
                     });
                 } else {
-                    prod.stock += item.quantity;
+                    prod.stock = Math.round((prod.stock + item.quantity) * 1000) / 1000;
                 }
             }
         });
@@ -4127,6 +4368,7 @@ function saveSettings(e) {
     const whatsapp = document.getElementById('set-store-whatsapp').value.trim();
     const instagram = document.getElementById('set-store-instagram').value.trim();
     const brandDescription = document.getElementById('set-store-description').value.trim();
+    const storeAlias = document.getElementById('set-store-alias') ? document.getElementById('set-store-alias').value.trim() : 'dhmotopartes.mp';
     const currency = document.getElementById('set-store-currency').value.trim();
     const storeTax = parseFloat(document.getElementById('set-store-tax').value) || 0;
 
@@ -4150,6 +4392,7 @@ function saveSettings(e) {
         storeName,
         storeAddress,
         storePhone,
+        storeAlias,
         currency,
         storeTax,
         cardBgType,
@@ -4210,6 +4453,16 @@ function applyBrandSettings() {
     const catalogStoreName = document.getElementById('catalog-store-name');
     if (catalogStoreName) {
         catalogStoreName.textContent = storeName;
+    }
+
+    // Sync store settings form inputs
+    const aliasInput = document.getElementById('set-store-alias');
+    if (aliasInput) {
+        aliasInput.value = state.settings.storeAlias || 'dhmotopartes.mp';
+    }
+    const catDisplayAlias = document.getElementById('cat-display-alias');
+    if (catDisplayAlias) {
+        catDisplayAlias.textContent = state.settings.storeAlias || 'dhmotopartes.mp';
     }
 
     // Render description, whatsapp and instagram in public catalog
@@ -4551,6 +4804,7 @@ function renderCatalogProductGrid() {
     if (!grid) return;
 
     const filtered = state.products.filter(p => {
+        if (p.isFractional) return false;
         const matchesCategory = !activeCatalogCategory || p.category === activeCatalogCategory;
         const matchesSearch = p.name.toLowerCase().includes(searchVal) ||
             p.sku.toLowerCase().includes(searchVal);
@@ -4662,63 +4916,115 @@ function exportSalesCSV() {
 }
 
 /* ==========================================================================
-   7. CAJA (CASH CONTROL) VIEW CONTROLLER
+   7. CAJA (CASH CONTROL) & SHIFT CLOSURE VIEW CONTROLLER
    ========================================================================== */
-function renderCaja() {
-    // 1. Calculate Metrics
+let activeCajaTab = 'movements'; // 'movements' | 'closures'
+let closuresPage = 1;
+
+function getLastClosure() {
+    if (!state.cashClosures || state.cashClosures.length === 0) return null;
+    const sorted = [...state.cashClosures].sort((a, b) => new Date(b.date) - new Date(a.date));
+    return sorted[0];
+}
+
+function getShiftMetrics() {
     const currency = state.settings.currency || '$';
+    const lastClosure = getLastClosure();
+    const shiftStartIso = lastClosure ? lastClosure.date : null;
+    const shiftStartFormatted = lastClosure 
+        ? new Date(lastClosure.date).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })
+        : 'Inicio del Sistema';
 
-    // Cash Sales metrics
-    const cashSales = state.sales.filter(s => s.paymentMethod === 'cash');
-    const salesTotal = cashSales.filter(s => s.status === 'completed').reduce((sum, s) => sum + s.total, 0);
-    const salesCount = cashSales.filter(s => s.status === 'completed').length;
+    // Base initial cash balance for active shift
+    const initialBalance = lastClosure ? (lastClosure.actualCash || 0) : 0;
 
-    // Voided Sales metrics (cash)
-    const voidsTotal = cashSales.filter(s => s.status === 'voided').reduce((sum, s) => sum + s.total, 0);
+    // Filter sales in current shift
+    const shiftSales = state.sales ? state.sales.filter(s => {
+        if (!shiftStartIso) return true;
+        return new Date(s.date) > new Date(shiftStartIso);
+    }) : [];
 
-    // Manual inflows
-    const inflowsTotal = state.cashMovements.filter(m => m.type === 'inflow').reduce((sum, m) => sum + m.amount, 0);
-    const inflowsCount = state.cashMovements.filter(m => m.type === 'inflow').length;
+    const cashSalesList = shiftSales.filter(s => s.paymentMethod === 'cash');
+    const cashSales = cashSalesList.filter(s => s.status === 'completed').reduce((sum, s) => sum + s.total, 0);
+    const cashSalesCount = cashSalesList.filter(s => s.status === 'completed').length;
+    const voidsTotal = cashSalesList.filter(s => s.status === 'voided').reduce((sum, s) => sum + s.total, 0);
 
-    // Manual outflows
-    const outflowsTotal = state.cashMovements.filter(m => m.type === 'outflow').reduce((sum, m) => sum + m.amount, 0);
-    const outflowsCount = state.cashMovements.filter(m => m.type === 'outflow').length;
+    const otherSales = shiftSales
+        .filter(s => s.paymentMethod !== 'cash' && s.status === 'completed')
+        .reduce((sum, s) => sum + s.total, 0);
 
-    // Balance
-    const balance = salesTotal - voidsTotal + inflowsTotal - outflowsTotal;
+    // Filter cash movements in current shift
+    const shiftMovements = state.cashMovements ? state.cashMovements.filter(m => {
+        if (!shiftStartIso) return true;
+        return new Date(m.date) > new Date(shiftStartIso);
+    }) : [];
 
-    // Update metric displays
-    document.getElementById('caja-metric-balance').textContent = `${currency}${balance.toFixed(2)}`;
-    document.getElementById('caja-metric-sales').textContent = `${currency}${salesTotal.toFixed(2)}`;
-    document.getElementById('caja-metric-sales-count').textContent = `${salesCount} transacciones`;
-    document.getElementById('caja-metric-inflows').textContent = `${currency}${inflowsTotal.toFixed(2)}`;
-    document.getElementById('caja-metric-inflows-count').textContent = `${inflowsCount} movimientos`;
-    document.getElementById('caja-metric-outflows').textContent = `${currency}${outflowsTotal.toFixed(2)}`;
-    document.getElementById('caja-metric-outflows-count').textContent = `${outflowsCount} movimientos`;
+    const inflowsTotal = shiftMovements.filter(m => m.type === 'inflow').reduce((sum, m) => sum + m.amount, 0);
+    const inflowsCount = shiftMovements.filter(m => m.type === 'inflow').length;
 
-    // Set border color of main balance based on sign
+    const outflowsTotal = shiftMovements.filter(m => m.type === 'outflow').reduce((sum, m) => sum + m.amount, 0);
+    const outflowsCount = shiftMovements.filter(m => m.type === 'outflow').length;
+
+    const expectedCash = initialBalance + cashSales + inflowsTotal - outflowsTotal - voidsTotal;
+
+    return {
+        currency,
+        lastClosure,
+        shiftStartIso,
+        shiftStartFormatted,
+        initialBalance,
+        cashSales,
+        cashSalesCount,
+        otherSales,
+        inflowsTotal,
+        inflowsCount,
+        outflowsTotal,
+        outflowsCount,
+        voidsTotal,
+        expectedCash,
+        shiftMovements,
+        shiftSales
+    };
+}
+
+function renderCaja() {
+    const metrics = getShiftMetrics();
+    const currency = metrics.currency;
+
+    // Update metric displays for active shift
+    document.getElementById('caja-metric-balance').textContent = `${currency}${metrics.expectedCash.toFixed(2)}`;
+    document.getElementById('caja-metric-sales').textContent = `${currency}${metrics.cashSales.toFixed(2)}`;
+    document.getElementById('caja-metric-sales-count').textContent = `${metrics.cashSalesCount} transacciones`;
+    document.getElementById('caja-metric-inflows').textContent = `${currency}${metrics.inflowsTotal.toFixed(2)}`;
+    document.getElementById('caja-metric-inflows-count').textContent = `${metrics.inflowsCount} movimientos`;
+    document.getElementById('caja-metric-outflows').textContent = `${currency}${metrics.outflowsTotal.toFixed(2)}`;
+    document.getElementById('caja-metric-outflows-count').textContent = `${metrics.outflowsCount} movimientos`;
+
     const balanceCard = document.getElementById('caja-metric-balance').closest('.metric-card');
-    if (balance < 0) {
+    if (metrics.expectedCash < 0) {
         balanceCard.style.borderColor = 'var(--danger)';
     } else {
         balanceCard.style.borderColor = '';
     }
 
-    // 2. Build the unified table rows
+    if (activeCajaTab === 'closures') {
+        renderCierresHistorial();
+        return;
+    }
+
+    // Render Turno Actual movements
     const searchVal = document.getElementById('caja-search').value.toLowerCase();
     const typeVal = document.getElementById('caja-filter-type').value;
     const tbody = document.getElementById('caja-table-body');
 
-    const allMovements = compileAllCashMovements();
+    const allMovements = compileAllCashMovements(metrics.shiftStartIso);
 
-    // Filter
     const filtered = allMovements.filter(m => {
         const matchesSearch = m.concept.toLowerCase().includes(searchVal) || m.notes.toLowerCase().includes(searchVal);
         const matchesType = !typeVal || m.type === typeVal;
         return matchesSearch && matchesType;
     });
 
-    // Pagination
     const totalItems = filtered.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
     if (cajaPage > totalPages) cajaPage = totalPages;
@@ -4731,7 +5037,7 @@ function renderCaja() {
         tbody.innerHTML = `
             <tr>
                 <td colspan="5" class="text-center text-muted" style="padding: 40px;">
-                    No se registran movimientos con los filtros seleccionados.
+                    No se registran movimientos en el turno actual con los filtros seleccionados.
                 </td>
             </tr>
         `;
@@ -4782,7 +5088,6 @@ function renderCaja() {
     });
     tbody.innerHTML = rowsHtml;
 
-    // Render pagination footer
     document.getElementById('caja-pagination').innerHTML = `
         <span>Mostrando registros ${startIdx + 1}-${Math.min(endIdx, totalItems)} de ${totalItems}</span>
         <div class="flex-align-center" style="gap: 8px;">
@@ -4798,6 +5103,340 @@ function renderCaja() {
 window.changeCajaPage = function (delta) {
     cajaPage += delta;
     renderCaja();
+};
+
+window.switchCajaViewTab = function(tabName) {
+    activeCajaTab = tabName;
+    const btnMovements = document.getElementById('caja-tab-movements-btn');
+    const btnClosures = document.getElementById('caja-tab-closures-btn');
+    const cardMovements = document.getElementById('caja-movements-card');
+    const cardClosures = document.getElementById('caja-closures-card');
+
+    if (tabName === 'closures') {
+        if (btnMovements) btnMovements.classList.remove('active-tab');
+        if (btnClosures) btnClosures.classList.add('active-tab');
+        if (cardMovements) cardMovements.style.display = 'none';
+        if (cardClosures) cardClosures.style.display = 'block';
+        renderCierresHistorial();
+    } else {
+        if (btnClosures) btnClosures.classList.remove('active-tab');
+        if (btnMovements) btnMovements.classList.add('active-tab');
+        if (cardClosures) cardClosures.style.display = 'none';
+        if (cardMovements) cardMovements.style.display = 'block';
+        cajaPage = 1;
+        renderCaja();
+    }
+};
+
+function renderCierresHistorial() {
+    const currency = state.settings.currency || '$';
+    const tbody = document.getElementById('closures-table-body');
+    if (!tbody) return;
+
+    const closures = state.cashClosures ? [...state.cashClosures].sort((a, b) => new Date(b.date) - new Date(a.date)) : [];
+
+    const totalItems = closures.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+    if (closuresPage > totalPages) closuresPage = totalPages;
+
+    const startIdx = (closuresPage - 1) * itemsPerPage;
+    const endIdx = startIdx + itemsPerPage;
+    const pageItems = closures.slice(startIdx, endIdx);
+
+    if (pageItems.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center text-muted" style="padding: 40px;">
+                    Aún no se han realizado cierres de caja en el sistema.
+                </td>
+            </tr>
+        `;
+        document.getElementById('closures-pagination').innerHTML = '';
+        return;
+    }
+
+    let rowsHtml = '';
+    pageItems.forEach(c => {
+        const diff = c.difference || 0;
+        let diffBadgeClass = 'badge-success';
+        let diffText = `${currency}0.00`;
+
+        if (diff > 0) {
+            diffBadgeClass = 'badge-primary';
+            diffText = `+${currency}${diff.toFixed(2)} (Sobrante)`;
+        } else if (diff < 0) {
+            diffBadgeClass = 'badge-danger';
+            diffText = `-${currency}${Math.abs(diff).toFixed(2)} (Faltante)`;
+        } else {
+            diffBadgeClass = 'badge-success';
+            diffText = `${currency}0.00 (Cuadrada)`;
+        }
+
+        rowsHtml += `
+            <tr>
+                <td style="font-weight: 700; color: var(--primary);">#${c.closureNumber || 1}</td>
+                <td>${new Date(c.date).toLocaleString('es-ES')}</td>
+                <td>${c.cashierName || c.closedBy}</td>
+                <td class="text-right">${currency}${(c.expectedCash || 0).toFixed(2)}</td>
+                <td class="text-right" style="font-weight: 700;">${currency}${(c.actualCash || 0).toFixed(2)}</td>
+                <td class="text-right"><span class="badge ${diffBadgeClass}">${diffText}</span></td>
+                <td class="text-center">
+                    <span class="badge ${c.emailSentTo ? 'badge-success' : 'badge-warning'}">
+                        ${c.emailSentTo ? 'Enviado' : 'Pendiente'}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <button class="btn btn-secondary btn-sm" onclick="viewClosureDetail('${c.id}')" title="Ver comprobante y reenviar">
+                        <i data-lucide="eye" style="width:14px; height:14px;"></i> Detalle
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    tbody.innerHTML = rowsHtml;
+
+    document.getElementById('closures-pagination').innerHTML = `
+        <span>Mostrando cierres ${startIdx + 1}-${Math.min(endIdx, totalItems)} de ${totalItems}</span>
+        <div class="flex-align-center" style="gap: 8px;">
+            <button class="btn btn-secondary btn-icon-only" onclick="changeClosuresPage(-1)" ${closuresPage === 1 ? 'disabled' : ''}><i data-lucide="chevron-left" style="width:14px; height:14px;"></i></button>
+            <span>Pág. ${closuresPage} de ${totalPages}</span>
+            <button class="btn btn-secondary btn-icon-only" onclick="changeClosuresPage(1)" ${closuresPage === totalPages ? 'disabled' : ''}><i data-lucide="chevron-right" style="width:14px; height:14px;"></i></button>
+        </div>
+    `;
+
+    if (window.lucide) lucide.createIcons();
+}
+
+window.changeClosuresPage = function(delta) {
+    closuresPage += delta;
+    renderCierresHistorial();
+};
+
+function openCierreCajaModal() {
+    const metrics = getShiftMetrics();
+    const currency = metrics.currency;
+
+    document.getElementById('cierre-initial-balance-display').textContent = `${currency}${metrics.initialBalance.toFixed(2)}`;
+    document.getElementById('cierre-cash-sales-display').textContent = `+${currency}${metrics.cashSales.toFixed(2)} (${metrics.cashSalesCount} ventas)`;
+    document.getElementById('cierre-inflows-display').textContent = `+${currency}${metrics.inflowsTotal.toFixed(2)} (${metrics.inflowsCount} mov.)`;
+    document.getElementById('cierre-outflows-display').textContent = `-${currency}${metrics.outflowsTotal.toFixed(2)} (${metrics.outflowsCount} mov.)`;
+    document.getElementById('cierre-voids-display').textContent = `-${currency}${metrics.voidsTotal.toFixed(2)}`;
+    document.getElementById('cierre-expected-display').textContent = `${currency}${metrics.expectedCash.toFixed(2)}`;
+    document.getElementById('cierre-other-sales-display').textContent = `${currency}${metrics.otherSales.toFixed(2)}`;
+    document.getElementById('cierre-shift-period-text').textContent = `Turno desde: ${metrics.shiftStartFormatted}`;
+
+    const actualInput = document.getElementById('cierre-actual-cash');
+    if (actualInput) {
+        actualInput.value = metrics.expectedCash.toFixed(2);
+    }
+    const notesInput = document.getElementById('cierre-notes');
+    if (notesInput) {
+        notesInput.value = '';
+    }
+
+    updateCierreDifferenceBadge();
+    openModal('modal-cierre-caja');
+}
+
+function updateCierreDifferenceBadge() {
+    const metrics = getShiftMetrics();
+    const currency = metrics.currency;
+    const actualVal = parseFloat(document.getElementById('cierre-actual-cash').value) || 0;
+    const diff = actualVal - metrics.expectedCash;
+    const badgeEl = document.getElementById('cierre-diff-badge');
+    if (!badgeEl) return;
+
+    if (Math.abs(diff) < 0.009) {
+        badgeEl.style.background = 'rgba(16,185,129,0.15)';
+        badgeEl.style.color = '#10b981';
+        badgeEl.textContent = `Caja Cuadrada (${currency}0.00)`;
+    } else if (diff > 0) {
+        badgeEl.style.background = 'rgba(59,130,246,0.15)';
+        badgeEl.style.color = '#3b82f6';
+        badgeEl.textContent = `Sobrante de Caja (+${currency}${diff.toFixed(2)})`;
+    } else {
+        badgeEl.style.background = 'rgba(239,68,68,0.15)';
+        badgeEl.style.color = '#ef4444';
+        badgeEl.textContent = `FALTANTE DE CAJA (-${currency}${Math.abs(diff).toFixed(2)})`;
+    }
+}
+
+async function processCierreCaja(e) {
+    e.preventDefault();
+    const metrics = getShiftMetrics();
+    const actualCash = parseFloat(document.getElementById('cierre-actual-cash').value) || 0;
+    const difference = actualCash - metrics.expectedCash;
+    const targetEmail = document.getElementById('cierre-target-email').value.trim() || 'dhmotopartes@gmail.com';
+    const notes = document.getElementById('cierre-notes').value.trim();
+
+    const cashierEmail = 'dhmotopartes@gmail.com';
+    let cashierName = 'Cajero DH Motopartes';
+    if (currentUserProfile && (currentUserProfile.first_name || currentUserProfile.last_name)) {
+        cashierName = `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim();
+    }
+
+    const closureNumber = state.cashClosures ? state.cashClosures.length + 1 : 1;
+    const closureObj = {
+        id: `CLO-${Date.now()}`,
+        closureNumber: closureNumber,
+        date: new Date().toISOString(),
+        openedAt: metrics.shiftStartIso || new Date().toISOString(),
+        closedBy: cashierEmail,
+        cashierName: cashierName,
+        initialBalance: metrics.initialBalance,
+        cashSales: metrics.cashSales,
+        cashSalesCount: metrics.cashSalesCount,
+        otherSales: metrics.otherSales,
+        inflows: metrics.inflowsTotal,
+        inflowsCount: metrics.inflowsCount,
+        outflows: metrics.outflowsTotal,
+        outflowsCount: metrics.outflowsCount,
+        voidsTotal: metrics.voidsTotal,
+        expectedCash: metrics.expectedCash,
+        actualCash: actualCash,
+        difference: difference,
+        notes: notes,
+        emailSentTo: targetEmail,
+        emailStatus: 'sent'
+    };
+
+    if (!state.cashClosures) state.cashClosures = [];
+    state.cashClosures.push(closureObj);
+    saveDatabase();
+
+    closeModal('modal-cierre-caja');
+    playScanSound('success');
+
+    // Dispatch closure email
+    await sendCierreEmail(closureObj);
+
+    // Refresh Caja view
+    cajaPage = 1;
+    renderCaja();
+
+    alert(`¡Cierre de Caja #${closureNumber} realizado con éxito!\nEl reporte fue procesado y enviado a ${targetEmail}.`);
+}
+
+async function sendCierreEmail(closureObj) {
+    const targetEmail = closureObj.targetEmail || 'dhmotopartes@gmail.com';
+    const storeName = (state.settings && state.settings.storeName) || 'DH Motopartes';
+    const currency = (state.settings && state.settings.currency) || '$';
+
+    try {
+        if (supabaseClient) {
+            const { data, error } = await supabaseClient.functions.invoke('send-cierre-email', {
+                body: {
+                    closureId: closureObj.id,
+                    closureNumber: closureObj.closureNumber,
+                    date: closureObj.date,
+                    openedAt: closureObj.openedAt,
+                    closedBy: closureObj.closedBy,
+                    cashierName: closureObj.cashierName,
+                    storeName: storeName,
+                    initialBalance: closureObj.initialBalance,
+                    cashSales: closureObj.cashSales,
+                    cashSalesCount: closureObj.cashSalesCount,
+                    otherSales: closureObj.otherSales,
+                    inflows: closureObj.inflows,
+                    inflowsCount: closureObj.inflowsCount,
+                    outflows: closureObj.outflows,
+                    outflowsCount: closureObj.outflowsCount,
+                    voidsTotal: closureObj.voidsTotal,
+                    expectedCash: closureObj.expectedCash,
+                    actualCash: closureObj.actualCash,
+                    difference: closureObj.difference,
+                    notes: closureObj.notes,
+                    targetEmail: targetEmail,
+                    currency: currency
+                }
+            });
+            if (error) {
+                console.warn("Respuesta de Edge Function send-cierre-email:", error);
+            }
+        }
+    } catch (err) {
+        console.warn("No se pudo invocar directamente la Edge Function de correo:", err);
+    }
+}
+
+window.viewClosureDetail = function(closureId) {
+    const closure = state.cashClosures ? state.cashClosures.find(c => c.id === closureId) : null;
+    if (!closure) return;
+
+    const currency = state.settings.currency || '$';
+    const storeName = state.settings.storeName || 'DH Motopartes';
+    const formattedDate = new Date(closure.date).toLocaleString('es-ES', { dateStyle: 'full', timeStyle: 'medium' });
+
+    const diff = closure.difference || 0;
+    let diffColor = '#10b981';
+    let diffText = 'CAJA CUADRADA ($0.00)';
+    if (diff > 0) {
+        diffColor = '#3b82f6';
+        diffText = `SOBRANTE (+${currency}${diff.toFixed(2)})`;
+    } else if (diff < 0) {
+        diffColor = '#ef4444';
+        diffText = `FALTANTE (-${currency}${Math.abs(diff).toFixed(2)})`;
+    }
+
+    const detailHtml = `
+        <div class="closure-ticket-view" style="font-family: monospace; font-size: 13px; color: var(--text-main); line-height: 1.5; padding: 10px;">
+            <div style="text-align: center; border-bottom: 1px dashed var(--border-color); padding-bottom: 10px; margin-bottom: 10px;">
+                <h3 style="margin: 0; font-size: 18px; font-weight: 800;">${storeName}</h3>
+                <p style="margin: 2px 0 0 0; font-size: 12px; color: var(--text-muted);">COMPROBANTE DE CIERRE DE CAJA #${closure.closureNumber || 1}</p>
+                <div style="margin-top: 6px; font-weight: 700; color: ${diffColor}; font-size: 13px;">${diffText}</div>
+            </div>
+
+            <div style="margin-bottom: 10px; font-size: 12px;">
+                <div><strong>Folio:</strong> ${closure.id}</div>
+                <div><strong>Fecha Cierre:</strong> ${formattedDate}</div>
+                <div><strong>Cajero:</strong> ${closure.cashierName || closure.closedBy}</div>
+                <div><strong>Enviado a:</strong> ${closure.targetEmail || 'dhmotopartes@gmail.com'}</div>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 12px;">
+                <tbody>
+                    <tr><td>Fondo de Apertura:</td><td style="text-align: right;">${currency}${(closure.initialBalance || 0).toFixed(2)}</td></tr>
+                    <tr style="color: var(--emerald);"><td>(+) Ventas Efectivo:</td><td style="text-align: right;">+${currency}${(closure.cashSales || 0).toFixed(2)}</td></tr>
+                    <tr style="color: var(--emerald);"><td>(+) Otros Ingresos:</td><td style="text-align: right;">+${currency}${(closure.inflows || 0).toFixed(2)}</td></tr>
+                    <tr style="color: var(--danger);"><td>(-) Egresos / Retiros:</td><td style="text-align: right;">-${currency}${(closure.outflows || 0).toFixed(2)}</td></tr>
+                    <tr style="color: var(--danger);"><td>(-) Anulaciones:</td><td style="text-align: right;">-${currency}${(closure.voidsTotal || 0).toFixed(2)}</td></tr>
+                    <tr style="border-top: 1px dashed var(--border-color); font-weight: 700; font-size: 13px;">
+                        <td>EFECTIVO ESPERADO:</td>
+                        <td style="text-align: right;">${currency}${(closure.expectedCash || 0).toFixed(2)}</td>
+                    </tr>
+                    <tr style="font-weight: 700; font-size: 13px;">
+                        <td>EFECTIVO REAL:</td>
+                        <td style="text-align: right;">${currency}${(closure.actualCash || 0).toFixed(2)}</td>
+                    </tr>
+                    <tr style="font-weight: 700; color: ${diffColor};">
+                        <td>DIFERENCIA:</td>
+                        <td style="text-align: right;">${diff >= 0 ? '+' : ''}${currency}${diff.toFixed(2)}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            ${closure.otherSales > 0 ? `
+            <div style="border-top: 1px dashed var(--border-color); padding-top: 6px; font-size: 11px; color: var(--text-muted);">
+                Ventas en otros medios de pago (Transferencias / Tarjetas): <strong>${currency}${(closure.otherSales).toFixed(2)}</strong>
+            </div>
+            ` : ''}
+
+            ${closure.notes ? `
+            <div style="border-top: 1px dashed var(--border-color); padding-top: 6px; margin-top: 6px; font-size: 12px; font-style: italic;">
+                <strong>Observaciones:</strong> ${closure.notes}
+            </div>
+            ` : ''}
+        </div>
+    `;
+
+    document.getElementById('cierre-detail-content').innerHTML = detailHtml;
+    document.getElementById('cierre-print-btn').onclick = () => window.print();
+    document.getElementById('cierre-resend-email-btn').onclick = async () => {
+        await sendCierreEmail(closure);
+        alert(`Reporte de Cierre #${closure.closureNumber} reenviado a ${closure.targetEmail || 'dhmotopartes@gmail.com'}`);
+    };
+
+    openModal('modal-cierre-detail');
 };
 
 function saveCajaMovement(e) {
@@ -4832,11 +5471,12 @@ function saveCajaMovement(e) {
     playScanSound('success');
 }
 
-function compileAllCashMovements() {
+function compileAllCashMovements(shiftStartIso) {
     let movements = [];
     // Add manual cash movements
     if (state.cashMovements) {
         state.cashMovements.forEach(m => {
+            if (shiftStartIso && new Date(m.date) <= new Date(shiftStartIso)) return;
             movements.push({
                 id: m.id,
                 date: m.date,
@@ -4850,6 +5490,7 @@ function compileAllCashMovements() {
     // Add cash sales
     if (state.sales) {
         state.sales.forEach(s => {
+            if (shiftStartIso && new Date(s.date) <= new Date(shiftStartIso)) return;
             if (s.paymentMethod === 'cash') {
                 if (s.status === 'completed') {
                     movements.push({
@@ -4931,8 +5572,11 @@ async function handleExcelImport(e) {
             const costIdx = findExcelColumnIndex(headers, ['costo', 'cost', 'compra', 'precio compra']);
             const priceIdx = findExcelColumnIndex(headers, ['precio', 'price', 'venta', 'precio venta']);
             const priceWholesaleIdx = findExcelColumnIndex(headers, ['mayorista', 'wholesale', 'precio mayorista', 'lista 2', 'descuento', 'discount', 'precio descuento']);
-            const stockIdx = findExcelColumnIndex(headers, ['stock', 'cantidad', 'cant']);
-            const minIdx = findExcelColumnIndex(headers, ['stockmin', 'stock minimo', 'minimo', 'alerta']);
+            const stockIdx = findExcelColumnIndex(headers, ['stock', 'cantidad', 'cant', 'stock local', 'local']);
+            const minIdx = findExcelColumnIndex(headers, ['stockmin', 'stock minimo', 'minimo', 'alerta', 'stock minimo local']);
+            const stockWholesaleIdx = findExcelColumnIndex(headers, ['stock mayorista', 'mayorista stock', 'stock wholesale', 'wholesale stock']);
+            const minWholesaleIdx = findExcelColumnIndex(headers, ['stockminwholesale', 'stockmin mayorista', 'stock minimo mayorista', 'minimo mayorista', 'alerta mayorista']);
+            const isFractionalIdx = findExcelColumnIndex(headers, ['fraccionable', 'isfractional', 'fraccion', 'fraccionario', 'decimal']);
 
             if (skuIdx === -1) {
                 alert("No se pudo detectar la columna 'SKU' o 'Código'. Por favor, asegúrate de que el archivo Excel tenga una columna con uno de estos nombres.");
@@ -4977,16 +5621,28 @@ async function handleExcelImport(e) {
                     ? parseFloat(row[priceWholesaleIdx]) || 0
                     : (exists ? (exists.priceWholesale || exists.priceDiscount || 0) : 0);
 
+                const isFractional = isFractionalIdx !== -1 && row[isFractionalIdx] !== undefined && row[isFractionalIdx] !== null
+                    ? (row[isFractionalIdx].toString().toLowerCase().trim() === 'true' || row[isFractionalIdx].toString().toLowerCase().trim() === 'si' || row[isFractionalIdx] === 1 || row[isFractionalIdx] === '1')
+                    : (exists ? (exists.isFractional || false) : false);
+
                 const stock = stockIdx !== -1 && row[stockIdx] !== undefined && row[stockIdx] !== null
-                    ? parseInt(row[stockIdx]) || 0
+                    ? (isFractional ? (parseFloat(row[stockIdx]) || 0) : (parseInt(row[stockIdx]) || 0))
                     : (exists ? exists.stock : 0);
 
                 const stockMin = minIdx !== -1 && row[minIdx] !== undefined && row[minIdx] !== null
-                    ? parseInt(row[minIdx]) || 5
+                    ? (isFractional ? (parseFloat(row[minIdx]) || 0) : (parseInt(row[minIdx]) || 5))
                     : (exists ? exists.stockMin : 5);
 
+                const stockWholesale = stockWholesaleIdx !== -1 && row[stockWholesaleIdx] !== undefined && row[stockWholesaleIdx] !== null
+                    ? (isFractional ? (parseFloat(row[stockWholesaleIdx]) || 0) : (parseInt(row[stockWholesaleIdx]) || 0))
+                    : (exists ? (exists.stockWholesale || 0) : 0);
+
+                const stockMinWholesale = minWholesaleIdx !== -1 && row[minWholesaleIdx] !== undefined && row[minWholesaleIdx] !== null
+                    ? (isFractional ? (parseFloat(row[minWholesaleIdx]) || 0) : (parseInt(row[minWholesaleIdx]) || 5))
+                    : (exists ? (exists.stockMinWholesale || 5) : 5);
+
                 tempExcelProducts.push({
-                    sku, name, category, cost, price, priceWholesale, stock, stockMin,
+                    sku, name, category, cost, price, priceWholesale, stock, stockMin, stockWholesale, stockMinWholesale, isFractional,
                     isNew: !exists,
                     existingProduct: exists || null
                 });
@@ -5036,7 +5692,7 @@ function showExcelImportPreview() {
                 <td class="text-right">${currency}${p.cost.toFixed(2)}</td>
                 <td class="text-right" style="font-weight: 700;">${currency}${p.price.toFixed(2)}</td>
                 <td class="text-right">${currency}${p.priceWholesale.toFixed(2)}</td>
-                <td class="text-center" style="font-weight: 700;">${p.stock}</td>
+                <td class="text-center" style="font-weight: 700;">${p.stock} L / ${p.stockWholesale || 0} M</td>
                 <td><span class="badge ${badgeClass}">${badgeText}</span></td>
             </tr>
         `;
@@ -5077,9 +5733,12 @@ function confirmExcelImport() {
                 priceDiscount: p.priceWholesale, // mantener sincronizado
                 stock: p.stock,
                 stockMin: p.stockMin,
+                stockWholesale: p.stockWholesale || 0,
+                stockMinWholesale: p.stockMinWholesale || 5,
                 isCombo: false,
                 components: [],
-                image: ''
+                image: '',
+                isFractional: p.isFractional || false
             });
             created++;
         } else {
@@ -5093,8 +5752,11 @@ function confirmExcelImport() {
                 prod.priceDiscount = p.priceWholesale; // mantener sincronizado
                 if (!prod.isCombo) {
                     prod.stock = p.stock;
+                    prod.stockWholesale = p.stockWholesale !== undefined ? p.stockWholesale : (prod.stockWholesale || 0);
                 }
                 prod.stockMin = p.stockMin;
+                prod.stockMinWholesale = p.stockMinWholesale !== undefined ? p.stockMinWholesale : (prod.stockMinWholesale || 5);
+                prod.isFractional = p.isFractional || false;
                 updated++;
             }
         }
@@ -5121,13 +5783,14 @@ async function downloadExcelTemplate() {
     }
 
     // Columns
-    const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio Minorista', 'Precio Mayorista', 'Stock', 'Stock Minimo'];
+    const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio Minorista', 'Precio Mayorista', 'Stock Local', 'Stock Minimo Local', 'Stock Mayorista', 'Stock Minimo Mayorista', 'Fraccionable'];
 
     // Sample items for motorcycle spare parts store
     const rows = [
-        ['REP-FIL-NAF', 'Filtro de Nafta Universal Motocicleta', 'Repuestos de Motor', 150.00, 320.00, 280.00, 50, 10],
-        ['REP-BUJ-NGK-D8EA', 'Bujía NGK D8EA (Motos 110cc-150cc)', 'Sistema Eléctrico', 420.00, 800.00, 700.00, 100, 15],
-        ['REP-TRA-CAD-DID', 'Cadena DID 428H-118L Reforzada', 'Transmisión', 3500.00, 5900.00, 5200.00, 15, 5]
+        ['REP-FIL-NAF', 'Filtro de Nafta Universal Motocicleta', 'Repuestos de Motor', 150.00, 320.00, 280.00, 50, 10, 30, 5, 'NO'],
+        ['REP-BUJ-NGK-D8EA', 'Bujía NGK D8EA (Motos 110cc-150cc)', 'Sistema Eléctrico', 420.00, 800.00, 700.00, 100, 15, 60, 8, 'NO'],
+        ['REP-TRA-CAD-DID', 'Cadena DID 428H-118L Reforzada', 'Transmisión', 3500.00, 5900.00, 5200.00, 15, 5, 10, 2, 'NO'],
+        ['LIQ-ACE-SUELTO', 'Aceite 2T Suelto (Lts)', 'Aceites', 900.00, 1500.00, 1300.00, 20.5, 5.0, 10.0, 2.0, 'SI']
     ];
 
     const data = [headers, ...rows];
@@ -5160,7 +5823,7 @@ async function exportInventoryExcel() {
     }
     
     // Headers
-    const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio Minorista', 'Precio Mayorista', 'Stock', 'Stock Minimo'];
+    const headers = ['SKU', 'Nombre', 'Categoria', 'Costo', 'Precio Minorista', 'Precio Mayorista', 'Stock Local', 'Stock Minimo Local', 'Stock Mayorista', 'Stock Minimo Mayorista', 'Fraccionable'];
 
     // Data Rows
     const rows = state.products.map(p => [
@@ -5171,7 +5834,10 @@ async function exportInventoryExcel() {
         p.price,
         p.priceWholesale || 0,
         p.stock,
-        p.stockMin
+        p.stockMin,
+        p.stockWholesale || 0,
+        p.stockMinWholesale || 5,
+        p.isFractional ? 'SI' : 'NO'
     ]);
 
     const data = [headers, ...rows];
@@ -5594,7 +6260,45 @@ window.openCatalogCheckoutModal = function () {
         totalDisplay.textContent = `${currency}${totalPrice.toFixed(2)}`;
     }
 
+    const catDisplayAlias = document.getElementById('cat-display-alias');
+    if (catDisplayAlias) {
+        catDisplayAlias.textContent = state.settings.storeAlias || 'dhmotopartes.mp';
+    }
+
+    const paymentSelect = document.getElementById('cat-cust-payment');
+    const transferInfo = document.getElementById('catalog-checkout-transfer-info');
+    if (paymentSelect && transferInfo) {
+        const toggleTransferInfo = () => {
+            const val = paymentSelect.value;
+            if (val.includes('Transferencia') || val.includes('Mercado Pago')) {
+                transferInfo.style.display = 'block';
+            } else {
+                transferInfo.style.display = 'none';
+            }
+        };
+        toggleTransferInfo();
+        paymentSelect.onchange = toggleTransferInfo;
+    }
+
     openModal('modal-catalog-checkout');
+};
+
+window.copyStoreAlias = function () {
+    const alias = (state.settings && state.settings.storeAlias) || 'dhmotopartes.mp';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(alias).then(() => {
+            const textSpan = document.getElementById('copy-alias-text');
+            if (textSpan) {
+                const orig = textSpan.textContent;
+                textSpan.textContent = '¡Copiado!';
+                setTimeout(() => { textSpan.textContent = orig; }, 2000);
+            }
+        }).catch(err => {
+            console.error('Failed to copy alias:', err);
+        });
+    } else {
+        alert(`Alias: ${alias}`);
+    }
 };
 
 window.backToCatalogCart = function () {
@@ -5617,7 +6321,7 @@ window.sendCatalogOrder = function (e) {
 
     const currency = state.settings.currency || '$';
     const totalPrice = catalogCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const storeName = state.settings.storeName || "Brinde Estilo";
+    const storeName = state.settings.storeName || "DHMotopartes";
 
     let message = `*¡Hola ${storeName}!* Me gustaría realizar el siguiente pedido:\n\n`;
     message += `*🛒 DETALLE DEL PEDIDO:*\n`;
@@ -5630,7 +6334,12 @@ window.sendCatalogOrder = function (e) {
     message += `- *Nombre:* ${name}\n`;
     message += `- *WhatsApp/Teléfono:* ${phone}\n`;
     message += `- *Dirección / Notas:* ${address}\n`;
-    message += `- *Método de Pago:* ${payment}\n\n`;
+    message += `- *Método de Pago:* ${payment}\n`;
+    if (payment.includes('Transferencia') || payment.includes('Mercado Pago')) {
+        const alias = state.settings.storeAlias || 'dhmotopartes.mp';
+        message += `- *Alias para Transferir:* ${alias}\n`;
+    }
+    message += `\n`;
 
     message += `Quedo atento/a para coordinar la entrega y el pago. ¡Muchas gracias!`;
 
@@ -5654,13 +6363,14 @@ window.sendCatalogOrder = function (e) {
 // ==========================================================================
 let tempComboComponents = [];
 
-window.getComboStock = function(comboProduct) {
+window.getComboStock = function(comboProduct, stockSource = 'local') {
     if (!comboProduct.components || comboProduct.components.length === 0) return 0;
     let minStock = Infinity;
     comboProduct.components.forEach(comp => {
         const realProduct = state.products.find(p => p.id === comp.id);
         if (realProduct) {
-            const maxCombosFromComp = Math.floor(realProduct.stock / comp.quantity);
+            const currentStock = stockSource === 'wholesale' ? (realProduct.stockWholesale || 0) : realProduct.stock;
+            const maxCombosFromComp = Math.floor(currentStock / comp.quantity);
             if (maxCombosFromComp < minStock) {
                 minStock = maxCombosFromComp;
             }
