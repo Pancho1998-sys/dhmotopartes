@@ -197,6 +197,7 @@ AS $$
 DECLARE
   filtered_products JSONB;
   categories JSONB;
+  public_settings JSONB;
 BEGIN
   -- Filtramos la lista de productos excluyendo aquellos que tienen isFractional = true
   SELECT COALESCE(
@@ -215,10 +216,30 @@ BEGIN
   FROM public.store_states
   WHERE store_id = target_store_id;
 
+  -- Extraemos las configuraciones públicas del JSON de estado de forma segura
+  SELECT jsonb_build_object(
+      'storeName', COALESCE(state->'settings'->>'storeName', 'DH Motopartes'),
+      'storeAddress', COALESCE(state->'settings'->>'storeAddress', ''),
+      'storePhone', COALESCE(state->'settings'->>'storePhone', ''),
+      'storeAlias', COALESCE(state->'settings'->>'storeAlias', ''),
+      'currency', COALESCE(state->'settings'->>'currency', '$'),
+      'logo', COALESCE(state->'settings'->>'logo', ''),
+      'whatsapp', COALESCE(state->'settings'->>'whatsapp', ''),
+      'instagram', COALESCE(state->'settings'->>'instagram', ''),
+      'brandDescription', COALESCE(state->'settings'->>'brandDescription', '')
+    ) INTO public_settings
+  FROM public.store_states
+  WHERE store_id = target_store_id;
+
+  IF public_settings IS NULL THEN
+    public_settings := '{}'::jsonb;
+  END IF;
+
   -- Devolvemos el JSON de catálogo
   RETURN jsonb_build_object(
     'products', COALESCE(filtered_products, '[]'::jsonb),
-    'categories', COALESCE(categories, '[]'::jsonb)
+    'categories', COALESCE(categories, '[]'::jsonb),
+    'settings', COALESCE(public_settings, '{}'::jsonb)
   );
 END;
 $$;
