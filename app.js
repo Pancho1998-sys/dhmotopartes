@@ -845,6 +845,28 @@ async function loadDatabase() {
         }
     }
 
+    // Public Guest Visitor Mode (Unauthenticated Web Catalog)
+    if (supabaseInitialized && (!session || !session.user)) {
+        try {
+            const publicStoreId = '3cd7c0ff-735b-430f-8da6-c538e4d5ed77';
+            const { data, error } = await supabaseClient.rpc('get_public_catalog', { target_store_id: publicStoreId });
+            if (!error && data) {
+                if (data.products && data.products.length > 0) {
+                    state.products = data.products;
+                }
+                if (data.categories && data.categories.length > 0) {
+                    state.settings.categories = data.categories;
+                }
+                console.log("Catálogo público de DHMotopartes cargado desde la nube con éxito.");
+                syncSettingsInputs();
+                syncFiscalSettingsInputs();
+                return;
+            }
+        } catch (pubErr) {
+            console.warn("No se pudo cargar el catálogo público remoto:", pubErr);
+        }
+    }
+
     updateSidebarStatus('offline', "Modo Local");
     let loadedLocal = false;
     
