@@ -15,7 +15,8 @@ const DEFAULT_STATE = {
         storeName: "Bigtech",
         storeAddress: "Av. Libertador 2450, Ciudad",
         storePhone: "+54 9 11 5555-1234",
-        storeAlias: "dhmotopartes.mp",
+        storeAlias: "DHMOTOPARTES",
+        storeHolder: "DANIEL OSCAR HIDALGO",
         currency: "$",
         storeTax: 15,
         categories: ['Sistema Eléctrico', 'Repuestos de Motor', 'Frenos', 'Transmisión', 'Herramientas', 'Accesorios', 'Aceites'],
@@ -84,7 +85,10 @@ function ensureStateProperties(loadedState) {
         }
     }
     if (!loadedState.settings.storeAlias) {
-        loadedState.settings.storeAlias = "dhmotopartes.mp";
+        loadedState.settings.storeAlias = "DHMOTOPARTES";
+    }
+    if (!loadedState.settings.storeHolder) {
+        loadedState.settings.storeHolder = "DANIEL OSCAR HIDALGO";
     }
     // Ensure 'Aceites' is in the categories list
     if (loadedState.settings.categories && !loadedState.settings.categories.includes('Aceites')) {
@@ -4390,7 +4394,8 @@ function saveSettings(e) {
     const whatsapp = document.getElementById('set-store-whatsapp').value.trim();
     const instagram = document.getElementById('set-store-instagram').value.trim();
     const brandDescription = document.getElementById('set-store-description').value.trim();
-    const storeAlias = document.getElementById('set-store-alias') ? document.getElementById('set-store-alias').value.trim() : 'dhmotopartes.mp';
+    const storeAlias = document.getElementById('set-store-alias') ? document.getElementById('set-store-alias').value.trim() : 'DHMOTOPARTES';
+    const storeHolder = document.getElementById('set-store-holder') ? document.getElementById('set-store-holder').value.trim() : 'DANIEL OSCAR HIDALGO';
     const currency = document.getElementById('set-store-currency').value.trim();
     const storeTax = parseFloat(document.getElementById('set-store-tax').value) || 0;
 
@@ -4415,6 +4420,7 @@ function saveSettings(e) {
         storeAddress,
         storePhone,
         storeAlias,
+        storeHolder,
         currency,
         storeTax,
         cardBgType,
@@ -4480,11 +4486,19 @@ function applyBrandSettings() {
     // Sync store settings form inputs
     const aliasInput = document.getElementById('set-store-alias');
     if (aliasInput) {
-        aliasInput.value = state.settings.storeAlias || 'dhmotopartes.mp';
+        aliasInput.value = state.settings.storeAlias || 'DHMOTOPARTES';
+    }
+    const holderInput = document.getElementById('set-store-holder');
+    if (holderInput) {
+        holderInput.value = state.settings.storeHolder || 'DANIEL OSCAR HIDALGO';
     }
     const catDisplayAlias = document.getElementById('cat-display-alias');
     if (catDisplayAlias) {
-        catDisplayAlias.textContent = state.settings.storeAlias || 'dhmotopartes.mp';
+        catDisplayAlias.textContent = state.settings.storeAlias || 'DHMOTOPARTES';
+    }
+    const catDisplayHolder = document.getElementById('cat-display-holder');
+    if (catDisplayHolder) {
+        catDisplayHolder.textContent = state.settings.storeHolder || 'DANIEL OSCAR HIDALGO';
     }
 
     // Render description, whatsapp and instagram in public catalog
@@ -6284,7 +6298,11 @@ window.openCatalogCheckoutModal = function () {
 
     const catDisplayAlias = document.getElementById('cat-display-alias');
     if (catDisplayAlias) {
-        catDisplayAlias.textContent = state.settings.storeAlias || 'dhmotopartes.mp';
+        catDisplayAlias.textContent = state.settings.storeAlias || 'DHMOTOPARTES';
+    }
+    const catDisplayHolder = document.getElementById('cat-display-holder');
+    if (catDisplayHolder) {
+        catDisplayHolder.textContent = state.settings.storeHolder || 'DANIEL OSCAR HIDALGO';
     }
 
     const paymentSelect = document.getElementById('cat-cust-payment');
@@ -6306,7 +6324,7 @@ window.openCatalogCheckoutModal = function () {
 };
 
 window.copyStoreAlias = function () {
-    const alias = (state.settings && state.settings.storeAlias) || 'dhmotopartes.mp';
+    const alias = (state.settings && state.settings.storeAlias) || 'DHMOTOPARTES';
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(alias).then(() => {
             const textSpan = document.getElementById('copy-alias-text');
@@ -6358,8 +6376,10 @@ window.sendCatalogOrder = function (e) {
     message += `- *Dirección / Notas:* ${address}\n`;
     message += `- *Método de Pago:* ${payment}\n`;
     if (payment.includes('Transferencia') || payment.includes('Mercado Pago')) {
-        const alias = state.settings.storeAlias || 'dhmotopartes.mp';
+        const alias = state.settings.storeAlias || 'DHMOTOPARTES';
+        const holder = state.settings.storeHolder || 'DANIEL OSCAR HIDALGO';
         message += `- *Alias para Transferir:* ${alias}\n`;
+        message += `- *Titular de la Cuenta:* ${holder}\n`;
     }
     message += `\n`;
 
