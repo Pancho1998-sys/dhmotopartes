@@ -29,6 +29,10 @@ class DHMotopartesRequestHandler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=STATIC_DIR, **kwargs)
 
     def do_GET(self):
+        # Strip query parameters from self.path so static files and APIs map correctly
+        if '?' in self.path:
+            self.path = self.path.split('?')[0]
+
         if self.path == '/api/db':
             db_data = b'{}'
             if os.path.exists(DB_PATH):
@@ -62,6 +66,9 @@ class DHMotopartesRequestHandler(SimpleHTTPRequestHandler):
             super().do_GET()
 
     def do_POST(self):
+        if '?' in self.path:
+            self.path = self.path.split('?')[0]
+
         if self.path == '/api/db':
             content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length)
