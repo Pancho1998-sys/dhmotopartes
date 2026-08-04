@@ -12,7 +12,7 @@
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- SheetJS for Excel import/export (loaded dynamically when needed) -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20260804">
     <!-- Dynamic custom styles for SaaS branding -->
     <style id="custom-brand-styles"></style>
 </head>
@@ -464,22 +464,22 @@
                                 </button>
                             </div>
 
-                            <!-- Price List Selection -->
-                            <div class="cart-price-list-section" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border-color); gap: 12px;">
-                                <span style="font-size: 13px; font-weight: 600; color: var(--primary);">Lista de Precios:</span>
-                                <select id="cart-price-list-select" style="flex: 1; padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background-color: var(--bg-input); color: var(--primary); font-size: 13px; font-weight: 600; cursor: pointer;">
-                                    <option value="price" style="background-color: var(--bg-card); color: var(--primary);">Lista 1: Minorista (Público)</option>
-                                    <option value="priceWholesale" style="background-color: var(--bg-card); color: var(--primary);">Lista 2: Mayorista</option>
-                                </select>
-                            </div>
-
-                            <!-- Stock Source Selection -->
-                            <div class="cart-stock-source-section" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border-color); gap: 12px;">
-                                <span style="font-size: 13px; font-weight: 600; color: var(--primary);">Origen de Stock:</span>
-                                <select id="cart-stock-source-select" style="flex: 1; padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background-color: var(--bg-input); color: var(--primary); font-size: 13px; font-weight: 600; cursor: pointer;">
-                                    <option value="local" style="background-color: var(--bg-card); color: var(--primary);">Stock Local</option>
-                                    <option value="wholesale" style="background-color: var(--bg-card); color: var(--primary);">Stock Mayorista</option>
-                                </select>
+                            <!-- Cart Options Bar (Compact Price List & Stock Source) -->
+                            <div class="cart-options-bar">
+                                <div class="cart-option-item">
+                                    <label for="cart-price-list-select" class="cart-option-label"><i data-lucide="tag" style="width:13px; height:13px;"></i> Precios:</label>
+                                    <select id="cart-price-list-select" class="cart-option-select">
+                                        <option value="price">Minorista</option>
+                                        <option value="priceWholesale">Mayorista</option>
+                                    </select>
+                                </div>
+                                <div class="cart-option-item">
+                                    <label for="cart-stock-source-select" class="cart-option-label"><i data-lucide="warehouse" style="width:13px; height:13px;"></i> Stock:</label>
+                                    <select id="cart-stock-source-select" class="cart-option-select">
+                                        <option value="local">Local</option>
+                                        <option value="wholesale">Mayorista</option>
+                                    </select>
+                                </div>
                             </div>
 
 
@@ -599,6 +599,30 @@
 
                 <!-- 4. CUSTOMERS VIEW -->
                 <section id="view-clientes" class="app-view">
+                    <!-- Customers Metrics Grid -->
+                    <div class="metrics-grid" style="margin-bottom: 20px;">
+                        <div class="metric-card card-gradient-primary">
+                            <div class="metric-icon">
+                                <i data-lucide="users"></i>
+                            </div>
+                            <div class="metric-details">
+                                <span class="metric-label">Clientes Registrados</span>
+                                <h3 class="metric-value" id="customers-metric-total">0</h3>
+                                <span class="metric-subtext">Base de datos CRM</span>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon bg-danger" style="color: #ef4444;">
+                                <i data-lucide="notebook-pen"></i>
+                            </div>
+                            <div class="metric-details">
+                                <span class="metric-label">Total Deuda en Cta. Cte.</span>
+                                <h3 class="metric-value text-danger" id="customers-metric-total-debt">$0.00</h3>
+                                <span class="metric-subtext" id="customers-metric-indebted-count">0 clientes con deuda</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="view-header-bar">
                         <div class="search-filters-row">
                             <div class="search-box">
@@ -621,8 +645,9 @@
                                         <th>Nombre Completo</th>
                                         <th>Teléfono</th>
                                         <th>Correo Electrónico</th>
-                                        <th class="text-center">Puntos Acumulados</th>
-                                        <th>Fecha de Registro</th>
+                                        <th class="text-center">Puntos</th>
+                                        <th class="text-right">Saldo / Deuda Cta. Cte.</th>
+                                        <th>Fecha Registro</th>
                                         <th class="text-center">Acciones</th>
                                     </tr>
                                 </thead>
@@ -1401,6 +1426,7 @@
                             <button class="method-btn active" data-method="cash"><i data-lucide="banknote"></i> Efectivo</button>
                             <button class="method-btn" data-method="card"><i data-lucide="credit-card"></i> Tarjeta</button>
                             <button class="method-btn" data-method="transfer"><i data-lucide="smartphone"></i> Transferencia</button>
+                            <button class="method-btn" data-method="credit"><i data-lucide="notebook-pen"></i> Cuenta Corriente</button>
                         </div>
                     </div>
                     
@@ -1418,6 +1444,16 @@
                             <span>Cambio a devolver:</span>
                             <span class="change-value text-success" id="checkout-change-display">$0.00</span>
                         </div>
+                    </div>
+
+                    <div id="checkout-credit-info" style="display: none; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 14px; border-radius: var(--radius-md); margin-top: 12px;">
+                        <div style="display: flex; align-items: center; gap: 8px; color: var(--danger); font-weight: 600; font-size: 13px;">
+                            <i data-lucide="alert-circle" style="width: 18px; height: 18px;"></i>
+                            <span id="checkout-credit-status-title">Venta a Cuenta Corriente (Fiado)</span>
+                        </div>
+                        <p id="checkout-credit-status-desc" style="font-size: 12px; color: var(--text-color); margin-top: 6px; margin-bottom: 0; line-height: 1.4;">
+                            El importe total de esta venta se acumulará como saldo deudor en la ficha del cliente seleccionado.
+                        </p>
                     </div>
                     
                     <!-- Factura Electrónica Checkbox -->
@@ -1710,6 +1746,18 @@
                             <option value="price">Lista 1: Minorista (Público)</option>
                             <option value="priceWholesale">Lista 2: Mayorista</option>
                         </select>
+                    </div>
+                    
+                    <div style="border-top: 1px dashed var(--border-color); margin-top: 14px; padding-top: 14px;">
+                        <label style="display: flex; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 600; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="cust-has-credit" checked style="width: 18px; height: 18px; cursor: pointer;">
+                            <span style="color: var(--primary);">Habilitar Venta a Cuenta Corriente (Crédito)</span>
+                        </label>
+                        <div class="form-group" style="margin-top: 10px;">
+                            <label for="cust-credit-limit">Límite de Crédito Máximo ($)</label>
+                            <input type="number" id="cust-credit-limit" min="0" step="0.01" placeholder="0.00 (Dejar en 0 para sin límite)">
+                            <span class="small text-muted" style="font-size: 11px;">Monto máximo de deuda permitido en compras a crédito.</span>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -2135,13 +2183,103 @@
         </div>
     </div>
 
+    <!-- 9. CUSTOMER DEBT PAYMENT MODAL -->
+    <div class="modal-backdrop" id="modal-customer-payment">
+        <div class="modal-box modal-medium">
+            <div class="modal-header">
+                <h3 class="modal-title"><i data-lucide="hand-coins" class="icon-inline text-emerald"></i> Registrar Pago / Abono de Cta. Cte.</h3>
+                <button class="btn-icon modal-close-btn" data-close-modal="modal-customer-payment"><i data-lucide="x"></i></button>
+            </div>
+            <form id="customer-payment-form" onsubmit="saveCustomerPayment(event)">
+                <input type="hidden" id="cust-pay-id">
+                <div class="modal-body">
+                    <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px;">
+                        <span style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px;">CLIENTE Y DEUDA ACTUAL</span>
+                        <h4 id="cust-pay-name" style="font-size: 16px; font-weight: 700; margin: 4px 0 2px 0; color: var(--text-main);">Cliente</h4>
+                        <div style="font-size: 13px; color: var(--danger); font-weight: 700; margin-top: 4px;">
+                            Deuda Pendiente: <span id="cust-pay-current-debt" style="font-size: 18px;">$0.00</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cust-pay-amount">Monto a Abonar ($) *</label>
+                        <input type="number" id="cust-pay-amount" required min="0.01" step="0.01" placeholder="0.00" class="input-large-text">
+                        <button type="button" class="btn btn-secondary small" onclick="setFullDebtPayment()" style="margin-top: 6px; padding: 4px 10px; font-size: 12px;">Pagar Deuda Total</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cust-pay-method">Método de Pago del Abono *</label>
+                        <select id="cust-pay-method" required>
+                            <option value="cash">Efectivo</option>
+                            <option value="transfer">Transferencia / Mercado Pago</option>
+                            <option value="card">Tarjeta de Débito / Crédito</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cust-pay-notes">Notas / Observaciones</label>
+                        <input type="text" id="cust-pay-notes" placeholder="Ej. Pago parcial recibido por caja...">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-outline" data-close-modal="modal-customer-payment">Cancelar</button>
+                    <button type="submit" class="btn btn-emerald" id="cust-pay-submit-btn">
+                        <i data-lucide="check-circle-2"></i> Registrar Abono e Ingresar a Caja
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 10. CUSTOMER MOVEMENTS MODAL -->
+    <div class="modal-backdrop" id="modal-customer-movements">
+        <div class="modal-box modal-large">
+            <div class="modal-header">
+                <h3 class="modal-title"><i data-lucide="history" class="icon-inline text-primary"></i> Historial de Cuenta Corriente</h3>
+                <button class="btn-icon modal-close-btn" data-close-modal="modal-customer-movements"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-input); padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                    <div>
+                        <h4 id="cust-mov-name" style="margin: 0; font-size: 16px; font-weight: 700;">Nombre del Cliente</h4>
+                        <span id="cust-mov-info" class="text-muted small">DNI: - | Tel: -</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted);">Saldo Deudor Actual</span>
+                        <div id="cust-mov-debt-display" style="font-size: 20px; font-weight: 800; color: var(--danger);">$0.00</div>
+                    </div>
+                </div>
+
+                <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                    <table class="data-table" style="font-size: 13px;">
+                        <thead>
+                            <tr>
+                                <th>Fecha y Hora</th>
+                                <th>Tipo</th>
+                                <th>Descripción / Ref.</th>
+                                <th class="text-right">Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cust-movements-tbody">
+                            <!-- Rows rendered dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="printCustomerStatement()"><i data-lucide="printer"></i> Imprimir Extracto</button>
+                <button type="button" class="btn btn-primary" data-close-modal="modal-customer-movements">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Supabase JS SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
 
     <!-- Application Script Files -->
-    <script src="components.js"></script>
-    <script src="fiscal.js"></script>
-    <script src="app.js"></script>
+    <script src="components.js?v=20260804"></script>
+    <script src="fiscal.js?v=20260804"></script>
+    <script src="app.js?v=20260804"></script>
 </body>
 </html>

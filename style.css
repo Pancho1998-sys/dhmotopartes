@@ -1698,10 +1698,57 @@ textarea:focus {
     background-color: rgba(0, 0, 0, 0.1);
 }
 
+/* Compact Cart Options Bar (Price List & Stock Source) */
+.cart-options-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-color);
+    gap: 12px;
+}
+
+.cart-option-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+}
+
+.cart-option-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--text-muted);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    user-select: none;
+}
+
+.cart-option-select {
+    flex: 1;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-input);
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    height: 30px;
+}
+
+.cart-option-select:focus {
+    border-color: var(--primary);
+    outline: none;
+}
+
 /* Payment Method Selectors */
 .payment-method-selector {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 10px;
 }
 
@@ -1709,29 +1756,32 @@ textarea:focus {
     background-color: var(--bg-input);
     border: 1px solid var(--border-color);
     color: var(--text-muted);
-    padding: 12px;
+    padding: 10px 14px;
     border-radius: var(--radius-md);
     cursor: pointer;
     font-weight: 600;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    transition: all 0.2s ease;
+    justify-content: center;
+    gap: 10px;
+    font-size: 13.5px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.method-btn i { width: 22px; height: 22px; }
+.method-btn i { width: 18px; height: 18px; }
 
 .method-btn:hover {
     color: var(--text-main);
     border-color: var(--border-hover);
+    transform: translateY(-1px);
 }
 
 .method-btn.active {
-    background-color: var(--primary-light);
+    background-color: rgba(99, 102, 241, 0.15);
     border-color: var(--primary);
-    color: var(--primary);
+    color: #ffffff;
+    box-shadow: 0 0 12px rgba(99, 102, 241, 0.25);
 }
 
 .input-large-text {

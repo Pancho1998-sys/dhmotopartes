@@ -359,6 +359,7 @@ function getPaymentMethodLabel(method, short = false) {
         case 'cash': return 'Efectivo';
         case 'card': return short ? 'Tarjeta' : 'Tarjeta Crédito/Débito';
         case 'transfer': return short ? 'Transferencia' : 'Transferencia Bancaria';
+        case 'credit': return short ? 'Cta. Cte.' : 'Cuenta Corriente (Fiado)';
         default: return 'Otro';
     }
 }
