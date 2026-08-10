@@ -12,7 +12,7 @@
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- SheetJS for Excel import/export (loaded dynamically when needed) -->
-    <link rel="stylesheet" href="style.css?v=20260804">
+    <link rel="stylesheet" href="style.css?v=20260805_2">
     <!-- Dynamic custom styles for SaaS branding -->
     <style id="custom-brand-styles"></style>
 </head>
@@ -2193,11 +2193,11 @@
             <form id="customer-payment-form" onsubmit="saveCustomerPayment(event)">
                 <input type="hidden" id="cust-pay-id">
                 <div class="modal-body">
-                    <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px;">
-                        <span style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px;">CLIENTE Y DEUDA ACTUAL</span>
+                    <div style="background: var(--bg-hover, rgba(0,0,0,0.03)); border: 1px solid var(--border-color, rgba(0,0,0,0.1)); border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px;">
+                        <span style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px;">CLIENTE Y ESTADO DE CUENTA</span>
                         <h4 id="cust-pay-name" style="font-size: 16px; font-weight: 700; margin: 4px 0 2px 0; color: var(--text-main);">Cliente</h4>
-                        <div style="font-size: 13px; color: var(--danger); font-weight: 700; margin-top: 4px;">
-                            Deuda Pendiente: <span id="cust-pay-current-debt" style="font-size: 18px;">$0.00</span>
+                        <div style="font-size: 13px; font-weight: 700; margin-top: 4px;">
+                            Estado Actual: <span id="cust-pay-current-debt" style="font-size: 18px;">$0.00</span>
                         </div>
                     </div>
 
@@ -2278,8 +2278,8 @@
     <script src="supabase-config.js"></script>
 
     <!-- Application Script Files -->
-    <script src="components.js?v=20260804"></script>
-    <script src="fiscal.js?v=20260804"></script>
-    <script src="app.js?v=20260804"></script>
+    <script src="components.js?v=20260805_2"></script>
+    <script src="fiscal.js?v=20260805"></script>
+    <script src="app.js?v=20260805"></script>
 </body>
 </html>

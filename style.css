@@ -817,6 +817,7 @@ textarea:focus {
     display: flex;
     align-items: center;
     flex: 1;
+    min-width: 280px;
     max-width: 480px;
 }
 
@@ -1519,15 +1520,18 @@ textarea:focus {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 20px;
+    flex-wrap: wrap;
+    gap: 14px;
     margin-bottom: 20px;
 }
 
 .search-filters-row {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 12px;
     flex: 1;
+    min-width: 320px;
 }
 
 .date-filter-group {
@@ -1553,6 +1557,38 @@ textarea:focus {
 .table-responsive {
     overflow-x: auto;
     width: 100%;
+}
+
+/* Fixed horizontal scrollbar & sticky header for Inventory View */
+#view-inventario.active-view {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+#view-inventario .data-table-card {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    max-height: calc(100vh - 210px);
+}
+
+#view-inventario .table-responsive {
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+#inventory-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: var(--bg-card);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 1px 0 var(--border-color);
 }
 
 .data-table {

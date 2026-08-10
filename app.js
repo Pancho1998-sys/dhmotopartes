@@ -1766,6 +1766,7 @@ function setupEventListeners() {
 
     // Keyboard Shortcuts (F8 for Cobrar, F9 for Imprimir)
     window.addEventListener('keydown', (e) => {
+        if (!e || !e.key) return;
         if (e.key === 'F8') {
             const checkoutBtn = document.getElementById('cart-checkout-btn');
             if (window.location.hash === '#pos' && checkoutBtn && !checkoutBtn.disabled) {
@@ -2037,6 +2038,8 @@ function setupEventListeners() {
    ========================================================================== */
 function setupBarcodeListener() {
     window.addEventListener('keydown', (e) => {
+        if (!e || !e.key) return;
+
         // Exclude inputs that are not the POS search bar.
         const activeEl = document.activeElement;
         if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
@@ -3198,7 +3201,16 @@ function updateCreditCheckoutValidation() {
                 titleEl.textContent = "Venta a Cuenta Corriente (Apto)";
                 titleEl.parentElement.style.color = 'var(--success)';
             }
-            if (descEl) descEl.textContent = `El importe total (${state.settings.currency}${checkoutTotalVal.toFixed(2)}) se cargará como deuda a la ficha de ${customer ? customer.name : 'cliente'}.`;
+            const currentDebt = customer ? (customer.deuda || 0) : 0;
+            if (descEl) {
+                if (currentDebt < 0) {
+                    descEl.textContent = `✨ El cliente ${customer ? customer.name : ''} posee ${state.settings.currency}${Math.abs(currentDebt).toFixed(2)} a favor. Se consumirá este saldo en la compra.`;
+                } else if (currentDebt > 0) {
+                    descEl.textContent = `El importe total (${state.settings.currency}${checkoutTotalVal.toFixed(2)}) se sumará a la deuda actual (${state.settings.currency}${currentDebt.toFixed(2)}) de ${customer ? customer.name : 'cliente'}.`;
+                } else {
+                    descEl.textContent = `El importe total (${state.settings.currency}${checkoutTotalVal.toFixed(2)}) se cargará como deuda a la ficha de ${customer ? customer.name : 'cliente'}.`;
+                }
+            }
         }
     }
 }
@@ -3745,8 +3757,10 @@ function renderCustomers() {
 function updateCustomersMetrics() {
     const customersList = state.customers || [];
     const totalCustomers = customersList.length;
-    const totalDebt = customersList.reduce((sum, c) => sum + (c.deuda || 0), 0);
+    const totalDebt = customersList.reduce((sum, c) => sum + ((c.deuda || 0) > 0 ? c.deuda : 0), 0);
+    const totalCredit = customersList.reduce((sum, c) => sum + ((c.deuda || 0) < 0 ? Math.abs(c.deuda) : 0), 0);
     const indebtedCount = customersList.filter(c => (c.deuda || 0) > 0).length;
+    const creditCount = customersList.filter(c => (c.deuda || 0) < 0).length;
 
     const totalEl = document.getElementById('customers-metric-total');
     const debtEl = document.getElementById('customers-metric-total-debt');
@@ -3754,7 +3768,13 @@ function updateCustomersMetrics() {
 
     if (totalEl) totalEl.textContent = totalCustomers;
     if (debtEl) debtEl.textContent = `${state.settings.currency}${totalDebt.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    if (countEl) countEl.textContent = `${indebtedCount} ${indebtedCount === 1 ? 'cliente con deuda' : 'clientes con deuda'}`;
+    if (countEl) {
+        let subtext = `${indebtedCount} ${indebtedCount === 1 ? 'cliente con deuda' : 'clientes con deuda'}`;
+        if (creditCount > 0) {
+            subtext += ` | ${creditCount} a favor (${state.settings.currency}${totalCredit.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
+        }
+        countEl.textContent = subtext;
+    }
 }
 
 function renderCustomersTable() {
@@ -3803,8 +3823,10 @@ function renderCustomersTable() {
         let debtBadge = '';
         if (debt > 0) {
             debtBadge = `<span class="badge badge-danger" style="font-weight: 700;">Debe ${state.settings.currency}${debt.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+        } else if (debt < 0) {
+            debtBadge = `<span class="badge badge-success" style="font-weight: 700;">A favor: ${state.settings.currency}${Math.abs(debt).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
         } else {
-            debtBadge = `<span class="badge badge-success" style="opacity: 0.85;">Al día (${state.settings.currency}0.00)</span>`;
+            debtBadge = `<span class="badge badge-secondary" style="opacity: 0.85;">Al día (${state.settings.currency}0.00)</span>`;
         }
 
         rowsHtml += `
@@ -3823,7 +3845,7 @@ function renderCustomersTable() {
                 <td>${c.dateRegistered || '-'}</td>
                 <td class="text-center">
                     <div class="table-action-btn-group">
-                        ${debt > 0 ? `<button class="btn btn-emerald btn-icon-only" onclick="openCustomerPaymentModal('${c.id}')" title="Cobrar / Abonar Cta. Cte."><i data-lucide="hand-coins" style="width:14px; height:14px;"></i></button>` : `<button class="btn btn-secondary btn-icon-only" onclick="openCustomerPaymentModal('${c.id}')" title="Ver / Registrar Abono"><i data-lucide="hand-coins" style="width:14px; height:14px; opacity:0.5;"></i></button>`}
+                        <button class="btn ${debt > 0 ? 'btn-emerald' : 'btn-secondary'} btn-icon-only" onclick="openCustomerPaymentModal('${c.id}')" title="${debt < 0 ? 'Registrar Abono A Favor' : 'Cobrar / Abonar Cta. Cte.'}"><i data-lucide="hand-coins" style="width:14px; height:14px;"></i></button>
                         <button class="btn btn-secondary btn-icon-only" onclick="openCustomerMovementsModal('${c.id}')" title="Ver Historial Cta. Cte."><i data-lucide="history" style="width:14px; height:14px;"></i></button>
                         <button class="btn btn-secondary btn-icon-only" onclick="editCustomer('${c.id}')" title="Editar"><i data-lucide="edit-3" style="width:14px; height:14px;"></i></button>
                         <button class="btn btn-danger btn-outline btn-icon-only" onclick="deleteCustomer('${c.id}')" title="Eliminar"><i data-lucide="trash-2" style="width:14px; height:14px;"></i></button>
@@ -3974,9 +3996,19 @@ window.openCustomerPaymentModal = function (customerId) {
     document.getElementById('cust-pay-id').value = c.id;
     document.getElementById('cust-pay-name').textContent = c.name;
     const debt = c.deuda || 0;
-    document.getElementById('cust-pay-current-debt').textContent = `${state.settings.currency}${debt.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const debtEl = document.getElementById('cust-pay-current-debt');
+    if (debt > 0) {
+        debtEl.textContent = `${state.settings.currency}${debt.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Deuda)`;
+        debtEl.style.color = 'var(--danger)';
+    } else if (debt < 0) {
+        debtEl.textContent = `${state.settings.currency}${Math.abs(debt).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (A Favor)`;
+        debtEl.style.color = 'var(--success)';
+    } else {
+        debtEl.textContent = `${state.settings.currency}0.00 (Sin Deuda)`;
+        debtEl.style.color = 'var(--text-muted)';
+    }
     document.getElementById('cust-pay-amount').value = debt > 0 ? debt.toFixed(2) : '';
-    document.getElementById('cust-pay-amount').max = debt > 0 ? debt : '';
+    document.getElementById('cust-pay-amount').removeAttribute('max');
     document.getElementById('cust-pay-notes').value = '';
 
     openModal('modal-customer-payment');
@@ -4009,8 +4041,8 @@ window.saveCustomerPayment = function (e) {
         return;
     }
 
-    // Deduct debt
-    c.deuda = Math.max(0, Math.round(((c.deuda || 0) - amount) * 100) / 100);
+    // Deduct debt (allows negative numbers representing Saldo a Favor)
+    c.deuda = Math.round(((c.deuda || 0) - amount) * 100) / 100;
 
     // Register movement in customer's credit history
     if (!c.ctaCteMovements) c.ctaCteMovements = [];
@@ -4042,7 +4074,15 @@ window.saveCustomerPayment = function (e) {
     }
 
     playScanSound('success');
-    alert(`✅ ¡Abono de ${state.settings.currency}${amount.toFixed(2)} registrado con éxito para ${c.name}!\nSaldo deudor restante: ${state.settings.currency}${c.deuda.toFixed(2)}.`);
+    let debtStatusMsg = '';
+    if (c.deuda > 0) {
+        debtStatusMsg = `Saldo deudor restante: ${state.settings.currency}${c.deuda.toFixed(2)}`;
+    } else if (c.deuda < 0) {
+        debtStatusMsg = `Saldo a favor generado: ${state.settings.currency}${Math.abs(c.deuda).toFixed(2)}`;
+    } else {
+        debtStatusMsg = `Cuenta al día (${state.settings.currency}0.00)`;
+    }
+    alert(`✅ ¡Abono de ${state.settings.currency}${amount.toFixed(2)} registrado con éxito para ${c.name}!\n${debtStatusMsg}.`);
 };
 
 let currentMovementsCustomerId = null;
@@ -4057,8 +4097,16 @@ window.openCustomerMovementsModal = function (customerId) {
     document.getElementById('cust-mov-info').textContent = `DNI/CUIT: ${c.dni || 'Sin registro'} | Teléfono: ${c.phone || 'Sin registro'}`;
     const debt = c.deuda || 0;
     const debtEl = document.getElementById('cust-mov-debt-display');
-    debtEl.textContent = `${state.settings.currency}${debt.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    debtEl.style.color = debt > 0 ? 'var(--danger)' : 'var(--success)';
+    if (debt > 0) {
+        debtEl.textContent = `${state.settings.currency}${debt.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Deuda)`;
+        debtEl.style.color = 'var(--danger)';
+    } else if (debt < 0) {
+        debtEl.textContent = `${state.settings.currency}${Math.abs(debt).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (A Favor)`;
+        debtEl.style.color = 'var(--success)';
+    } else {
+        debtEl.textContent = `${state.settings.currency}0.00 (Al día)`;
+        debtEl.style.color = 'var(--text-muted)';
+    }
 
     const tbody = document.getElementById('cust-movements-tbody');
     const movements = [...(c.ctaCteMovements || [])].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -4115,7 +4163,7 @@ window.printCustomerStatement = function () {
                 <p style="margin: 4px 0;"><strong>Cliente:</strong> ${c.name}</p>
                 <p style="margin: 4px 0;"><strong>DNI / CUIT:</strong> ${c.dni || 'Sin documento'}</p>
                 <p style="margin: 4px 0;"><strong>Teléfono:</strong> ${c.phone || '-'}</p>
-                <p style="margin: 4px 0; font-size: 16px;"><strong>Saldo Deudor Actual:</strong> <span style="color: red;">$${(c.deuda || 0).toFixed(2)}</span></p>
+                <p style="margin: 4px 0; font-size: 16px;"><strong>Saldo Actual:</strong> ${(c.deuda || 0) > 0 ? `<span style="color: red;">$${(c.deuda || 0).toFixed(2)} (Saldo Deudor)</span>` : ((c.deuda || 0) < 0 ? `<span style="color: green;">$${Math.abs(c.deuda || 0).toFixed(2)} (Saldo a Favor)</span>` : `<span style="color: #666;">$0.00 (Al día)</span>`)}</p>
             </div>
             <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px;">
                 <thead>

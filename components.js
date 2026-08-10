@@ -187,7 +187,7 @@ function createPOSProductCard(product, currency = '$', priceKey = 'price', stock
         stockText = 'Agotado';
     } else if (stock <= minThreshold) {
         stockClass = 'stock-badge-low';
-        stockText = 'Stock Bajo';
+        stockText = `Stock Bajo (${stock})`;
     }
 
     // Fallback image helper
@@ -382,7 +382,7 @@ function createCatalogProductCard(product, currency = '$') {
         stockText = 'Agotado';
     } else if (product.stock <= product.stockMin) {
         stockClass = 'stock-badge-low';
-        stockText = 'Stock Bajo';
+        stockText = `Stock Bajo (${product.stock})`;
     }
 
     const imagePlaceholder = product.image ? 
