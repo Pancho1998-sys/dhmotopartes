@@ -6614,7 +6614,16 @@ window.renderCatalogCart = function () {
     if (!container) return;
 
     const totalItems = catalogCart.reduce((sum, item) => sum + item.quantity, 0);
-    const totalPrice = catalogCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+    let totalPrice = 0;
+    catalogCart.forEach(item => {
+        const prod = state.products.find(p => p.id === item.id);
+        const retailPrice = prod ? prod.price : item.price;
+        const wholesalePrice = prod ? (parseFloat(prod.priceWholesale !== undefined ? prod.priceWholesale : prod.priceDiscount) || 0) : 0;
+        const isWholesaleActive = item.quantity >= 5 && wholesalePrice > 0 && wholesalePrice < retailPrice;
+        const unitPrice = isWholesaleActive ? wholesalePrice : retailPrice;
+        totalPrice += unitPrice * item.quantity;
+    });
 
     if (badge) {
         if (totalItems > 0) {
@@ -6642,11 +6651,33 @@ window.renderCatalogCart = function () {
         if (checkoutBtn) checkoutBtn.disabled = false;
         let itemsHtml = '';
         catalogCart.forEach(item => {
+            const prod = state.products.find(p => p.id === item.id);
+            const retailPrice = prod ? prod.price : item.price;
+            const wholesalePrice = prod ? (parseFloat(prod.priceWholesale !== undefined ? prod.priceWholesale : prod.priceDiscount) || 0) : 0;
+            const hasWholesaleOption = wholesalePrice > 0 && wholesalePrice < retailPrice;
+            const isWholesaleActive = item.quantity >= 5 && hasWholesaleOption;
+            const unitPrice = isWholesaleActive ? wholesalePrice : retailPrice;
+            const itemSubtotal = unitPrice * item.quantity;
+
+            let priceDisplayHtml = `<div class="catalog-cart-item-price">${currency}${unitPrice.toFixed(2)} c/u</div>`;
+            if (isWholesaleActive) {
+                priceDisplayHtml = `
+                    <div class="catalog-cart-item-price">
+                        <span style="text-decoration: line-through; font-size: 11px; color: var(--text-muted); margin-right: 4px;">${currency}${retailPrice.toFixed(2)}</span>
+                        <strong>${currency}${unitPrice.toFixed(2)} c/u</strong>
+                    </div>
+                    <div class="cart-wholesale-badge"><i data-lucide="sparkles" style="width:10px; height:10px;"></i> Precio Mayorista Aplicado</div>
+                `;
+            } else if (hasWholesaleOption) {
+                const needed = 5 - item.quantity;
+                priceDisplayHtml += `<div class="cart-wholesale-hint">💡 Faltan ${needed} un. para precio mayorista (${currency}${wholesalePrice.toFixed(2)})</div>`;
+            }
+
             itemsHtml += `
                 <div class="catalog-cart-item">
                     <div class="catalog-cart-item-details">
                         <div class="catalog-cart-item-title">${item.name}</div>
-                        <div class="catalog-cart-item-price">${currency}${item.price.toFixed(2)}</div>
+                        ${priceDisplayHtml}
                     </div>
                     <div class="catalog-cart-item-qty-actions">
                         <button class="qty-btn" onclick="updateCatalogCartItemQty('${item.id}', -1)">-</button>
@@ -6654,7 +6685,7 @@ window.renderCatalogCart = function () {
                         <button class="qty-btn" onclick="updateCatalogCartItemQty('${item.id}', 1)">+</button>
                     </div>
                     <div class="catalog-cart-item-total">
-                        ${currency}${(item.price * item.quantity).toFixed(2)}
+                        ${currency}${itemSubtotal.toFixed(2)}
                     </div>
                     <button class="btn btn-icon" onclick="removeCatalogCartItem('${item.id}')" style="color: var(--danger); margin-left: 10px;" title="Eliminar del carrito">
                         <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
@@ -6680,20 +6711,39 @@ window.openCatalogCheckoutModal = function () {
     const totalDisplay = document.getElementById('cat-checkout-total-display');
     const currency = state.settings.currency || '$';
 
+    let totalPrice = 0;
     if (summaryContainer) {
         let summaryHtml = '';
         catalogCart.forEach(item => {
+            const prod = state.products.find(p => p.id === item.id);
+            const retailPrice = prod ? prod.price : item.price;
+            const wholesalePrice = prod ? (parseFloat(prod.priceWholesale !== undefined ? prod.priceWholesale : prod.priceDiscount) || 0) : 0;
+            const isWholesaleActive = item.quantity >= 5 && wholesalePrice > 0 && wholesalePrice < retailPrice;
+            const unitPrice = isWholesaleActive ? wholesalePrice : retailPrice;
+            const itemSubtotal = unitPrice * item.quantity;
+            totalPrice += itemSubtotal;
+
+            const badgeHtml = isWholesaleActive ? `<small style="color: var(--primary); font-weight: bold; margin-left: 4px;">(Mayorista 5+ un.)</small>` : '';
+
             summaryHtml += `
-                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                    <span>${item.quantity}x ${item.name}</span>
-                    <span>${currency}${(item.price * item.quantity).toFixed(2)}</span>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px;">
+                    <span>${item.quantity}x ${item.name}${badgeHtml}</span>
+                    <span>${currency}${itemSubtotal.toFixed(2)}</span>
                 </div>
             `;
         });
         summaryContainer.innerHTML = summaryHtml;
+    } else {
+        catalogCart.forEach(item => {
+            const prod = state.products.find(p => p.id === item.id);
+            const retailPrice = prod ? prod.price : item.price;
+            const wholesalePrice = prod ? (parseFloat(prod.priceWholesale !== undefined ? prod.priceWholesale : prod.priceDiscount) || 0) : 0;
+            const isWholesaleActive = item.quantity >= 5 && wholesalePrice > 0 && wholesalePrice < retailPrice;
+            const unitPrice = isWholesaleActive ? wholesalePrice : retailPrice;
+            totalPrice += unitPrice * item.quantity;
+        });
     }
 
-    const totalPrice = catalogCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     if (totalDisplay) {
         totalDisplay.textContent = `${currency}${totalPrice.toFixed(2)}`;
     }
@@ -6762,13 +6812,22 @@ window.sendCatalogOrder = function (e) {
     }
 
     const currency = state.settings.currency || '$';
-    const totalPrice = catalogCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    let totalPrice = 0;
     const storeName = state.settings.storeName || "DHMotopartes";
 
     let message = `*¡Hola ${storeName}!* Me gustaría realizar el siguiente pedido:\n\n`;
     message += `*🛒 DETALLE DEL PEDIDO:*\n`;
     catalogCart.forEach(item => {
-        message += `- ${item.quantity}x _${item.name}_ (${currency}${item.price.toFixed(2)} c/u) -> *Total: ${currency}${(item.price * item.quantity).toFixed(2)}*\n`;
+        const prod = state.products.find(p => p.id === item.id);
+        const retailPrice = prod ? prod.price : item.price;
+        const wholesalePrice = prod ? (parseFloat(prod.priceWholesale !== undefined ? prod.priceWholesale : prod.priceDiscount) || 0) : 0;
+        const isWholesaleActive = item.quantity >= 5 && wholesalePrice > 0 && wholesalePrice < retailPrice;
+        const unitPrice = isWholesaleActive ? wholesalePrice : retailPrice;
+        const itemSubtotal = unitPrice * item.quantity;
+        totalPrice += itemSubtotal;
+
+        const wsTag = isWholesaleActive ? ' - _Mayorista 5+ un._' : '';
+        message += `- ${item.quantity}x _${item.name}_ (${currency}${unitPrice.toFixed(2)} c/u${wsTag}) -> *Total: ${currency}${itemSubtotal.toFixed(2)}*\n`;
     });
     message += `\n*💰 TOTAL A PAGAR:* *${currency}${totalPrice.toFixed(2)}*\n\n`;
 

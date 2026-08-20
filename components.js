@@ -394,6 +394,19 @@ function createCatalogProductCard(product, currency = '$') {
         `<button class="btn btn-secondary small w-full" style="margin-top: 8px; cursor: not-allowed;" disabled>Sin Stock</button>` :
         `<button class="btn btn-primary small w-full" style="margin-top: 8px;" onclick="event.stopPropagation(); addCatalogCartItem('${product.id}')"><i data-lucide="plus" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:4px;"></i>Agregar</button>`;
 
+    const wholesalePrice = parseFloat(product.priceWholesale !== undefined ? product.priceWholesale : product.priceDiscount) || 0;
+    const hasWholesale = wholesalePrice > 0 && wholesalePrice < product.price;
+
+    const wholesaleHtml = hasWholesale ? `
+        <div class="prod-card-wholesale-box">
+            <span class="wholesale-price-badge">
+                <i data-lucide="tag" style="width:11px; height:11px; vertical-align:middle; margin-right:3px;"></i>
+                Mayorista: <strong>${currency}${wholesalePrice.toFixed(2)}</strong>
+            </span>
+            <span class="wholesale-min-note">(a partir de 5 unidades)</span>
+        </div>
+    ` : '';
+
     return `
         <div class="${cardClass}" data-id="${product.id}" onclick="${isOutOfStock ? '' : `addCatalogCartItem('${product.id}')`}">
             <span class="prod-card-sku">${product.sku}</span>
@@ -410,6 +423,7 @@ function createCatalogProductCard(product, currency = '$') {
                     <span class="prod-card-price">${currency}${product.price.toFixed(2)}</span>
                     <span class="prod-card-stock ${stockClass}">${stockText}</span>
                 </div>
+                ${wholesaleHtml}
                 ${addBtnHtml}
             </div>
         </div>
