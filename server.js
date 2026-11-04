@@ -121,3 +121,4 @@ server.listen(PORT, '0.0.0.0', () => {
     const startCmd = process.platform === 'win32' ? 'start' : (process.platform === 'darwin' ? 'open' : 'xdg-open');
     exec(`${startCmd} http://localhost:${PORT}/`);
 });
+
