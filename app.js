@@ -11,6 +11,7 @@ const DEFAULT_STATE = {
     suppliers: [],
     cashMovements: [],
     cashClosures: [],
+    receptions: [],
     settings: {
         storeName: "Bigtech",
         storeAddress: "Av. Libertador 2450, Ciudad",
@@ -20,6 +21,7 @@ const DEFAULT_STATE = {
         currency: "$",
         storeTax: 15,
         categories: ['Sistema Eléctrico', 'Repuestos de Motor', 'Frenos', 'Transmisión', 'Herramientas', 'Accesorios', 'Aceites'],
+        geminiApiKey: "",
         logo: "",
         cardBgType: "default",
         cardBgColor: "#1f2937",
@@ -83,6 +85,7 @@ function ensureStateProperties(loadedState) {
     if (!loadedState.suppliers) loadedState.suppliers = [];
     if (!loadedState.cashMovements) loadedState.cashMovements = [];
     if (!loadedState.cashClosures) loadedState.cashClosures = [];
+    if (!loadedState.receptions) loadedState.receptions = [];
     if (!loadedState.settings) {
         loadedState.settings = JSON.parse(JSON.stringify(DEFAULT_STATE.settings));
     } else {
@@ -92,6 +95,9 @@ function ensureStateProperties(loadedState) {
                 loadedState.settings[key] = defaultSettings[key];
             }
         }
+    }
+    if (loadedState.settings.geminiApiKey === undefined) {
+        loadedState.settings.geminiApiKey = "";
     }
     if (!loadedState.settings.storeAlias) {
         loadedState.settings.storeAlias = "DHMOTOPARTES";
@@ -654,6 +660,8 @@ function syncSettingsInputs() {
         if (descEl) descEl.value = state.settings.brandDescription || "";
         if (currEl) currEl.value = state.settings.currency || "";
         if (taxEl) taxEl.value = state.settings.storeTax || 0;
+        const geminiKeyEl = document.getElementById('set-gemini-api-key');
+        if (geminiKeyEl) geminiKeyEl.value = state.settings.geminiApiKey || "";
 
         // Brand & Design Sync
         const cardBgType = state.settings.cardBgType || "default";
@@ -1496,6 +1504,13 @@ function setupEventListeners() {
     });
 
     // Inventory View Listeners
+    const btnReceptionAi = document.getElementById('btn-reception-ai');
+    if (btnReceptionAi) {
+        btnReceptionAi.addEventListener('click', () => {
+            openReceptionAiModal();
+        });
+    }
+
     document.getElementById('inventory-add-product-btn').addEventListener('click', () => {
         document.getElementById('product-modal-title').textContent = "Registrar Nuevo Repuesto";
         document.getElementById('product-id-field').value = "";
@@ -4800,6 +4815,7 @@ function saveSettings(e) {
     const storeHolder = document.getElementById('set-store-holder') ? document.getElementById('set-store-holder').value.trim() : 'DANIEL OSCAR HIDALGO';
     const currency = document.getElementById('set-store-currency').value.trim();
     const storeTax = parseFloat(document.getElementById('set-store-tax').value) || 0;
+    const geminiApiKey = document.getElementById('set-gemini-api-key') ? document.getElementById('set-gemini-api-key').value.trim() : (state.settings.geminiApiKey || '');
 
     const cardBgType = document.getElementById('set-card-bg-type').value;
     const cardBgColor = document.getElementById('set-card-bg-color').value;
@@ -4832,7 +4848,8 @@ function saveSettings(e) {
         accentColor,
         whatsapp,
         instagram,
-        brandDescription
+        brandDescription,
+        geminiApiKey
     };
 
     // Apply brand settings dynamically
@@ -6291,6 +6308,62 @@ async function exportInventoryExcel() {
         console.error("Inventory export failed:", err);
         alert("Ocurrió un error al exportar el inventario a Excel: " + err.message);
     }
+}
+
+/* ==========================================================================
+   AI Receipt Scanner & Staging Menu
+   ========================================================================== */
+let tempReceptionFile = null;
+let tempReceptionFileBase64 = null;
+let tempReceptionMimeType = null;
+let tempStagingItems = [];
+
+window.togglePasswordVisibility = function(inputId) {
+    const el = document.getElementById(inputId);
+    if (!el) return;
+    el.type = el.type === 'password' ? 'text' : 'password';
+};
+
+function openReceptionAiModal() {
+    tempReceptionFile = null;
+    tempReceptionFileBase64 = null;
+    tempReceptionMimeType = null;
+    tempStagingItems = [];
+
+    // Reset Steps visibility
+    const stepUpload = document.getElementById('reception-step-upload');
+    const stepStaging = document.getElementById('reception-step-staging');
+    const btnBack = document.getElementById('btn-reception-back');
+    const btnProcess = document.getElementById('btn-reception-process-ai');
+    const btnAuthorize = document.getElementById('btn-reception-authorize');
+    const loadingContainer = document.getElementById('reception-loading-container');
+    const dropzone = document.getElementById('reception-dropzone');
+    const previewCard = document.getElementById('reception-file-preview-card');
+
+    if (stepUpload) stepUpload.style.display = 'block';
+    if (stepStaging) stepStaging.style.display = 'none';
+    if (btnBack) btnBack.style.display = 'none';
+    if (btnProcess) btnProcess.style.display = 'inline-flex';
+    if (btnAuthorize) btnAuthorize.style.display = 'none';
+    if (loadingContainer) loadingContainer.style.display = 'none';
+    if (dropzone) dropzone.style.display = 'block';
+    if (previewCard) previewCard.style.display = 'none';
+
+    // Populate quick API key if available
+    const keyInput = document.getElementById('reception-quick-api-key');
+    const keyStatusText = document.getElementById('reception-ai-key-status-text');
+    const currentKey = (state.settings && state.settings.geminiApiKey) || '';
+    if (keyInput) keyInput.value = currentKey;
+    if (keyStatusText) {
+        if (currentKey) {
+            keyStatusText.innerHTML = '<span style="color: var(--success); font-weight: 600;">✓ Clave Gemini configurada y activa</span>';
+        } else {
+            keyStatusText.innerHTML = '<span style="color: var(--warning); font-weight: 600;">⚠ Sin clave API configurada (o usa el botón "Probar con Remito Demo")</span>';
+        }
+    }
+
+    openModal('modal-reception-ai');
+    if (window.lucide) lucide.createIcons();
 }
 
 /* ==========================================================================

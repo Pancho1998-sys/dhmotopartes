@@ -559,6 +559,9 @@
                                 <i data-lucide="file-spreadsheet"></i> Importar Excel
                                 <input type="file" id="inventory-import-excel" accept=".xlsx, .xls, .csv" style="display: none;">
                             </label>
+                            <button class="btn btn-primary" id="btn-reception-ai" title="Escanear remito o factura con Inteligencia Artificial" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); border-color: #6366f1;">
+                                <i data-lucide="sparkles"></i> Escanear Remito / Factura (IA)
+                            </button>
                             <button class="btn btn-primary" id="inventory-add-product-btn">
                                 <i data-lucide="plus-circle"></i> Nuevo Repuesto / Herramienta
                             </button>
@@ -1150,6 +1153,32 @@
                                     </div>
                                     <button type="submit" class="btn btn-primary w-full">
                                         <i data-lucide="save"></i> Guardar Configuración Fiscal
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- AI & Gemini Vision Scanner Card -->
+                        <div class="dashboard-panel">
+                            <div class="panel-header">
+                                <h3 class="panel-title"><i data-lucide="bot" class="text-muted icon-inline" style="color: #6366f1;"></i> Inteligencia Artificial (Gemini Vision)</h3>
+                            </div>
+                            <div class="panel-body">
+                                <form id="settings-ai-form" class="settings-form" onsubmit="event.preventDefault(); saveSettings(event);">
+                                    <div class="form-group">
+                                        <label for="set-gemini-api-key">Google Gemini API Key</label>
+                                        <div style="display: flex; gap: 8px;">
+                                            <input type="password" id="set-gemini-api-key" placeholder="AIzaSy..." style="flex: 1;">
+                                            <button type="button" class="btn btn-secondary" onclick="togglePasswordVisibility('set-gemini-api-key')" title="Mostrar / Ocultar">
+                                                <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+                                            </button>
+                                        </div>
+                                        <span class="small text-muted" style="margin-top: 6px; display: block;">
+                                            Digitaliza fotos y PDFs de remitos/facturas en segundos. Obtén tu clave en <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style="color: var(--primary); text-decoration: underline;">Google AI Studio</a>.
+                                        </span>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-full">
+                                        <i data-lucide="save"></i> Guardar Clave de Inteligencia Artificial
                                     </button>
                                 </form>
                             </div>
@@ -2273,6 +2302,204 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="printCustomerStatement()"><i data-lucide="printer"></i> Imprimir Extracto</button>
                 <button type="button" class="btn btn-primary" data-close-modal="modal-customer-movements">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 11. AI RECEIPT SCANNING & STAGING MODAL -->
+    <div class="modal-backdrop" id="modal-reception-ai">
+        <div class="modal-box modal-xl">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div class="reception-ai-icon-badge">
+                        <i data-lucide="sparkles"></i>
+                    </div>
+                    <div>
+                        <h3 class="modal-title" style="margin: 0; font-size: 18px;">Ingreso de Mercadería con Escaneo IA</h3>
+                        <p class="text-muted small" style="margin: 0;">Extracción inteligente de remitos y menú de carga prevista de stock</p>
+                    </div>
+                </div>
+                <button class="btn-icon modal-close-btn" data-close-modal="modal-reception-ai"><i data-lucide="x"></i></button>
+            </div>
+
+            <!-- PASO 1: SUBIR O TOMAR FOTO DEL REMITO -->
+            <div class="modal-body" id="reception-step-upload">
+                <div class="reception-upload-hero">
+                    <!-- Dropzone -->
+                    <div class="reception-dropzone" id="reception-dropzone">
+                        <input type="file" id="reception-file-input" accept="image/png, image/jpeg, image/webp, application/pdf" style="display: none;">
+                        <input type="file" id="reception-camera-input" accept="image/*" capture="environment" style="display: none;">
+                        
+                        <div class="dropzone-icon-container">
+                            <i data-lucide="upload-cloud" class="dropzone-icon"></i>
+                        </div>
+                        <h4 style="margin: 12px 0 6px 0; font-size: 16px; font-weight: 700;">Arrastra tu Remito o Factura aquí</h4>
+                        <p class="text-muted small" style="margin-bottom: 16px;">Soporta imágenes (JPG, PNG, WEBP) o documentos PDF de distribuidores y proveedores</p>
+                        
+                        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('reception-file-input').click()">
+                                <i data-lucide="file-text"></i> Seleccionar Archivo
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('reception-camera-input').click()">
+                                <i data-lucide="camera"></i> Tomar Foto
+                            </button>
+                            <button type="button" class="btn btn-outline-primary" id="btn-load-demo-receipt">
+                                <i data-lucide="sparkles"></i> Probar con Remito Demo
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- File Preview Card (Hidden initially) -->
+                    <div id="reception-file-preview-card" style="display: none; margin-top: 16px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div id="reception-preview-thumb-box" style="width: 48px; height: 48px; border-radius: var(--radius-sm); background: var(--bg-surface); display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--border-color);">
+                                <i data-lucide="file-text" id="reception-preview-default-icon" style="color: var(--primary);"></i>
+                                <img id="reception-preview-img" src="" style="width: 100%; height: 100%; object-fit: cover; display: none;" alt="Preview">
+                            </div>
+                            <div>
+                                <h5 id="reception-preview-filename" style="margin: 0; font-size: 14px; font-weight: 700;">remito.pdf</h5>
+                                <span id="reception-preview-filesize" class="text-muted small">0 KB</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button type="button" class="btn btn-secondary small" id="btn-reception-clear-file">
+                                <i data-lucide="trash-2"></i> Cambiar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- AI Key Box -->
+                    <div class="reception-ai-key-box" id="reception-ai-key-box" style="margin-top: 16px;">
+                        <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                            <i data-lucide="bot" style="color: #6366f1;"></i>
+                            <div>
+                                <div style="font-size: 13px; font-weight: 600;">Motor IA Gemini Vision</div>
+                                <span class="small text-muted" id="reception-ai-key-status-text">Listo para extraer códigos, descripciones, cantidades y costos.</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <input type="password" id="reception-quick-api-key" placeholder="API Key de Gemini..." style="padding: 6px 10px; font-size: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface); width: 220px;">
+                            <button type="button" class="btn btn-secondary small" id="btn-save-quick-api-key" title="Guardar clave">Guardar</button>
+                        </div>
+                    </div>
+
+                    <!-- Loading State -->
+                    <div id="reception-loading-container" style="display: none; padding: 36px 20px; text-align: center;">
+                        <div class="reception-spinner"></div>
+                        <h4 style="margin: 16px 0 6px 0; font-size: 16px; font-weight: 700;">Analizando remito con Inteligencia Artificial...</h4>
+                        <p class="text-muted small">Extrayendo códigos de producto, descripciones, cantidades y precios de costo.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PASO 2: MENÚ DE CARGA PREVISTA (STAGING) -->
+            <div class="modal-body" id="reception-step-staging" style="display: none;">
+                <!-- Header Toolbar -->
+                <div class="staging-header-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 16px;">
+                    <!-- Supplier & Invoice Details -->
+                    <div class="staging-info-card" style="background: var(--bg-input); padding: 12px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                        <div class="form-row" style="margin-bottom: 0;">
+                            <div class="form-group col-6" style="margin-bottom: 0;">
+                                <label for="staging-supplier-select" class="small">Proveedor / Distribuidor</label>
+                                <select id="staging-supplier-select" class="filter-select w-full" style="padding: 6px 10px; font-size: 13px;">
+                                    <option value="">Proveedor general / No especificado</option>
+                                </select>
+                            </div>
+                            <div class="form-group col-6" style="margin-bottom: 0;">
+                                <label for="staging-invoice-num" class="small">N° Remito / Factura</label>
+                                <input type="text" id="staging-invoice-num" placeholder="Ej: REM-00123" style="padding: 6px 10px; font-size: 13px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pricing & Margin Recalculator -->
+                    <div class="staging-info-card" style="background: var(--bg-input); padding: 12px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <label for="staging-global-margin" class="small" style="margin: 0; font-weight: 600;">Margen Minorista Sugerido (%)</label>
+                            <span class="small text-muted">L1 = Costo + %</span>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="number" id="staging-global-margin" value="40" min="0" max="500" step="5" style="width: 80px; padding: 6px 10px; font-size: 13px;">
+                            <button type="button" class="btn btn-secondary small" id="btn-apply-global-margin" title="Recalcular precios de venta para todos los productos">
+                                <i data-lucide="refresh-cw"></i> Recalcular Precios
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Staging Metrics Summary -->
+                <div class="staging-metrics-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px;">
+                    <div class="staging-metric-pill" style="padding: 10px 14px; border-radius: var(--radius-md); background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.25); text-align: center;">
+                        <span class="small text-muted" style="text-transform: uppercase; font-weight: 700; font-size: 11px; display: block;">Total Ítems</span>
+                        <span style="font-size: 22px; font-weight: 800; font-family: var(--font-title);" id="staging-metric-total">0</span>
+                    </div>
+                    <div class="staging-metric-pill" style="padding: 10px 14px; border-radius: var(--radius-md); background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); text-align: center;">
+                        <span class="small text-muted" style="text-transform: uppercase; font-weight: 700; font-size: 11px; display: block; color: var(--warning);">A Crear (Nuevos)</span>
+                        <span style="font-size: 22px; font-weight: 800; font-family: var(--font-title); color: var(--warning);" id="staging-metric-new">0</span>
+                    </div>
+                    <div class="staging-metric-pill" style="padding: 10px 14px; border-radius: var(--radius-md); background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); text-align: center;">
+                        <span class="small text-muted" style="text-transform: uppercase; font-weight: 700; font-size: 11px; display: block; color: var(--success);">A Sumar (Existentes)</span>
+                        <span style="font-size: 22px; font-weight: 800; font-family: var(--font-title); color: var(--success);" id="staging-metric-existing">0</span>
+                    </div>
+                    <div class="staging-metric-pill" style="padding: 10px 14px; border-radius: var(--radius-md); background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.25); text-align: center;">
+                        <span class="small text-muted" style="text-transform: uppercase; font-weight: 700; font-size: 11px; display: block; color: #3b82f6;">Total Compra</span>
+                        <span style="font-size: 22px; font-weight: 800; font-family: var(--font-title); color: #3b82f6;" id="staging-metric-cost">$0.00</span>
+                    </div>
+                </div>
+
+                <!-- Staging Interactive Table -->
+                <div class="data-table-card" style="margin-bottom: 12px; border-radius: var(--radius-md);">
+                    <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+                        <table class="data-table" id="staging-products-table" style="font-size: 13px;">
+                            <thead>
+                                <tr>
+                                    <th style="width: 100px;">Estado</th>
+                                    <th style="width: 130px;">Código / SKU</th>
+                                    <th>Descripción del Repuesto</th>
+                                    <th style="width: 150px;">Categoría</th>
+                                    <th class="text-center" style="width: 80px;">Cant.</th>
+                                    <th class="text-right" style="width: 110px;">Costo ($)</th>
+                                    <th class="text-right" style="width: 110px;">P. Minorista L1</th>
+                                    <th class="text-right" style="width: 110px;">P. Mayorista L2</th>
+                                    <th class="text-center" style="width: 45px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="staging-table-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Staging Bottom Toolbar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; flex-wrap: wrap; gap: 10px;">
+                    <button type="button" class="btn btn-secondary small" id="btn-staging-add-row">
+                        <i data-lucide="plus"></i> Añadir Repuesto Manual
+                    </button>
+                    
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; user-select: none;">
+                        <input type="checkbox" id="staging-register-cash-outflow" checked>
+                        <span>Registrar egreso automático en <strong>Caja Chica</strong> por el total de la compra</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- MODAL FOOTER -->
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <button type="button" class="btn btn-secondary btn-outline" id="btn-reception-back" style="display: none;">
+                        <i data-lucide="arrow-left"></i> Volver a Escanear
+                    </button>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" class="btn btn-secondary" data-close-modal="modal-reception-ai">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btn-reception-process-ai" style="display: inline-flex; background: linear-gradient(135deg, #4f46e5, #7c3aed); border-color: #6366f1;">
+                        <i data-lucide="sparkles"></i> Procesar con IA
+                    </button>
+                    <button type="button" class="btn btn-primary" id="btn-reception-authorize" style="display: none; background: var(--success); border-color: var(--success);">
+                        <i data-lucide="check-circle-2"></i> Autorizar e Impactar en Stock
+                    </button>
+                </div>
             </div>
         </div>
     </div>
