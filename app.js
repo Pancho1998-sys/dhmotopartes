@@ -631,6 +631,9 @@ async function setupAuthentication() {
 function getFriendlyAuthErrorMessage(error) {
     if (!error) return 'Error desconocido.';
     const message = error.message.toLowerCase();
+    if (message.includes('failed to fetch') || message.includes('networkerror') || message.includes('enotfound')) {
+        return 'No se pudo conectar con la base de datos en la nube (el proyecto de Supabase puede estar pausado o sin internet). Haz clic en el botón "Trabajar sin Conexión (Modo Local)" que ves debajo para ingresar.';
+    }
     if (message.includes('invalid login credentials') || message.includes('invalid credentials')) {
         return 'Correo o contraseña incorrectos.';
     }
