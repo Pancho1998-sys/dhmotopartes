@@ -90,6 +90,7 @@ El sistema restringe el acceso a las vistas y las consultas de base de datos seg
 * Estado de stock controlado mediante semáforos de colores (Suficiente, Bajo, Agotado).
 * Editor integrado de artículos (SKU, nombre, costo, precio, categoría, stock actual e inventario mínimo de alerta).
 * Sistema de importación/exportación directa a hojas de cálculo Excel (`.xlsx`).
+* **Ingreso de Mercadería y Escáner IA:** Digitalización automática de remitos y facturas en fotos o PDFs mediante Gemini Vision, menú interactivo de Carga Prevista (staging) para verificación de costos/márgenes y autorización de impacto en stock.
 
 ### 👥 CRM de Clientes
 * Registro de datos personales, contacto y acumulación automática de puntos de fidelidad por cada compra para incentivar ventas recurrentes.
