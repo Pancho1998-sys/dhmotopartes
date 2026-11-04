@@ -1510,6 +1510,7 @@ function setupEventListeners() {
             openReceptionAiModal();
         });
     }
+    initReceptionAiListeners();
 
     document.getElementById('inventory-add-product-btn').addEventListener('click', () => {
         document.getElementById('product-modal-title').textContent = "Registrar Nuevo Repuesto";
@@ -6365,6 +6366,471 @@ function openReceptionAiModal() {
     openModal('modal-reception-ai');
     if (window.lucide) lucide.createIcons();
 }
+
+// Realistic sample receipt from a motorcycle parts distributor for quick demo & testing
+const DEMO_RECEIPT_DATA = {
+    proveedor: "Distribuidora Motos del Plata S.A.",
+    numero_comprobante: "REM-00049281",
+    items: [
+        { codigo: "REP-BUJ-C7HSA", descripcion: "Bujía NGK C7HSA (Motos 110cc)", cantidad: 20, costo_unitario: 650.00 },
+        { codigo: "REP-CAD-428H", descripcion: "Cadena de Transmisión 428H-118L Reforzada WStandard", cantidad: 8, costo_unitario: 4800.00 },
+        { codigo: "REP-PAS-YBR", descripcion: "Juego de Pastillas de Freno Delantero Yamaha YBR 125", cantidad: 12, costo_unitario: 2400.00 },
+        { codigo: "REP-CAB-TITAN", descripcion: "Cable de Embrague Honda CG Titan 150", cantidad: 15, costo_unitario: 1100.00 },
+        { codigo: "LUB-MOT-20W50", descripcion: "Aceite Motul 3000 4T 20W50 Mineral 1L", cantidad: 24, costo_unitario: 3900.00 },
+        { codigo: "REP-JUN-WAVE", descripcion: "Juego de Juntas Completo Honda Wave 110 S", cantidad: 6, costo_unitario: 2150.00 },
+        { codigo: "REP-FIL-XR150", descripcion: "Filtro de Aire Honda XR 150 L", cantidad: 10, costo_unitario: 1750.00 },
+        { codigo: "REP-REL-12V", descripcion: "Relay de Arranque Universal 12V 4 Pines", cantidad: 10, costo_unitario: 1350.00 }
+    ]
+};
+
+function initReceptionAiListeners() {
+    const dropzone = document.getElementById('reception-dropzone');
+    const fileInput = document.getElementById('reception-file-input');
+    const cameraInput = document.getElementById('reception-camera-input');
+    const btnClear = document.getElementById('btn-reception-clear-file');
+    const btnDemo = document.getElementById('btn-load-demo-receipt');
+    const btnProcess = document.getElementById('btn-reception-process-ai');
+    const btnSaveKey = document.getElementById('btn-save-quick-api-key');
+    const btnBack = document.getElementById('btn-reception-back');
+    const btnAddRow = document.getElementById('btn-staging-add-row');
+    const btnApplyMargin = document.getElementById('btn-apply-global-margin');
+    const btnAuthorize = document.getElementById('btn-reception-authorize');
+
+    if (dropzone) {
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.add('dragover');
+        });
+        dropzone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.remove('dragover');
+        });
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.remove('dragover');
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                handleReceptionFileSelected(e.dataTransfer.files[0]);
+            }
+        });
+    }
+
+    if (fileInput) {
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                handleReceptionFileSelected(e.target.files[0]);
+            }
+        });
+    }
+
+    if (cameraInput) {
+        cameraInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                handleReceptionFileSelected(e.target.files[0]);
+            }
+        });
+    }
+
+    if (btnClear) {
+        btnClear.addEventListener('click', () => {
+            tempReceptionFile = null;
+            tempReceptionFileBase64 = null;
+            tempReceptionMimeType = null;
+            const drop = document.getElementById('reception-dropzone');
+            const card = document.getElementById('reception-file-preview-card');
+            const fi = document.getElementById('reception-file-input');
+            const ci = document.getElementById('reception-camera-input');
+            if (drop) drop.style.display = 'block';
+            if (card) card.style.display = 'none';
+            if (fi) fi.value = '';
+            if (ci) ci.value = '';
+        });
+    }
+
+    if (btnSaveKey) {
+        btnSaveKey.addEventListener('click', () => {
+            const val = (document.getElementById('reception-quick-api-key').value || '').trim();
+            if (!state.settings) state.settings = {};
+            state.settings.geminiApiKey = val;
+            const setGen = document.getElementById('set-gemini-api-key');
+            if (setGen) setGen.value = val;
+            saveDatabase();
+            const keyStatusText = document.getElementById('reception-ai-key-status-text');
+            if (keyStatusText) {
+                if (val) {
+                    keyStatusText.innerHTML = '<span style="color: var(--success); font-weight: 600;">✓ Clave Gemini guardada con éxito</span>';
+                } else {
+                    keyStatusText.innerHTML = '<span style="color: var(--warning); font-weight: 600;">⚠ Clave eliminada</span>';
+                }
+            }
+            playScanSound('success');
+        });
+    }
+
+    if (btnDemo) {
+        btnDemo.addEventListener('click', async () => {
+            const loading = document.getElementById('reception-loading-container');
+            const drop = document.getElementById('reception-dropzone');
+            const card = document.getElementById('reception-file-preview-card');
+            if (loading) loading.style.display = 'block';
+            if (drop) drop.style.display = 'none';
+            if (card) card.style.display = 'none';
+
+            await new Promise(r => setTimeout(r, 650));
+            if (loading) loading.style.display = 'none';
+            processExtractedReceiptData(DEMO_RECEIPT_DATA);
+            playScanSound('success');
+        });
+    }
+
+    if (btnProcess) {
+        btnProcess.addEventListener('click', async () => {
+            if (!tempReceptionFileBase64) {
+                alert("Por favor selecciona primero una imagen o documento PDF de tu remito o factura.");
+                return;
+            }
+
+            const apiKey = (state.settings && state.settings.geminiApiKey) || (document.getElementById('reception-quick-api-key').value || '').trim();
+            if (!apiKey) {
+                const wantsDemo = confirm("No tienes configurada una clave de Gemini API.\n\n¿Deseas probar con el 'Remito de Demostración' para ver el funcionamiento de la Carga Prevista?");
+                if (wantsDemo) {
+                    processExtractedReceiptData(DEMO_RECEIPT_DATA);
+                    playScanSound('success');
+                    return;
+                }
+                const promptKey = prompt("Ingresa tu API Key de Google Gemini (puedes obtenerla gratis en aistudio.google.com):");
+                if (promptKey && promptKey.trim()) {
+                    state.settings.geminiApiKey = promptKey.trim();
+                    const setGen = document.getElementById('set-gemini-api-key');
+                    if (setGen) setGen.value = promptKey.trim();
+                    const qk = document.getElementById('reception-quick-api-key');
+                    if (qk) qk.value = promptKey.trim();
+                    saveDatabase();
+                } else {
+                    return;
+                }
+            }
+
+            const activeKey = (state.settings && state.settings.geminiApiKey) || '';
+            const loading = document.getElementById('reception-loading-container');
+            const card = document.getElementById('reception-file-preview-card');
+            const drop = document.getElementById('reception-dropzone');
+            if (loading) loading.style.display = 'block';
+            if (card) card.style.display = 'none';
+            if (drop) drop.style.display = 'none';
+
+            try {
+                const extracted = await callGeminiReceiptExtractor(tempReceptionFileBase64, tempReceptionMimeType, activeKey);
+                if (loading) loading.style.display = 'none';
+                if (!extracted || !extracted.items || extracted.items.length === 0) {
+                    throw new Error("No se detectaron líneas de productos legibles en el comprobante. Verifica que la imagen sea nítida.");
+                }
+                processExtractedReceiptData(extracted);
+                playScanSound('success');
+            } catch (err) {
+                console.error("Gemini Extraction Error:", err);
+                if (loading) loading.style.display = 'none';
+                if (card) card.style.display = 'flex';
+                alert("Error al procesar el remito con IA: " + err.message);
+            }
+        });
+    }
+
+    if (btnBack) {
+        btnBack.addEventListener('click', () => {
+            const stepUpload = document.getElementById('reception-step-upload');
+            const stepStaging = document.getElementById('reception-step-staging');
+            const btnBackEl = document.getElementById('btn-reception-back');
+            const btnProcessEl = document.getElementById('btn-reception-process-ai');
+            const btnAuthorizeEl = document.getElementById('btn-reception-authorize');
+            const drop = document.getElementById('reception-dropzone');
+            const card = document.getElementById('reception-file-preview-card');
+
+            if (stepUpload) stepUpload.style.display = 'block';
+            if (stepStaging) stepStaging.style.display = 'none';
+            if (btnBackEl) btnBackEl.style.display = 'none';
+            if (btnProcessEl) btnProcessEl.style.display = 'inline-flex';
+            if (btnAuthorizeEl) btnAuthorizeEl.style.display = 'none';
+
+            if (tempReceptionFileBase64) {
+                if (card) card.style.display = 'flex';
+                if (drop) drop.style.display = 'none';
+            } else {
+                if (drop) drop.style.display = 'block';
+                if (card) card.style.display = 'none';
+            }
+            if (window.lucide) lucide.createIcons();
+        });
+    }
+
+    if (btnAddRow) {
+        btnAddRow.addEventListener('click', () => {
+            if (typeof addManualStagingRow === 'function') addManualStagingRow();
+        });
+    }
+
+    if (btnApplyMargin) {
+        btnApplyMargin.addEventListener('click', () => {
+            if (typeof applyGlobalMarginToStaging === 'function') applyGlobalMarginToStaging();
+        });
+    }
+
+    if (btnAuthorize) {
+        btnAuthorize.addEventListener('click', () => {
+            if (typeof authorizeStockReception === 'function') authorizeStockReception();
+        });
+    }
+}
+
+function handleReceptionFileSelected(file) {
+    if (!file) return;
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'application/pdf'];
+    if (!allowed.some(t => file.type.toLowerCase().includes(t.replace('image/', '')) || file.type.toLowerCase() === t)) {
+        alert("Formato de archivo no compatible. Por favor sube una imagen (JPG, PNG, WEBP) o un documento PDF.");
+        return;
+    }
+
+    tempReceptionFile = file;
+    tempReceptionMimeType = file.type || 'image/jpeg';
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        tempReceptionFileBase64 = e.target.result;
+
+        const drop = document.getElementById('reception-dropzone');
+        const card = document.getElementById('reception-file-preview-card');
+        const fname = document.getElementById('reception-preview-filename');
+        const fsize = document.getElementById('reception-preview-filesize');
+        const pimg = document.getElementById('reception-preview-img');
+        const picon = document.getElementById('reception-preview-default-icon');
+
+        if (drop) drop.style.display = 'none';
+        if (card) card.style.display = 'flex';
+        if (fname) fname.textContent = file.name;
+        if (fsize) fsize.textContent = `${(file.size / 1024).toFixed(1)} KB`;
+
+        if (file.type.startsWith('image/')) {
+            if (pimg) {
+                pimg.src = tempReceptionFileBase64;
+                pimg.style.display = 'block';
+            }
+            if (picon) picon.style.display = 'none';
+        } else {
+            if (pimg) pimg.style.display = 'none';
+            if (picon) picon.style.display = 'block';
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+async function callGeminiReceiptExtractor(dataUrl, mimeType, apiKey) {
+    const rawBase64 = dataUrl.split(',')[1] || dataUrl;
+    const cleanMime = mimeType || 'image/jpeg';
+
+    const promptText = `Eres un asistente experto en digitalización de remitos, facturas y comprobantes de compra de repuestos para motocicletas, accesorios y herramientas de talleres.
+Analiza la imagen o PDF adjunto y extrae todos los productos o repuestos incluidos en la lista o tabla del comprobante.
+
+Devuelve estrictamente un JSON con este formato exacto:
+{
+  "proveedor": "Nombre de la distribuidora o proveedor si figura en el encabezado (ej: WStandard, Distribuidora Motos, etc., o null)",
+  "numero_comprobante": "Número de remito o factura (ej: 0001-00049281, o null)",
+  "items": [
+    {
+      "codigo": "Código o SKU del artículo según figura en el remito",
+      "descripcion": "Nombre o descripción clara del repuesto",
+      "cantidad": 10,
+      "costo_unitario": 1250.00
+    }
+  ]
+}
+
+Reglas obligatorias:
+1. 'cantidad' debe ser un número positivo (no string).
+2. 'costo_unitario' debe ser el precio unitario de costo o compra según figure en el comprobante (número flotante, no string). Si no tiene costo o sólo es remito de traslado sin precio, usa 0.
+3. Si un artículo no tiene código explícito, genera un código alfanumérico corto y limpio representativo basado en el tipo de repuesto (ej: REP-BUJIA-110).
+4. No incluyas subtotales ni impuestos como filas de productos.
+5. Devuelve solo el JSON válido sin texto previo ni posterior.`;
+
+    const body = {
+        contents: [
+            {
+                parts: [
+                    {
+                        inlineData: {
+                            mimeType: cleanMime,
+                            data: rawBase64
+                        }
+                    },
+                    {
+                        text: promptText
+                    }
+                ]
+            }
+        ],
+        generationConfig: {
+            temperature: 0.1,
+            responseMimeType: "application/json"
+        }
+    };
+
+    const models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash'];
+    let lastError = null;
+
+    for (const model of models) {
+        try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                const msg = (errData.error && errData.error.message) || `HTTP ${response.status}`;
+                lastError = new Error(msg);
+                continue;
+            }
+
+            const result = await response.json();
+            const textResponse = result.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!textResponse) throw new Error("Respuesta vacía del modelo Gemini");
+
+            const parsed = JSON.parse(textResponse.trim());
+            return parsed;
+        } catch (e) {
+            lastError = e;
+        }
+    }
+
+    throw lastError || new Error("No se pudo conectar con el servicio Gemini Vision.");
+}
+
+function guessCategoryFromText(text) {
+    if (!text) return 'Repuestos de Motor';
+    const t = text.toLowerCase();
+    if (t.includes('aceite') || t.includes('lubricante') || t.includes('grasa') || t.includes('motul') || t.includes('castrol') || t.includes('valvoline')) {
+        return 'Aceites';
+    }
+    if (t.includes('freno') || t.includes('pastilla') || t.includes('disco') || t.includes('zapata') || t.includes('caliper') || t.includes('bomba freno')) {
+        return 'Frenos';
+    }
+    if (t.includes('cadena') || t.includes('corona') || t.includes('piñon') || t.includes('pinon') || t.includes('transmision') || t.includes('correa')) {
+        return 'Transmisión';
+    }
+    if (t.includes('bujia') || t.includes('relay') || t.includes('bateria') || t.includes('bobina') || t.includes('cdi') || t.includes('estator') || t.includes('regulador') || t.includes('lampara') || t.includes('faro') || t.includes('giro')) {
+        return 'Sistema Eléctrico';
+    }
+    if (t.includes('herramienta') || t.includes('llave') || t.includes('extractor') || t.includes('tubo') || t.includes('pinza')) {
+        return 'Herramientas';
+    }
+    if (t.includes('casco') || t.includes('guante') || t.includes('candado') || t.includes('funda') || t.includes('parabrisa') || t.includes('espejo')) {
+        return 'Accesorios';
+    }
+    return 'Repuestos de Motor';
+}
+
+function processExtractedReceiptData(receiptData) {
+    if (!receiptData || !receiptData.items || receiptData.items.length === 0) {
+        alert("El comprobante procesado no contiene artículos válidos.");
+        return;
+    }
+
+    const supplierSelect = document.getElementById('staging-supplier-select');
+    if (supplierSelect) {
+        let optionsHtml = '<option value="">Proveedor general / No especificado</option>';
+        (state.suppliers || []).forEach(s => {
+            optionsHtml += `<option value="${s.id}">${s.name} ${s.phone ? `(${s.phone})` : ''}</option>`;
+        });
+        supplierSelect.innerHTML = optionsHtml;
+
+        if (receiptData.proveedor) {
+            const normP = receiptData.proveedor.toLowerCase();
+            const matchedSupp = (state.suppliers || []).find(s => 
+                s.name.toLowerCase().includes(normP) || normP.includes(s.name.toLowerCase())
+            );
+            if (matchedSupp) {
+                supplierSelect.value = matchedSupp.id;
+            }
+        }
+    }
+
+    const invInput = document.getElementById('staging-invoice-num');
+    if (invInput) {
+        invInput.value = receiptData.numero_comprobante || '';
+    }
+
+    const defaultMargin = parseFloat(document.getElementById('staging-global-margin')?.value) || 40;
+
+    tempStagingItems = receiptData.items.map((item, index) => {
+        const itemCode = (item.codigo || `REP-${Date.now()}-${index + 1}`).trim().toUpperCase();
+        const itemName = (item.descripcion || 'Repuesto sin descripción').trim();
+        const itemQty = Math.max(1, parseFloat(item.cantidad) || 1);
+        const itemCost = Math.max(0, parseFloat(item.costo_unitario) || 0);
+
+        let existingProd = state.products.find(p => p.sku && p.sku.toUpperCase() === itemCode);
+        
+        if (!existingProd && itemName.length >= 6) {
+            const normName = itemName.toLowerCase();
+            existingProd = state.products.find(p => {
+                const pNorm = (p.name || '').toLowerCase();
+                return pNorm.includes(normName) || normName.includes(pNorm);
+            });
+        }
+
+        const isNew = !existingProd;
+        const category = existingProd ? existingProd.category : guessCategoryFromText(itemName);
+
+        let price = 0;
+        let priceWholesale = 0;
+
+        if (existingProd) {
+            if (itemCost > 0 && Math.abs(itemCost - (existingProd.cost || 0)) > 1) {
+                price = Math.round(itemCost * (1 + (defaultMargin / 100)));
+                priceWholesale = Math.round(itemCost * (1 + ((defaultMargin * 0.5) / 100)));
+            } else {
+                price = existingProd.price || Math.round(itemCost * (1 + (defaultMargin / 100)));
+                priceWholesale = existingProd.priceWholesale || Math.round(price * 0.85);
+            }
+        } else {
+            price = itemCost > 0 ? Math.round(itemCost * (1 + (defaultMargin / 100))) : 0;
+            priceWholesale = itemCost > 0 ? Math.round(itemCost * (1 + ((defaultMargin * 0.5) / 100))) : 0;
+        }
+
+        return {
+            id: isNew ? null : existingProd.id,
+            isNew,
+            sku: existingProd ? existingProd.sku : itemCode,
+            name: existingProd ? existingProd.name : itemName,
+            category,
+            quantity: itemQty,
+            cost: itemCost,
+            price,
+            priceWholesale,
+            existingStock: existingProd ? (existingProd.stock || 0) : 0,
+            targetLocation: 'local'
+        };
+    });
+
+    const stepUpload = document.getElementById('reception-step-upload');
+    const stepStaging = document.getElementById('reception-step-staging');
+    const btnBack = document.getElementById('btn-reception-back');
+    const btnProcess = document.getElementById('btn-reception-process-ai');
+    const btnAuthorize = document.getElementById('btn-reception-authorize');
+
+    if (stepUpload) stepUpload.style.display = 'none';
+    if (stepStaging) stepStaging.style.display = 'block';
+    if (btnBack) btnBack.style.display = 'inline-flex';
+    if (btnProcess) btnProcess.style.display = 'none';
+    if (btnAuthorize) btnAuthorize.style.display = 'inline-flex';
+
+    renderStagingTable();
+    if (window.lucide) lucide.createIcons();
+}
+
+function renderStagingTable() {}
 
 /* ==========================================================================
    9. SUPERADMIN CASHIER MANAGEMENT PANEL
