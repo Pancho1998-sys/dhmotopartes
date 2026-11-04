@@ -6830,7 +6830,302 @@ function processExtractedReceiptData(receiptData) {
     if (window.lucide) lucide.createIcons();
 }
 
-function renderStagingTable() {}
+function renderStagingTable() {
+    const tbody = document.getElementById('staging-table-body');
+    if (!tbody) return;
+
+    if (tempStagingItems.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="9" class="text-center text-muted" style="padding: 30px;">
+                    No hay productos en la lista previa. Pulsa "+ Añadir Repuesto Manual" o vuelve al paso de escaneo.
+                </td>
+            </tr>
+        `;
+        updateStagingMetrics();
+        return;
+    }
+
+    const categories = (state.settings && state.settings.categories) || ['Sistema Eléctrico', 'Repuestos de Motor', 'Frenos', 'Transmisión', 'Herramientas', 'Accesorios', 'Aceites'];
+
+    let rowsHtml = '';
+    tempStagingItems.forEach((item, index) => {
+        let catOptions = '';
+        categories.forEach(cat => {
+            catOptions += `<option value="${cat}" ${cat === item.category ? 'selected' : ''}>${cat}</option>`;
+        });
+
+        const statusBadge = item.isNew
+            ? `<span class="staging-badge-new" title="Producto nuevo. Se creará en el catálogo al autorizar."><i data-lucide="plus-circle" style="width: 12px; height: 12px;"></i> Nuevo</span>`
+            : `<span class="staging-badge-existing" title="Producto ya existente. Se sumará al stock actual (${item.existingStock})."><i data-lucide="check-circle-2" style="width: 12px; height: 12px;"></i> Stock: ${item.existingStock}</span>`;
+
+        rowsHtml += `
+            <tr data-index="${index}">
+                <td>${statusBadge}</td>
+                <td>
+                    <input type="text" class="staging-input" value="${item.sku || ''}" onchange="updateStagingItem(${index}, 'sku', this.value)" style="text-transform: uppercase; font-family: monospace; font-weight: 700;">
+                </td>
+                <td>
+                    <input type="text" class="staging-input" value="${item.name || ''}" onchange="updateStagingItem(${index}, 'name', this.value)" placeholder="Descripción...">
+                </td>
+                <td>
+                    <select class="staging-input" onchange="updateStagingItem(${index}, 'category', this.value)">
+                        ${catOptions}
+                    </select>
+                </td>
+                <td class="text-center">
+                    <input type="number" class="staging-input staging-input-number" min="0.1" step="any" value="${item.quantity}" onchange="updateStagingItem(${index}, 'quantity', this.value)" style="width: 70px;">
+                </td>
+                <td class="text-right">
+                    <input type="number" class="staging-input staging-input-number" min="0" step="any" value="${item.cost}" onchange="updateStagingItem(${index}, 'cost', this.value)" style="width: 95px;">
+                </td>
+                <td class="text-right">
+                    <input type="number" class="staging-input staging-input-number" min="0" step="any" value="${item.price}" onchange="updateStagingItem(${index}, 'price', this.value)" style="width: 95px; color: var(--primary); font-weight: 700;">
+                </td>
+                <td class="text-right">
+                    <input type="number" class="staging-input staging-input-number" min="0" step="any" value="${item.priceWholesale}" onchange="updateStagingItem(${index}, 'priceWholesale', this.value)" style="width: 95px;">
+                </td>
+                <td class="text-center">
+                    <button type="button" class="btn-remove-staging" onclick="removeStagingRow(${index})" title="Eliminar fila">
+                        <i data-lucide="trash-2" style="width: 15px; height: 15px;"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = rowsHtml;
+    updateStagingMetrics();
+    if (window.lucide) lucide.createIcons();
+}
+
+function updateStagingMetrics() {
+    const totalCount = tempStagingItems.length;
+    const newCount = tempStagingItems.filter(i => i.isNew).length;
+    const existingCount = tempStagingItems.filter(i => !i.isNew).length;
+    const totalCost = tempStagingItems.reduce((acc, i) => acc + (i.quantity * i.cost), 0);
+    const currency = (state.settings && state.settings.currency) || '$';
+
+    const elTotal = document.getElementById('staging-metric-total');
+    const elNew = document.getElementById('staging-metric-new');
+    const elExisting = document.getElementById('staging-metric-existing');
+    const elCost = document.getElementById('staging-metric-cost');
+
+    if (elTotal) elTotal.textContent = totalCount;
+    if (elNew) elNew.textContent = newCount;
+    if (elExisting) elExisting.textContent = existingCount;
+    if (elCost) elCost.textContent = `${currency}${totalCost.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+window.updateStagingItem = function(index, field, value) {
+    if (!tempStagingItems[index]) return;
+    const item = tempStagingItems[index];
+
+    if (field === 'quantity') {
+        item.quantity = Math.max(0.1, parseFloat(value) || 1);
+        updateStagingMetrics();
+    } else if (field === 'cost') {
+        item.cost = Math.max(0, parseFloat(value) || 0);
+        const defaultMargin = parseFloat(document.getElementById('staging-global-margin')?.value) || 40;
+        item.price = Math.round(item.cost * (1 + (defaultMargin / 100)));
+        item.priceWholesale = Math.round(item.cost * (1 + ((defaultMargin * 0.5) / 100)));
+        renderStagingTable();
+    } else if (field === 'price') {
+        item.price = Math.max(0, parseFloat(value) || 0);
+    } else if (field === 'priceWholesale') {
+        item.priceWholesale = Math.max(0, parseFloat(value) || 0);
+    } else if (field === 'sku') {
+        item.sku = (value || '').trim().toUpperCase();
+        const matched = state.products.find(p => p.sku && p.sku.toUpperCase() === item.sku);
+        if (matched) {
+            item.isNew = false;
+            item.id = matched.id;
+            item.existingStock = matched.stock || 0;
+            item.category = matched.category;
+        } else {
+            item.isNew = true;
+            item.id = null;
+            item.existingStock = 0;
+        }
+        renderStagingTable();
+    } else if (field === 'name') {
+        item.name = (value || '').trim();
+    } else if (field === 'category') {
+        item.category = value;
+    }
+};
+
+window.removeStagingRow = function(index) {
+    tempStagingItems.splice(index, 1);
+    renderStagingTable();
+};
+
+window.addManualStagingRow = function() {
+    const defaultMargin = parseFloat(document.getElementById('staging-global-margin')?.value) || 40;
+    const categories = (state.settings && state.settings.categories) || ['Repuestos de Motor'];
+    tempStagingItems.push({
+        id: null,
+        isNew: true,
+        sku: `REP-${Date.now().toString().slice(-6)}`,
+        name: 'Nuevo Repuesto',
+        category: categories[0] || 'Repuestos de Motor',
+        quantity: 1,
+        cost: 0,
+        price: 0,
+        priceWholesale: 0,
+        existingStock: 0,
+        targetLocation: 'local'
+    });
+    renderStagingTable();
+};
+
+window.applyGlobalMarginToStaging = function() {
+    const margin = parseFloat(document.getElementById('staging-global-margin')?.value) || 40;
+    tempStagingItems.forEach(item => {
+        if (item.cost > 0) {
+            item.price = Math.round(item.cost * (1 + (margin / 100)));
+            item.priceWholesale = Math.round(item.cost * (1 + ((margin * 0.5) / 100)));
+        }
+    });
+    renderStagingTable();
+    playScanSound('success');
+};
+
+window.authorizeStockReception = function() {
+    if (!tempStagingItems || tempStagingItems.length === 0) {
+        alert("No hay ningún producto en la lista de Carga Prevista para autorizar.");
+        return;
+    }
+
+    // Validate that items have SKU and description
+    for (let i = 0; i < tempStagingItems.length; i++) {
+        const it = tempStagingItems[i];
+        if (!it.sku || !it.sku.trim()) {
+            alert(`El artículo #${i + 1} no tiene un Código/SKU válido. Por favor complétalo.`);
+            return;
+        }
+        if (!it.name || !it.name.trim()) {
+            alert(`El artículo con SKU ${it.sku} no tiene descripción. Por favor complétala.`);
+            return;
+        }
+    }
+
+    let created = 0;
+    let updated = 0;
+    let totalUnits = 0;
+    let totalCost = 0;
+
+    tempStagingItems.forEach(item => {
+        const qty = Math.max(0.1, parseFloat(item.quantity) || 1);
+        const cost = Math.max(0, parseFloat(item.cost) || 0);
+        const price = Math.max(0, parseFloat(item.price) || 0);
+        const priceWholesale = Math.max(0, parseFloat(item.priceWholesale) || 0);
+        const skuUpper = item.sku.trim().toUpperCase();
+
+        let prod = null;
+        if (!item.isNew && item.id) {
+            prod = state.products.find(p => p.id === item.id);
+        }
+        if (!prod) {
+            prod = state.products.find(p => p.sku && p.sku.toUpperCase() === skuUpper);
+        }
+
+        if (prod) {
+            // Update existing product
+            prod.stock = (parseFloat(prod.stock) || 0) + qty;
+            prod.cost = cost;
+            prod.price = price;
+            prod.priceWholesale = priceWholesale;
+            prod.priceDiscount = priceWholesale;
+            if (item.category) prod.category = item.category;
+            updated++;
+        } else {
+            // Create new product
+            state.products.push({
+                id: `p_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+                sku: skuUpper,
+                name: item.name.trim(),
+                category: item.category || 'Repuestos de Motor',
+                cost: cost,
+                price: price,
+                priceWholesale: priceWholesale,
+                priceDiscount: priceWholesale,
+                stock: qty,
+                stockMin: 5,
+                stockWholesale: 0,
+                stockMinWholesale: 5,
+                isCombo: false,
+                components: [],
+                image: '',
+                isFractional: false
+            });
+            created++;
+        }
+
+        totalUnits += qty;
+        totalCost += (qty * cost);
+    });
+
+    const supplierId = document.getElementById('staging-supplier-select')?.value || null;
+    const supplierObj = (state.suppliers || []).find(s => s.id === supplierId);
+    const supplierName = supplierObj ? supplierObj.name : 'Distribuidor General';
+    const invoiceNum = (document.getElementById('staging-invoice-num')?.value || '').trim() || 'S/N';
+
+    // Log the reception in state.receptions
+    if (!state.receptions) state.receptions = [];
+    state.receptions.push({
+        id: `rec_${Date.now()}`,
+        date: new Date().toISOString(),
+        invoiceNum,
+        supplierId,
+        supplierName,
+        itemsCount: tempStagingItems.length,
+        totalUnits,
+        totalCost,
+        items: tempStagingItems.map(i => ({
+            sku: i.sku,
+            name: i.name,
+            quantity: i.quantity,
+            cost: i.cost,
+            price: i.price,
+            isNew: i.isNew
+        }))
+    });
+
+    // Register cash outflow if checkbox is active
+    const registerCash = document.getElementById('staging-register-cash-outflow')?.checked;
+    if (registerCash && totalCost > 0) {
+        if (!state.cashMovements) state.cashMovements = [];
+        state.cashMovements.push({
+            id: `cm_${Date.now()}`,
+            date: new Date().toISOString(),
+            type: 'outflow',
+            amount: totalCost,
+            concept: `Compra mercadería - Remito ${invoiceNum} (${supplierName})`
+        });
+    }
+
+    saveDatabase();
+    closeModal('modal-reception-ai');
+
+    // Reset temporary variables
+    tempStagingItems = [];
+    tempReceptionFileBase64 = null;
+    tempReceptionFile = null;
+
+    // Refresh UI views
+    inventoryPage = 1;
+    renderInventory();
+    if (typeof renderCajaDashboard === 'function') renderCajaDashboard();
+    playScanSound('success');
+
+    const currency = (state.settings && state.settings.currency) || '$';
+    alert(`¡Carga de Stock Autorizada e Impactada con Éxito!\n\n` +
+          `• ${created} repuestos nuevos creados en catálogo.\n` +
+          `• ${updated} repuestos existentes con stock actualizado.\n` +
+          `• Total de unidades ingresadas: ${totalUnits}\n` +
+          `• Costo total de compra: ${currency}${totalCost.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+};
 
 /* ==========================================================================
    9. SUPERADMIN CASHIER MANAGEMENT PANEL
