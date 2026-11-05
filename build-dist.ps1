@@ -41,30 +41,96 @@ foreach ($file in $Files) {
     }
 }
 
+# Base de datos vacia para clientes nuevos
 $EmptyDb = Join-Path $TempDir "dhmotopartes_db.json"
 Set-Content -Path $EmptyDb -Value "{}" -Encoding UTF8
 Write-Host "  OK  dhmotopartes_db.json (base de datos vacia para cliente nuevo)" -ForegroundColor Green
 
+# -------------------------------------------------------
+# Generar actualizar.bat — para clientes que ya tienen
+# el sistema instalado y solo quieren actualizar archivos
+# -------------------------------------------------------
+$ActualizarBat = @'
+@echo off
+title DHMotopartes - Actualizador
+echo.
+echo ======================================================
+echo   DHMotopartes - Actualizador de version
+echo ======================================================
+echo.
+echo Este script actualiza los archivos del sistema
+echo SIN borrar tu base de datos (ventas, productos, etc).
+echo.
+set /p DEST=Escribe la ruta donde esta instalado DHMotopartes (ej: C:\DHMotopartes): 
+echo.
+
+if not exist "%DEST%" (
+    echo ERROR: La carpeta "%DEST%" no existe.
+    pause
+    exit /b 1
+)
+
+if not exist "%DEST%\DHMotopartes-Server.exe" (
+    echo ERROR: No se encontro DHMotopartes-Server.exe en "%DEST%".
+    echo Verifica que sea la carpeta correcta de instalacion.
+    pause
+    exit /b 1
+)
+
+echo Actualizando archivos...
+set SRC=%~dp0
+
+for %%f in (DHMotopartes-Server.exe index.html app.js components.js fiscal.js style.css supabase-config.js xlsx.full.min.js) do (
+    if exist "%SRC%%%f" (
+        copy /y "%SRC%%%f" "%DEST%\%%f" >nul
+        echo   OK  %%f
+    )
+)
+
+echo.
+echo ======================================================
+echo   Actualizacion completada exitosamente!
+echo   Tu base de datos NO fue modificada.
+echo   Ya podes abrir DHMotopartes-Server.exe normalmente.
+echo ======================================================
+echo.
+pause
+'@
+
+Set-Content -Path (Join-Path $TempDir "actualizar.bat") -Value $ActualizarBat -Encoding ASCII
+Write-Host "  OK  actualizar.bat (actualizador para clientes existentes)" -ForegroundColor Green
+
+# LEEME.txt
 $ReadmeLines = @(
-    "DHMotopartes - Instrucciones de instalacion",
+    "DHMotopartes - Instrucciones",
+    "============================",
     "",
-    "1. Copia TODA esta carpeta a la PC donde quieras usar el sistema",
+    "--- INSTALACION NUEVA ---",
+    "1. Copia TODA esta carpeta a la PC (Escritorio, Documentos, etc.)",
     "2. Haz doble clic en DHMotopartes-Server.exe",
-    "3. Se abre el navegador automaticamente con el sistema listo",
-    "4. Para trabajar sin internet, elige 'Trabajar sin Conexion (Modo Local)'",
+    "3. Se abre el navegador automaticamente",
+    "4. Elige 'Trabajar sin Conexion (Modo Local)'",
     "",
-    "Acceso desde celular o tablet:",
-    "Una vez iniciado el servidor, podes acceder desde cualquier dispositivo",
-    "en la misma red Wi-Fi usando la IP que aparece en la consola del servidor.",
+    "--- ACTUALIZACION (ya tenes el sistema instalado) ---",
+    "1. Extrae este ZIP en cualquier carpeta temporal",
+    "2. Ejecuta actualizar.bat",
+    "3. Cuando te pida la ruta, escribe donde esta instalado DHMotopartes",
+    "   Ejemplo: C:\DHMotopartes",
+    "4. El script actualiza los archivos SIN tocar tu base de datos",
+    "",
+    "--- ACCESO DESDE CELULAR / TABLET ---",
+    "Con el servidor corriendo, entra desde cualquier dispositivo",
+    "en la misma red Wi-Fi usando la IP que aparece en la consola.",
     "Ejemplo: http://192.168.1.X:8000/",
     "",
     "Requisitos: Windows 10/11 de 64 bits. Sin instalaciones adicionales.",
     "",
-    "Version del paquete: $Version"
+    "Version: $Version"
 )
 Set-Content -Path (Join-Path $TempDir "LEEME.txt") -Value $ReadmeLines -Encoding UTF8
 Write-Host "  OK  LEEME.txt" -ForegroundColor Green
 
+# Eliminar zip anterior y comprimir
 if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
 
 Write-Host ""
@@ -79,4 +145,7 @@ Write-Host "======================================================"
 Write-Host ("  LISTO: " + $ZipName + " (" + $sizeMB + " MB)") -ForegroundColor Green
 Write-Host ("  Ubicacion: " + $ZipPath) -ForegroundColor Green
 Write-Host "======================================================"
+Write-Host ""
+Write-Host "  - Clientes NUEVOS:      extraen el ZIP y ejecutan DHMotopartes-Server.exe"
+Write-Host "  - Clientes existentes:  extraen el ZIP y ejecutan actualizar.bat"
 Write-Host ""
