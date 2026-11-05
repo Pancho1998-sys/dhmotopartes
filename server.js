@@ -8,7 +8,10 @@ const os = require('os');
 const { exec } = require('child_process');
 
 const PORT = 8000;
-const STATIC_DIR = __dirname;
+// When compiled with @yao-pkg/pkg, __dirname points to the virtual snapshot FS.
+// Use process.execPath directory to resolve real filesystem paths.
+const IS_PKG = typeof process.pkg !== 'undefined';
+const STATIC_DIR = IS_PKG ? path.dirname(process.execPath) : __dirname;
 const DB_PATH = path.join(STATIC_DIR, 'dhmotopartes_db.json');
 
 const MIME_TYPES = {
@@ -58,7 +61,7 @@ const server = http.createServer((req, res) => {
     // 2. Info API
     if (req.method === 'GET' && reqPath === '/api/info') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({ frozen: false }));
+        res.end(JSON.stringify({ frozen: IS_PKG, mode: IS_PKG ? 'executable' : 'script' }));
         return;
     }
 

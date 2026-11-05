@@ -1,0 +1,25 @@
+{
+  "name": "dhmotopartes-server",
+  "version": "1.0.0",
+  "description": "DHMotopartes - Servidor local para distribución standalone",
+  "main": "server.js",
+  "bin": "server.js",
+  "pkg": {
+    "targets": ["node18-win-x64"],
+    "outputPath": ".",
+    "assets": [
+      "index.html",
+      "app.js",
+      "components.js",
+      "fiscal.js",
+      "style.css",
+      "supabase-config.js",
+      "xlsx.full.min.js"
+    ]
+  },
+  "scripts": {
+    "start": "node server.js",
+    "build": "npx @yao-pkg/pkg server.js --targets node18-win-x64 --output DHMotopartes-Server.exe"
+  }
+}
+
