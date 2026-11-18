@@ -15,6 +15,12 @@ Thumbs.db
 .github\instructions\codacy.instructions.md
 
 
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+
 # PyInstaller build directories
 build/
 dist/

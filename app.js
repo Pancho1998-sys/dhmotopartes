@@ -3621,8 +3621,15 @@ function saveProduct(e) {
             components: isCombo ? [...tempComboComponents] : []
         });
     } else {
+        const skuExists = state.products.find(p => p.sku === sku && p.id !== id);
+        if (skuExists) {
+            alert(`Ya existe otro repuesto con el SKU: ${sku}`);
+            return;
+        }
+
         const product = state.products.find(p => p.id === id);
         if (product) {
+            const oldSku = product.sku;
             product.sku = sku;
             product.name = name;
             product.category = category;
@@ -3643,6 +3650,20 @@ function saveProduct(e) {
             product.stockMin = stockMin;
             product.stockMinWholesale = stockMinWholesale;
             product.image = image;
+
+            // Sincronizar SKU en combos si este producto forma parte de algún kit/combo
+            if (oldSku !== sku) {
+                state.products.forEach(otherProd => {
+                    if (otherProd.isCombo && Array.isArray(otherProd.components)) {
+                        otherProd.components.forEach(comp => {
+                            if (comp.id === id) {
+                                comp.sku = sku;
+                                comp.name = name;
+                            }
+                        });
+                    }
+                });
+            }
         }
     }
 
@@ -3659,7 +3680,7 @@ window.editProduct = function (id) {
     document.getElementById('product-modal-title').textContent = "Editar Repuesto";
     document.getElementById('product-id-field').value = p.id;
     document.getElementById('prod-sku').value = p.sku;
-    document.getElementById('prod-sku').readOnly = true;
+    document.getElementById('prod-sku').readOnly = false;
     document.getElementById('prod-name').value = p.name;
     document.getElementById('prod-category').value = p.category;
     document.getElementById('prod-cost').value = p.cost;
