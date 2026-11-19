@@ -1,5 +1,6 @@
 # Binaries and executables
 *.exe
+*.zip
 
 # Python caches and compiled files
 __pycache__/

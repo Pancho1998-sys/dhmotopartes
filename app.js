@@ -6516,7 +6516,7 @@ function initReceptionAiListeners() {
                 return;
             }
 
-            const apiKey = (state.settings && state.settings.geminiApiKey) || (document.getElementById('reception-quick-api-key').value || '').trim();
+            let apiKey = (state.settings && state.settings.geminiApiKey) || (document.getElementById('reception-quick-api-key') ? document.getElementById('reception-quick-api-key').value.trim() : '');
             if (!apiKey) {
                 const wantsDemo = confirm("No tienes configurada una clave de Gemini API.\n\n¿Deseas probar con el 'Remito de Demostración' para ver el funcionamiento de la Carga Prevista?");
                 if (wantsDemo) {
@@ -6526,18 +6526,21 @@ function initReceptionAiListeners() {
                 }
                 const promptKey = prompt("Ingresa tu API Key de Google Gemini (puedes obtenerla gratis en aistudio.google.com):");
                 if (promptKey && promptKey.trim()) {
-                    state.settings.geminiApiKey = promptKey.trim();
-                    const setGen = document.getElementById('set-gemini-api-key');
-                    if (setGen) setGen.value = promptKey.trim();
-                    const qk = document.getElementById('reception-quick-api-key');
-                    if (qk) qk.value = promptKey.trim();
-                    saveDatabase();
+                    apiKey = promptKey.trim();
                 } else {
                     return;
                 }
             }
 
-            const activeKey = (state.settings && state.settings.geminiApiKey) || '';
+            // Guardar y persistir la clave activa
+            if (!state.settings) state.settings = {};
+            state.settings.geminiApiKey = apiKey;
+            const setGen = document.getElementById('set-gemini-api-key');
+            if (setGen) setGen.value = apiKey;
+            const qk = document.getElementById('reception-quick-api-key');
+            if (qk) qk.value = apiKey;
+            saveDatabase();
+
             const loading = document.getElementById('reception-loading-container');
             const card = document.getElementById('reception-file-preview-card');
             const drop = document.getElementById('reception-dropzone');
@@ -6546,7 +6549,7 @@ function initReceptionAiListeners() {
             if (drop) drop.style.display = 'none';
 
             try {
-                const extracted = await callGeminiReceiptExtractor(tempReceptionFileBase64, tempReceptionMimeType, activeKey);
+                const extracted = await callGeminiReceiptExtractor(tempReceptionFileBase64, tempReceptionMimeType, apiKey);
                 if (loading) loading.style.display = 'none';
                 if (!extracted || !extracted.items || extracted.items.length === 0) {
                     throw new Error("No se detectaron líneas de productos legibles en el comprobante. Verifica que la imagen sea nítida.");
@@ -6699,7 +6702,13 @@ Reglas obligatorias:
         }
     };
 
-    const models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash'];
+    const models = [
+        'gemini-3.5-flash-lite',
+        'gemini-3.1-flash-lite',
+        'gemini-3.5-flash',
+        'gemini-flash-lite-latest',
+        'gemini-3.8-flash'
+    ];
     let lastError = null;
 
     for (const model of models) {
@@ -6714,13 +6723,13 @@ Reglas obligatorias:
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({}));
                 const msg = (errData.error && errData.error.message) || `HTTP ${response.status}`;
-                lastError = new Error(msg);
+                lastError = new Error(`[${model}] ${msg}`);
                 continue;
             }
 
             const result = await response.json();
             const textResponse = result.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (!textResponse) throw new Error("Respuesta vacía del modelo Gemini");
+            if (!textResponse) throw new Error(`Respuesta vacía del modelo Gemini (${model})`);
 
             const parsed = JSON.parse(textResponse.trim());
             return parsed;
