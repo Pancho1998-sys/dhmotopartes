@@ -8,11 +8,11 @@ const os = require('os');
 const { exec } = require('child_process');
 
 const PORT = 8000;
-// When compiled with @yao-pkg/pkg, __dirname points to the virtual snapshot FS.
-// Use process.execPath directory to resolve real filesystem paths.
+// When compiled with @yao-pkg/pkg, __dirname points to the virtual snapshot FS (embedded files).
+// process.execPath directory is the real directory where the .exe is running on the user's PC.
 const IS_PKG = typeof process.pkg !== 'undefined';
-const STATIC_DIR = IS_PKG ? path.dirname(process.execPath) : __dirname;
-const DB_PATH = path.join(STATIC_DIR, 'dhmotopartes_db.json');
+const REAL_DIR = IS_PKG ? path.dirname(process.execPath) : __dirname;
+const DB_PATH = path.join(REAL_DIR, 'dhmotopartes_db.json');
 
 const MIME_TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -61,7 +61,15 @@ const server = http.createServer((req, res) => {
     // 2. Info API
     if (req.method === 'GET' && reqPath === '/api/info') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({ frozen: IS_PKG, mode: IS_PKG ? 'executable' : 'script' }));
+        let embeddedFiles = [];
+        try { embeddedFiles = fs.readdirSync(__dirname); } catch (e) { embeddedFiles = [e.message]; }
+        res.end(JSON.stringify({
+            frozen: IS_PKG,
+            mode: IS_PKG ? 'executable' : 'script',
+            dirname: __dirname,
+            realDir: REAL_DIR,
+            embeddedFiles
+        }));
         return;
     }
 
@@ -84,15 +92,23 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // 4. Static file serving
-    const safePath = path.normalize(reqPath).replace(/^(\.\.[\/\\])+/, '');
-    const filePath = path.join(STATIC_DIR, safePath);
+    // 4. Static file serving (Embed-first / Real-disk fallback)
+    const cleanRelPath = reqPath.replace(/^\/+/, '');
+    const realFilePath = path.join(REAL_DIR, cleanRelPath);
+    const embeddedFilePath = path.join(__dirname, cleanRelPath);
 
-    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-        const ext = path.extname(filePath).toLowerCase();
+    let targetPath = null;
+    if (fs.existsSync(realFilePath) && fs.statSync(realFilePath).isFile()) {
+        targetPath = realFilePath;
+    } else if (fs.existsSync(embeddedFilePath) && fs.statSync(embeddedFilePath).isFile()) {
+        targetPath = embeddedFilePath;
+    }
+
+    if (targetPath) {
+        const ext = path.extname(targetPath).toLowerCase();
         const contentType = MIME_TYPES[ext] || 'application/octet-stream';
         res.writeHead(200, { 'Content-Type': contentType });
-        fs.createReadStream(filePath).pipe(res);
+        fs.createReadStream(targetPath).pipe(res);
     } else {
         res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
         res.end('404 Not Found');
