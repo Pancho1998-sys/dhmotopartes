@@ -6167,24 +6167,24 @@ async function handleExcelImport(e) {
     reader.readAsArrayBuffer(file);
 }
 
-function showExcelImportPreview() {
-    const totalCount = tempExcelProducts.length;
-    const newCount = tempExcelProducts.filter(p => p.isNew).length;
-    const updateCount = totalCount - newCount;
-
-    document.getElementById('excel-total-count').textContent = totalCount;
-    document.getElementById('excel-new-count').textContent = newCount;
-    document.getElementById('excel-update-count').textContent = updateCount;
-
+function renderExcelPreviewRows(filterText = '') {
     const tbody = document.getElementById('excel-preview-table-body');
-    let rowsHtml = '';
+    if (!tbody) return;
     const currency = state.settings.currency || '$';
+    const q = filterText.toLowerCase().trim();
 
-    // Show first 5 items to keep modal lightweight
-    const previewItems = tempExcelProducts.slice(0, 5);
-    previewItems.forEach(p => {
+    const filtered = q
+        ? tempExcelProducts.filter(p => p.sku.toLowerCase().includes(q) || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q))
+        : tempExcelProducts;
+
+    const limit = q ? 200 : 80;
+    const itemsToShow = filtered.slice(0, limit);
+
+    let rowsHtml = '';
+    itemsToShow.forEach(p => {
         const badgeClass = p.isNew ? 'badge-success' : 'badge-warning';
         const badgeText = p.isNew ? 'Nuevo' : 'Actualizar';
+        const stockStyle = p.stock > 0 ? 'color: var(--success); font-weight: 800;' : 'color: var(--text-muted);';
 
         rowsHtml += `
             <tr>
@@ -6194,23 +6194,66 @@ function showExcelImportPreview() {
                 <td class="text-right">${currency}${p.cost.toFixed(2)}</td>
                 <td class="text-right" style="font-weight: 700;">${currency}${p.price.toFixed(2)}</td>
                 <td class="text-right">${currency}${p.priceWholesale.toFixed(2)}</td>
-                <td class="text-center" style="font-weight: 700;">${p.stock} L / ${p.stockWholesale || 0} M</td>
+                <td class="text-center" style="${stockStyle}">${p.stock} L / ${p.stockWholesale || 0} M</td>
                 <td><span class="badge ${badgeClass}">${badgeText}</span></td>
             </tr>
         `;
     });
 
-    if (totalCount > 5) {
+    if (filtered.length > limit) {
         rowsHtml += `
             <tr>
-                <td colspan="8" class="text-center text-muted" style="padding: 12px; font-weight: 500;">
-                    ... y ${totalCount - 5} productos más en el archivo ...
-                  </td>
+                <td colspan="8" class="text-center text-muted" style="padding: 12px; font-weight: 600;">
+                    ... y ${filtered.length - limit} productos más (usa el buscador para encontrar un repuesto específico) ...
+                </td>
+            </tr>
+        `;
+    } else if (filtered.length === 0) {
+        rowsHtml += `
+            <tr>
+                <td colspan="8" class="text-center text-muted" style="padding: 20px;">
+                    No se encontraron productos en la vista previa que coincidan con "${filterText}".
+                </td>
             </tr>
         `;
     }
 
     tbody.innerHTML = rowsHtml;
+
+    const countEl = document.getElementById('excel-preview-showing-count');
+    if (countEl) {
+        countEl.textContent = `Mostrando ${itemsToShow.length} de ${filtered.length} productos`;
+    }
+}
+
+function showExcelImportPreview() {
+    const totalCount = tempExcelProducts.length;
+    const newCount = tempExcelProducts.filter(p => p.isNew).length;
+    const updateCount = totalCount - newCount;
+    const totalStock = tempExcelProducts.reduce((sum, p) => sum + (parseFloat(p.stock) || 0), 0);
+    const withStockCount = tempExcelProducts.filter(p => (parseFloat(p.stock) || 0) > 0).length;
+
+    const totalCountEl = document.getElementById('excel-total-count');
+    if (totalCountEl) totalCountEl.textContent = totalCount;
+
+    const newCountEl = document.getElementById('excel-new-count');
+    if (newCountEl) newCountEl.textContent = newCount;
+
+    const updateCountEl = document.getElementById('excel-update-count');
+    if (updateCountEl) updateCountEl.textContent = updateCount;
+
+    const stockTotalEl = document.getElementById('excel-stock-total');
+    if (stockTotalEl) {
+        stockTotalEl.innerHTML = `${totalStock.toLocaleString()} <span style="font-size: 13px; font-weight: 600; opacity: 0.85;">(${withStockCount} con stock)</span>`;
+    }
+
+    const searchInput = document.getElementById('excel-preview-search');
+    if (searchInput) {
+        searchInput.value = '';
+        searchInput.oninput = (e) => renderExcelPreviewRows(e.target.value);
+    }
+
+    renderExcelPreviewRows('');
 
     if (window.lucide) lucide.createIcons();
     openModal('modal-excel-preview');

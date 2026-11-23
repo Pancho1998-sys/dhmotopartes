@@ -12,7 +12,7 @@
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- SheetJS for Excel import/export (loaded dynamically when needed) -->
-    <link rel="stylesheet" href="style.css?v=20261119_3">
+    <link rel="stylesheet" href="style.css?v=20261123_2">
     <!-- Dynamic custom styles for SaaS branding -->
     <style id="custom-brand-styles"></style>
 </head>
@@ -2054,36 +2054,46 @@
 
     <!-- 7. EXCEL PREVIEW MODAL -->
     <div class="modal-backdrop" id="modal-excel-preview">
-        <div class="modal-box modal-large">
+        <div class="modal-box modal-xl modal-excel-box">
             <div class="modal-header">
-                <h3 class="modal-title">Vista Previa de Importación</h3>
+                <h3 class="modal-title">Vista Previa de Importación Masiva</h3>
                 <button class="btn-icon modal-close-btn" data-close-modal="modal-excel-preview"><i data-lucide="x"></i></button>
             </div>
             <div class="modal-body">
                 <!-- Metrics and summaries -->
-                <div class="excel-summary-container" style="display: flex; gap: 20px; margin-bottom: 20px;">
-                    <div class="excel-summary-card" style="flex: 1; padding: 15px; border-radius: var(--radius-md); background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.25); text-align: center;">
+                <div class="excel-summary-container" style="display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;">
+                    <div class="excel-summary-card" style="flex: 1; min-width: 140px; padding: 15px; border-radius: var(--radius-md); background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.25); text-align: center;">
                         <span class="small text-muted" style="text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Productos Totales</span>
                         <h2 style="font-size: 26px; font-weight: 800; font-family: var(--font-title); margin-top: 5px;" id="excel-total-count">0</h2>
                     </div>
-                    <div class="excel-summary-card" style="flex: 1; padding: 15px; border-radius: var(--radius-md); background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); text-align: center;">
+                    <div class="excel-summary-card" style="flex: 1; min-width: 140px; padding: 15px; border-radius: var(--radius-md); background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); text-align: center;">
                         <span class="small text-muted" style="text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Nuevos (Crear)</span>
                         <h2 style="font-size: 26px; font-weight: 800; font-family: var(--font-title); margin-top: 5px; color: var(--success);" id="excel-new-count">0</h2>
                     </div>
-                    <div class="excel-summary-card" style="flex: 1; padding: 15px; border-radius: var(--radius-md); background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); text-align: center;">
+                    <div class="excel-summary-card" style="flex: 1; min-width: 140px; padding: 15px; border-radius: var(--radius-md); background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); text-align: center;">
                         <span class="small text-muted" style="text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Existentes (Actualizar)</span>
                         <h2 style="font-size: 26px; font-weight: 800; font-family: var(--font-title); margin-top: 5px; color: var(--warning);" id="excel-update-count">0</h2>
                     </div>
+                    <div class="excel-summary-card" style="flex: 1; min-width: 160px; padding: 15px; border-radius: var(--radius-md); background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.25); text-align: center;">
+                        <span class="small text-muted" style="text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Stock Total Detectado</span>
+                        <h2 style="font-size: 24px; font-weight: 800; font-family: var(--font-title); margin-top: 5px; color: #3b82f6;" id="excel-stock-total">0 U.</h2>
+                    </div>
                 </div>
 
-                <div class="alert-info-box" style="margin-bottom: 20px;">
+                <div class="alert-info-box" style="margin-bottom: 16px;">
                     <i data-lucide="info"></i>
-                    <p class="small">El sistema ha mapeado las columnas de forma inteligente. Revisa la previsualización de las primeras 5 filas antes de confirmar la importación.</p>
+                    <p class="small" id="excel-mapping-status-text">Columnas mapeadas correctamente. Revisa la lista previa antes de confirmar el ingreso.</p>
+                </div>
+
+                <!-- Search and Count in preview -->
+                <div style="display: flex; gap: 12px; margin-bottom: 12px; align-items: center; justify-content: space-between;">
+                    <input type="text" id="excel-preview-search" class="form-control" placeholder="Filtrar vista previa por SKU o nombre de repuesto..." style="flex: 1; max-width: 450px; padding: 8px 14px; font-size: 13px;">
+                    <span id="excel-preview-showing-count" class="small text-muted" style="font-weight: 600;">Cargando productos...</span>
                 </div>
 
                 <!-- Preview Table -->
                 <div class="data-table-card" style="margin-bottom: 16px; border-radius: var(--radius-md);">
-                    <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                    <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
                         <table class="data-table" id="excel-preview-table">
                             <thead>
                                 <tr>
@@ -2111,9 +2121,9 @@
                     </button>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="padding: 16px 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px; background: rgba(0,0,0,0.15);">
                 <button type="button" class="btn btn-secondary btn-outline" data-close-modal="modal-excel-preview">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="excel-confirm-import-btn">
+                <button type="button" class="btn btn-primary" id="excel-confirm-import-btn" style="padding: 10px 24px; font-weight: 700;">
                     <i data-lucide="check-circle-2"></i> Confirmar e Importar
                 </button>
             </div>
@@ -2509,8 +2519,8 @@
     <script src="supabase-config.js"></script>
 
     <!-- Application Script Files -->
-    <script src="components.js?v=20261123"></script>
-    <script src="fiscal.js?v=20261123"></script>
-    <script src="app.js?v=20261123"></script>
+    <script src="components.js?v=20261123_2"></script>
+    <script src="fiscal.js?v=20261123_2"></script>
+    <script src="app.js?v=20261123_2"></script>
 </body>
 </html>
