@@ -1534,6 +1534,98 @@
         </div>
     </div>
 
+    <!-- 2.1 FRACTIONAL PRODUCT MODAL (Venta por importe o cantidad) -->
+    <div class="modal-backdrop" id="modal-fractional-qty">
+        <div class="modal-box modal-medium">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title" id="fractional-modal-product-name">Producto Fraccionable</h3>
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;" id="fractional-modal-product-sku">SKU: ---</p>
+                </div>
+                <button class="btn-icon modal-close-btn" data-close-modal="modal-fractional-qty"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <!-- Info de precio y stock -->
+                <div class="fractional-product-summary">
+                    <div>
+                        <span class="fractional-summary-label">Precio Unitario</span>
+                        <span class="fractional-summary-price" id="fractional-modal-unit-price">$0.00</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <span class="fractional-summary-label">Stock Disponible</span>
+                        <span class="fractional-summary-stock" id="fractional-modal-stock-disp">0</span>
+                    </div>
+                </div>
+
+                <!-- Selector de Modo de Venta -->
+                <div class="fractional-mode-switcher">
+                    <button type="button" class="btn btn-outline fractional-mode-btn active" id="fractional-mode-amount-btn">
+                        <i data-lucide="dollar-sign" style="width: 16px; height: 16px;"></i> Por Dinero ($)
+                    </button>
+                    <button type="button" class="btn btn-outline fractional-mode-btn" id="fractional-mode-qty-btn">
+                        <i data-lucide="scale" style="width: 16px; height: 16px;"></i> Por Cantidad
+                    </button>
+                </div>
+
+                <!-- Modo 1: Por Dinero ($) -->
+                <div id="fractional-panel-amount">
+                    <div class="form-group">
+                        <label for="fractional-input-amount" style="font-weight: 600;">Importe en dinero a vender ($) *</label>
+                        <div class="fractional-amount-input-wrapper">
+                            <span class="fractional-amount-prefix">$</span>
+                            <input type="number" id="fractional-input-amount" step="any" min="0" placeholder="0" class="fractional-input-large">
+                        </div>
+                    </div>
+                    <div class="fractional-presets-container">
+                        <button type="button" class="btn btn-secondary btn-sm fractional-preset-btn" onclick="window.setFractionalAmount(500)">$500</button>
+                        <button type="button" class="btn btn-secondary btn-sm fractional-preset-btn" onclick="window.setFractionalAmount(1000)">$1.000</button>
+                        <button type="button" class="btn btn-secondary btn-sm fractional-preset-btn" onclick="window.setFractionalAmount(1500)">$1.500</button>
+                        <button type="button" class="btn btn-secondary btn-sm fractional-preset-btn" onclick="window.setFractionalAmount(2000)">$2.000</button>
+                        <button type="button" class="btn btn-secondary btn-sm fractional-preset-btn" onclick="window.setFractionalAmount(5000)">$5.000</button>
+                        <button type="button" class="btn btn-secondary btn-sm fractional-preset-btn" onclick="window.setFractionalAmount(10000)">$10.000</button>
+                    </div>
+                </div>
+
+                <!-- Modo 2: Por Cantidad / Fracción -->
+                <div id="fractional-panel-qty" style="display: none;">
+                    <div class="form-group">
+                        <label for="fractional-input-qty" style="font-weight: 600;">Cantidad a vender *</label>
+                        <input type="number" id="fractional-input-qty" step="any" min="0" placeholder="0.5" class="fractional-input-large">
+                    </div>
+                    <div class="fractional-presets-container">
+                        <button type="button" class="btn btn-secondary btn-sm fractional-preset-btn" onclick="window.setFractionalQty(0.25)">0.25 (1/4)</button>
+                        <button type="button" class="btn btn-secondary btn-sm fractional-preset-btn" onclick="window.setFractionalQty(0.5)">0.50 (1/2)</button>
+                        <button type="button" class="btn btn-secondary btn-sm fractional-preset-btn" onclick="window.setFractionalQty(0.75)">0.75 (3/4)</button>
+                        <button type="button" class="btn btn-secondary btn-sm fractional-preset-btn" onclick="window.setFractionalQty(1)">1.00</button>
+                        <button type="button" class="btn btn-secondary btn-sm fractional-preset-btn" onclick="window.setFractionalQty(1.5)">1.50</button>
+                        <button type="button" class="btn btn-secondary btn-sm fractional-preset-btn" onclick="window.setFractionalQty(2)">2.00</button>
+                    </div>
+                </div>
+
+                <!-- Tarjeta de Cálculo Resultante en Tiempo Real -->
+                <div class="fractional-calc-card">
+                    <div class="fractional-calc-row">
+                        <span class="fractional-calc-label">Cantidad a descontar:</span>
+                        <strong class="fractional-calc-value" id="fractional-calc-qty">0.000</strong>
+                    </div>
+                    <div class="fractional-calc-row">
+                        <span class="fractional-calc-label">Total a cobrar:</span>
+                        <strong class="fractional-calc-total-value" id="fractional-calc-total">$0.00</strong>
+                    </div>
+                    <div id="fractional-calc-warning" class="fractional-calc-warning" style="display: none;">
+                        ⚠️ La cantidad calculada supera el stock disponible.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary btn-outline" data-close-modal="modal-fractional-qty">Cancelar</button>
+                <button class="btn btn-primary" id="fractional-confirm-btn">
+                    <i data-lucide="shopping-cart"></i> <span id="fractional-confirm-btn-text">Agregar al Carrito</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- 3. PRODUCT FORM MODAL (Add/Edit) -->
     <div class="modal-backdrop" id="modal-product">
         <div class="modal-box modal-medium">
@@ -1623,7 +1715,7 @@
                         <div class="form-group col-12">
                             <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; cursor: pointer; user-select: none; margin-bottom: 12px;">
                                 <input type="checkbox" id="prod-is-fractional" style="width: 16px; height: 16px;">
-                                <span>Producto Fraccionable (permite decimales y se oculta en la web)</span>
+                                <span>Producto Fraccionable (permite venta por importe $, fraccionamiento y decimales)</span>
                             </label>
                         </div>
                     </div>

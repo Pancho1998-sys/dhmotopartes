@@ -202,10 +202,12 @@ function createPOSProductCard(product, currency = '$', priceKey = 'price', stock
     }
 
     const comboBadge = product.isCombo ? `<span class="badge badge-primary" style="position: absolute; top: 8px; right: 8px; font-size: 10px; z-index: 10; padding: 2px 6px; background-color: var(--primary); color: #fff; border-radius: var(--radius-sm); font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">Combo</span>` : '';
+    const fractionalBadge = product.isFractional ? `<span class="badge badge-fractional" style="position: absolute; top: 8px; right: ${product.isCombo ? '65px' : '8px'}; font-size: 10px; z-index: 10; padding: 2px 6px; background-color: #0284c7; color: #fff; border-radius: var(--radius-sm); font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"><i data-lucide="scale" style="width:10px; height:10px; vertical-align:middle; margin-right:2px;"></i>Fraccional</span>` : '';
 
     return `
         <div class="${cardClass}" data-id="${product.id}" onclick="${isOutOfStock ? '' : `addCartItem('${product.id}')`}" style="position: relative;">
             ${comboBadge}
+            ${fractionalBadge}
             <span class="prod-card-sku">${product.sku}</span>
             <div class="prod-card-image">
                 ${imagePlaceholder}

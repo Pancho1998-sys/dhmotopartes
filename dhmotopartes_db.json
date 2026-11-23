@@ -109,6 +109,19 @@
             "stock": 15,
             "stockMin": 5,
             "image": ""
+        },
+        {
+            "id": "p11",
+            "sku": "LIQ-ACE-SUE",
+            "name": "Aceite Mineral 20W50 Suelto (Lts)",
+            "category": "Repuestos de Motor",
+            "cost": 1200,
+            "price": 2500,
+            "priceWholesale": 2100,
+            "stock": 45.5,
+            "stockMin": 10,
+            "isFractional": true,
+            "image": ""
         }
     ],
     "cart": [],

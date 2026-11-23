@@ -3004,3 +3004,159 @@ body.catalog-fullscreen .content-container {
     background: rgba(239, 68, 68, 0.1);
 }
 
+/* ==========================================================================
+   Fractional Products Sale Modal
+   ========================================================================== */
+.fractional-product-summary {
+    background-color: var(--bg-hover);
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid var(--border-color);
+}
+
+.fractional-summary-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.fractional-summary-price {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.fractional-summary-stock {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.fractional-mode-switcher {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.fractional-mode-btn {
+    flex: 1;
+    padding: 10px 14px;
+    font-weight: 600;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: var(--radius-md);
+    transition: all 0.2s ease;
+}
+
+.fractional-mode-btn.active {
+    background-color: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary);
+    box-shadow: 0 2px 6px rgba(var(--primary-rgb), 0.3);
+}
+
+.fractional-amount-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.fractional-amount-prefix {
+    position: absolute;
+    left: 14px;
+    font-weight: 700;
+    color: var(--text-muted);
+    font-size: 18px;
+    pointer-events: none;
+}
+
+.fractional-input-large {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    padding: 12px 14px !important;
+    border-radius: var(--radius-md) !important;
+}
+
+.fractional-amount-input-wrapper .fractional-input-large {
+    padding-left: 32px !important;
+}
+
+.fractional-presets-container {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.fractional-preset-btn {
+    flex: 1 1 calc(33.333% - 6px);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px 10px;
+    border-radius: var(--radius-sm);
+    text-align: center;
+    background-color: var(--bg-hover);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    transition: all 0.15s ease;
+}
+
+.fractional-preset-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background-color: rgba(var(--primary-rgb), 0.08);
+}
+
+.fractional-calc-card {
+    background-color: var(--bg-main);
+    border: 1px dashed var(--primary);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    margin-top: 10px;
+}
+
+.fractional-calc-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.fractional-calc-row:last-child {
+    margin-bottom: 0;
+}
+
+.fractional-calc-label {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.fractional-calc-value {
+    font-size: 15px;
+    color: var(--text-main);
+    font-family: var(--font-mono, monospace);
+}
+
+.fractional-calc-total-value {
+    font-size: 20px;
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.fractional-calc-warning {
+    color: var(--danger);
+    font-size: 12px;
+    margin-top: 6px;
+    font-weight: 500;
+}
+

@@ -1084,7 +1084,8 @@ function loadDemoData() {
         { id: "p7", sku: "ACC-CAS-REV", name: "Casco Rebatible Hawk Revo Negro Mate L", category: "Accesorios", cost: 19000, price: 28900, stock: 6, stockMin: 2, image: "" },
         { id: "p8", sku: "REP-CAB-EMB", name: "Cable de Embrague Corven Triax 150", category: "Transmisión", cost: 500, price: 1100, stock: 0, stockMin: 5, image: "" },
         { id: "p9", sku: "REP-BTE-YUAS", name: "Batería Yuasa 12V 7Ah YTX7L-BS", category: "Sistema Eléctrico", cost: 13500, price: 19500, stock: 9, stockMin: 3, image: "" },
-        { id: "p10", sku: "HER-COR-CAD", name: "Corta Cadena Profesional Mecánico", category: "Herramientas", cost: 2000, price: 3400, stock: 15, stockMin: 5, image: "" }
+        { id: "p10", sku: "HER-COR-CAD", name: "Corta Cadena Profesional Mecánico", category: "Herramientas", cost: 2000, price: 3400, stock: 15, stockMin: 5, image: "" },
+        { id: "p11", sku: "LIQ-ACE-SUE", name: "Aceite Mineral 20W50 Suelto (Lts)", category: "Repuestos de Motor", cost: 1200, price: 2500, priceWholesale: 2100, stock: 45.5, stockMin: 10, isFractional: true, image: "" }
     ];
 
     state.customers = [
@@ -1390,6 +1391,35 @@ function setupEventListeners() {
     document.getElementById('cart-clear-btn').addEventListener('click', clearCart);
     document.getElementById('cart-apply-discount-btn').addEventListener('click', () => openModal('modal-discount'));
     document.getElementById('cart-checkout-btn').addEventListener('click', openCheckoutModal);
+
+    // Fractional Product Modal Listeners
+    const fracAmountBtn = document.getElementById('fractional-mode-amount-btn');
+    const fracQtyBtn = document.getElementById('fractional-mode-qty-btn');
+    const fracAmountInput = document.getElementById('fractional-input-amount');
+    const fracQtyInput = document.getElementById('fractional-input-qty');
+    const fracConfirmBtn = document.getElementById('fractional-confirm-btn');
+
+    if (fracAmountBtn) fracAmountBtn.addEventListener('click', () => window.setFractionalMode('amount'));
+    if (fracQtyBtn) fracQtyBtn.addEventListener('click', () => window.setFractionalMode('qty'));
+    if (fracAmountInput) {
+        fracAmountInput.addEventListener('input', window.recalcFractional);
+        fracAmountInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                window.confirmFractionalSale();
+            }
+        });
+    }
+    if (fracQtyInput) {
+        fracQtyInput.addEventListener('input', window.recalcFractional);
+        fracQtyInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                window.confirmFractionalSale();
+            }
+        });
+    }
+    if (fracConfirmBtn) fracConfirmBtn.addEventListener('click', window.confirmFractionalSale);
 
     // Price List and Customer selection auto-switch listeners in POS
     const cartPriceListSelect = document.getElementById('cart-price-list-select');
@@ -2859,6 +2889,219 @@ window.changePOSPage = function(delta) {
     renderPOSProductGrid();
 };
 
+// Active fractional sale modal state
+let activeFractionalContext = null;
+
+window.openFractionalModal = function(product, existingCartItem = null, isEditing = false) {
+    if (!product) return;
+
+    const priceListSelect = document.getElementById('cart-price-list-select');
+    const priceKey = priceListSelect ? priceListSelect.value : 'price';
+    let unitPrice = product.price;
+    if (priceKey === 'priceWholesale') {
+        unitPrice = parseFloat(product.priceWholesale) || product.price;
+    }
+
+    const stockSourceSelect = document.getElementById('cart-stock-source-select');
+    const stockSource = stockSourceSelect ? stockSourceSelect.value : 'local';
+    const maxStock = product.isCombo 
+        ? window.getComboStock(product, stockSource) 
+        : (stockSource === 'wholesale' ? (product.stockWholesale || 0) : product.stock);
+
+    const currency = (state.settings && state.settings.currency) || '$';
+
+    activeFractionalContext = {
+        product,
+        existingCartItem,
+        isEditing,
+        unitPrice,
+        maxStock,
+        currency,
+        mode: 'amount',
+        calculatedQty: 0,
+        calculatedTotal: 0
+    };
+
+    // Update header info
+    document.getElementById('fractional-modal-product-name').textContent = product.name;
+    document.getElementById('fractional-modal-product-sku').textContent = `SKU: ${product.sku} | ${product.category || 'General'}`;
+    document.getElementById('fractional-modal-unit-price').textContent = `${currency}${unitPrice.toFixed(2)}`;
+    document.getElementById('fractional-modal-stock-disp').textContent = `${maxStock}`;
+
+    const confirmBtnText = document.getElementById('fractional-confirm-btn-text');
+    if (confirmBtnText) {
+        confirmBtnText.textContent = isEditing ? 'Actualizar en Carrito' : 'Agregar al Carrito';
+    }
+
+    // Default mode: amount
+    window.setFractionalMode('amount');
+
+    // Pre-populate if editing
+    if (isEditing && existingCartItem) {
+        const initialAmount = Math.round(existingCartItem.quantity * unitPrice * 100) / 100;
+        document.getElementById('fractional-input-amount').value = initialAmount > 0 ? initialAmount : '';
+        document.getElementById('fractional-input-qty').value = existingCartItem.quantity;
+        window.recalcFractional();
+    } else {
+        document.getElementById('fractional-input-amount').value = '';
+        document.getElementById('fractional-input-qty').value = '';
+        window.recalcFractional();
+    }
+
+    openModal('modal-fractional-qty');
+
+    // Auto focus the amount input
+    setTimeout(() => {
+        const input = document.getElementById('fractional-input-amount');
+        if (input) input.focus();
+    }, 150);
+};
+
+window.setFractionalMode = function(mode) {
+    if (!activeFractionalContext) return;
+    activeFractionalContext.mode = mode;
+
+    const amountBtn = document.getElementById('fractional-mode-amount-btn');
+    const qtyBtn = document.getElementById('fractional-mode-qty-btn');
+    const amountPanel = document.getElementById('fractional-panel-amount');
+    const qtyPanel = document.getElementById('fractional-panel-qty');
+
+    if (mode === 'amount') {
+        if (amountBtn) amountBtn.classList.add('active');
+        if (qtyBtn) qtyBtn.classList.remove('active');
+        if (amountPanel) amountPanel.style.display = 'block';
+        if (qtyPanel) qtyPanel.style.display = 'none';
+
+        if (activeFractionalContext.calculatedQty > 0) {
+            const amt = Math.round(activeFractionalContext.calculatedQty * activeFractionalContext.unitPrice * 100) / 100;
+            document.getElementById('fractional-input-amount').value = amt > 0 ? amt : '';
+        }
+        setTimeout(() => {
+            const input = document.getElementById('fractional-input-amount');
+            if (input) input.focus();
+        }, 50);
+    } else {
+        if (qtyBtn) qtyBtn.classList.add('active');
+        if (amountBtn) amountBtn.classList.remove('active');
+        if (qtyPanel) qtyPanel.style.display = 'block';
+        if (amountPanel) amountPanel.style.display = 'none';
+
+        if (activeFractionalContext.calculatedQty > 0) {
+            document.getElementById('fractional-input-qty').value = activeFractionalContext.calculatedQty;
+        }
+        setTimeout(() => {
+            const input = document.getElementById('fractional-input-qty');
+            if (input) input.focus();
+        }, 50);
+    }
+
+    window.recalcFractional();
+};
+
+window.setFractionalAmount = function(amount) {
+    const input = document.getElementById('fractional-input-amount');
+    if (!input) return;
+    input.value = amount;
+    window.recalcFractional();
+};
+
+window.setFractionalQty = function(qty) {
+    const input = document.getElementById('fractional-input-qty');
+    if (!input) return;
+    input.value = qty;
+    window.recalcFractional();
+};
+
+window.recalcFractional = function() {
+    if (!activeFractionalContext) return;
+
+    const { unitPrice, maxStock, currency, mode, isEditing, existingCartItem } = activeFractionalContext;
+    let qty = 0;
+    let total = 0;
+
+    if (mode === 'amount') {
+        const amountVal = parseFloat(document.getElementById('fractional-input-amount').value) || 0;
+        if (amountVal > 0 && unitPrice > 0) {
+            qty = Math.round((amountVal / unitPrice) * 10000) / 10000;
+            total = amountVal;
+        }
+    } else {
+        const qtyVal = parseFloat(document.getElementById('fractional-input-qty').value) || 0;
+        if (qtyVal > 0) {
+            qty = qtyVal;
+            total = Math.round((qty * unitPrice) * 100) / 100;
+        }
+    }
+
+    activeFractionalContext.calculatedQty = qty;
+    activeFractionalContext.calculatedTotal = total;
+
+    // Update UI elements
+    const calcQtyEl = document.getElementById('fractional-calc-qty');
+    const calcTotalEl = document.getElementById('fractional-calc-total');
+    const warningEl = document.getElementById('fractional-calc-warning');
+    const confirmBtn = document.getElementById('fractional-confirm-btn');
+
+    if (calcQtyEl) calcQtyEl.textContent = qty > 0 ? qty.toString() : '0.000';
+    if (calcTotalEl) calcTotalEl.textContent = `${currency}${total.toFixed(2)}`;
+
+    // Validate available stock
+    const currentInCart = (!isEditing && existingCartItem) ? existingCartItem.quantity : 0;
+    const totalDemanded = currentInCart + qty;
+    const exceedsStock = qty > 0 && totalDemanded > maxStock;
+
+    if (warningEl) {
+        if (exceedsStock) {
+            warningEl.style.display = 'block';
+            warningEl.textContent = `⚠️ Supera el stock disponible (Máximo restante: ${Math.max(0, Math.round((maxStock - currentInCart) * 1000) / 1000)}).`;
+        } else {
+            warningEl.style.display = 'none';
+        }
+    }
+
+    if (confirmBtn) {
+        confirmBtn.disabled = qty <= 0 || exceedsStock;
+    }
+};
+
+window.confirmFractionalSale = function() {
+    if (!activeFractionalContext) return;
+
+    const { product, existingCartItem, isEditing, unitPrice, maxStock, calculatedQty } = activeFractionalContext;
+
+    if (calculatedQty <= 0) {
+        alert("Por favor, ingrese un importe o cantidad válida mayor a 0.");
+        return;
+    }
+
+    const currentInCart = (!isEditing && existingCartItem) ? existingCartItem.quantity : 0;
+    if (currentInCart + calculatedQty > maxStock) {
+        playScanSound('fail');
+        alert(`No hay suficiente stock disponible. Stock máximo: ${maxStock}`);
+        return;
+    }
+
+    if (isEditing && existingCartItem) {
+        existingCartItem.quantity = calculatedQty;
+        existingCartItem.price = unitPrice;
+    } else if (existingCartItem) {
+        existingCartItem.quantity = Math.round((existingCartItem.quantity + calculatedQty) * 10000) / 10000;
+        existingCartItem.price = unitPrice;
+    } else {
+        state.cart.push({
+            id: product.id,
+            name: product.name,
+            sku: product.sku,
+            price: unitPrice,
+            quantity: calculatedQty
+        });
+    }
+
+    playScanSound('success');
+    closeModal('modal-fractional-qty');
+    renderCart();
+};
+
 // Shopping Cart Actions
 window.addCartItem = function(prodId, shouldRender = true) {
     const product = state.products.find(p => p.id === prodId);
@@ -2880,6 +3123,12 @@ window.addCartItem = function(prodId, shouldRender = true) {
         return;
     }
 
+    // Modal interactivo para producto fraccionable (por importe $ o por cantidad)
+    if (product.isFractional) {
+        window.openFractionalModal(product, existingInCart, false);
+        return;
+    }
+
     const priceListSelect = document.getElementById('cart-price-list-select');
     const priceKey = priceListSelect ? priceListSelect.value : 'price';
     let itemPrice = product.price;
@@ -2888,21 +3137,6 @@ window.addCartItem = function(prodId, shouldRender = true) {
     }
 
     let addedQty = 1;
-    if (product.isFractional) {
-        const qtyInput = prompt(`Ingrese la cantidad a vender de "${product.name}" (Fraccionable):`, "1");
-        if (qtyInput === null) return; // cancelado
-        const parsedQty = parseFloat(qtyInput);
-        if (isNaN(parsedQty) || parsedQty <= 0) {
-            alert("Por favor, ingrese una cantidad válida mayor a 0.");
-            return;
-        }
-        if (cartQty + parsedQty > maxStockAvailable) {
-            playScanSound('fail');
-            alert(`No hay suficiente stock disponible. Stock máximo restante: ${maxStockAvailable - cartQty}`);
-            return;
-        }
-        addedQty = parsedQty;
-    }
 
     if (existingInCart) {
         existingInCart.quantity = Math.round((existingInCart.quantity + addedQty) * 1000) / 1000;
@@ -2956,13 +3190,16 @@ window.modifyCartItemQty = function (prodId, delta) {
         ? window.getComboStock(product, stockSource) 
         : (stockSource === 'wholesale' ? (product.stockWholesale || 0) : product.stock);
 
-    if (delta > 0 && cartItem.quantity + delta > maxStockAvailable) {
+    const step = product.isFractional ? (cartItem.quantity < 1 ? 0.25 : 1) : 1;
+    const appliedDelta = delta > 0 ? step : -step;
+
+    if (appliedDelta > 0 && cartItem.quantity + appliedDelta > maxStockAvailable) {
         playScanSound('fail');
         alert("Stock máximo alcanzado.");
         return;
     }
 
-    cartItem.quantity = Math.round((cartItem.quantity + delta) * 1000) / 1000;
+    cartItem.quantity = Math.round((cartItem.quantity + appliedDelta) * 10000) / 10000;
     if (cartItem.quantity <= 0) {
         state.cart = state.cart.filter(item => item.id !== prodId);
     }
@@ -2976,6 +3213,11 @@ window.promptCartItemQty = function(prodId) {
 
     const product = state.products.find(p => p.id === prodId);
     if (!product) return;
+
+    if (product.isFractional) {
+        window.openFractionalModal(product, cartItem, true);
+        return;
+    }
 
     const defaultValue = cartItem.quantity;
     const qtyInput = prompt(`Ingrese la cantidad para "${product.name}":`, defaultValue);
