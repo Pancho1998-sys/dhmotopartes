@@ -6002,13 +6002,35 @@ function compileAllCashMovements(shiftStartIso) {
    ========================================================================== */
 let tempExcelProducts = [];
 
-function findExcelColumnIndex(headers, targets) {
+function normalizeHeaderStr(str) {
+    if (!str) return '';
+    return str.toString().toLowerCase().trim()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
+        .replace(/[_\-\.]+/g, " ") // replace underscores, dashes, dots with space
+        .replace(/\s+/g, " "); // collapse spaces
+}
+
+function findExcelColumnIndex(headers, targets, fallbackKeywords = [], excludeKeywords = []) {
+    // 1. Exact match with normalized headers
     for (let i = 0; i < headers.length; i++) {
         if (headers[i] === undefined || headers[i] === null) continue;
-        const h = headers[i].toString().toLowerCase().trim()
-            .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // remove accents
-        if (targets.includes(h)) {
+        const rawH = headers[i].toString().toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const cleanH = normalizeHeaderStr(headers[i]);
+        if (targets.includes(rawH) || targets.includes(cleanH)) {
             return i;
+        }
+    }
+    // 2. Substring/fuzzy match with fallback keywords (if provided)
+    if (fallbackKeywords && fallbackKeywords.length > 0) {
+        for (let i = 0; i < headers.length; i++) {
+            if (headers[i] === undefined || headers[i] === null) continue;
+            const cleanH = normalizeHeaderStr(headers[i]);
+            const isExcluded = excludeKeywords.some(ex => cleanH.includes(ex));
+            if (isExcluded) continue;
+            const hasKeyword = fallbackKeywords.some(fb => cleanH.includes(fb));
+            if (hasKeyword) {
+                return i;
+            }
         }
     }
     return -1;
@@ -6045,18 +6067,18 @@ async function handleExcelImport(e) {
 
             const headers = jsonRows[0];
 
-            // Mappings (variations in spanish/english)
-            const skuIdx = findExcelColumnIndex(headers, ['sku', 'codigo', 'code', 'referencia', 'id']);
-            const nameIdx = findExcelColumnIndex(headers, ['nombre', 'name', 'descripcion', 'producto', 'articulo', 'detalle']);
-            const catIdx = findExcelColumnIndex(headers, ['categoria', 'category']);
-            const costIdx = findExcelColumnIndex(headers, ['costo', 'cost', 'compra', 'precio compra']);
-            const priceIdx = findExcelColumnIndex(headers, ['precio', 'price', 'venta', 'precio venta']);
-            const priceWholesaleIdx = findExcelColumnIndex(headers, ['mayorista', 'wholesale', 'precio mayorista', 'lista 2', 'descuento', 'discount', 'precio descuento']);
-            const stockIdx = findExcelColumnIndex(headers, ['stock', 'cantidad', 'cant', 'stock local', 'local']);
-            const minIdx = findExcelColumnIndex(headers, ['stockmin', 'stock minimo', 'minimo', 'alerta', 'stock minimo local']);
-            const stockWholesaleIdx = findExcelColumnIndex(headers, ['stock mayorista', 'mayorista stock', 'stock wholesale', 'wholesale stock']);
-            const minWholesaleIdx = findExcelColumnIndex(headers, ['stockminwholesale', 'stockmin mayorista', 'stock minimo mayorista', 'minimo mayorista', 'alerta mayorista']);
-            const isFractionalIdx = findExcelColumnIndex(headers, ['fraccionable', 'isfractional', 'fraccion', 'fraccionario', 'decimal']);
+            // Mappings (variations in spanish/english, underscores, abbreviations)
+            const skuIdx = findExcelColumnIndex(headers, ['sku', 'codigo', 'code', 'referencia', 'id', 'cod', 'articulo', 'item', 'codigo producto', 'cod producto'], ['sku', 'cod']);
+            const nameIdx = findExcelColumnIndex(headers, ['nombre', 'name', 'descripcion', 'producto', 'articulo', 'detalle', 'descripcion producto', 'concepto', 'titulo'], ['nombre', 'descrip', 'producto', 'articulo', 'detalle'], ['categoria', 'codigo', 'cod']);
+            const catIdx = findExcelColumnIndex(headers, ['categoria', 'category', 'rubro', 'familia', 'grupo', 'seccion', 'tipo'], ['categor', 'rubro', 'familia']);
+            const costIdx = findExcelColumnIndex(headers, ['costo', 'cost', 'compra', 'precio compra', 'costo unitario', 'precio costo', 'costo lista', 'costo unit'], ['costo', 'compra'], ['venta', 'mayorista']);
+            const priceIdx = findExcelColumnIndex(headers, ['precio', 'price', 'venta', 'precio venta', 'precio minorista', 'pvp', 'lista 1', 'precio 1', 'precio lista', 'minorista'], ['precio', 'venta', 'pvp'], ['mayorista', 'costo', 'compra', 'descuento']);
+            const priceWholesaleIdx = findExcelColumnIndex(headers, ['mayorista', 'wholesale', 'precio mayorista', 'lista 2', 'precio 2', 'descuento', 'discount', 'precio descuento', 'costo mayorista'], ['mayorista', 'lista 2', 'descuento'], ['stock', 'minimo', 'min']);
+            const stockIdx = findExcelColumnIndex(headers, ['stock', 'cantidad', 'cant', 'stock local', 'local', 'stock fisico', 'stock real', 'stock actual', 'existencia', 'existencias', 'unidades', 'saldo', 'disponible', 'fisico', 'inventario', 'cant local'], ['stock', 'cant', 'fisic', 'existenc', 'unidad'], ['min', 'alerta', 'mayorista', 'wholesale']);
+            const minIdx = findExcelColumnIndex(headers, ['stockmin', 'stock minimo', 'minimo', 'alerta', 'stock minimo local', 'min local'], ['min', 'alerta'], ['mayorista', 'wholesale']);
+            const stockWholesaleIdx = findExcelColumnIndex(headers, ['stock mayorista', 'mayorista stock', 'stock wholesale', 'wholesale stock', 'cant mayorista'], ['stock mayorista', 'cant mayorista']);
+            const minWholesaleIdx = findExcelColumnIndex(headers, ['stockminwholesale', 'stockmin mayorista', 'stock minimo mayorista', 'minimo mayorista', 'alerta mayorista'], ['min mayorista', 'minimo mayorista']);
+            const isFractionalIdx = findExcelColumnIndex(headers, ['fraccionable', 'isfractional', 'fraccion', 'fraccionario', 'decimal', 'pesable', 'a granel'], ['fraccion', 'pesable', 'granel']);
 
             if (skuIdx === -1) {
                 alert("No se pudo detectar la columna 'SKU' o 'Código'. Por favor, asegúrate de que el archivo Excel tenga una columna con uno de estos nombres.");
