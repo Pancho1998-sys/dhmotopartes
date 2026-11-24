@@ -1766,6 +1766,10 @@ function setupEventListeners() {
         document.getElementById('caja-movement-modal-title').textContent = "Registrar Ingreso de Caja";
         document.getElementById('caja-movement-type-field').value = "inflow";
         document.getElementById('caja-movement-form').reset();
+        const destSelect = document.getElementById('caja-movement-destination');
+        if (destSelect) {
+            destSelect.value = currentCashScope === 'wholesale' ? 'wholesale' : 'local';
+        }
         openModal('modal-caja-movement');
     });
 
@@ -1773,6 +1777,10 @@ function setupEventListeners() {
         document.getElementById('caja-movement-modal-title').textContent = "Registrar Egreso de Caja";
         document.getElementById('caja-movement-type-field').value = "outflow";
         document.getElementById('caja-movement-form').reset();
+        const destSelect = document.getElementById('caja-movement-destination');
+        if (destSelect) {
+            destSelect.value = currentCashScope === 'wholesale' ? 'wholesale' : 'local';
+        }
         openModal('modal-caja-movement');
     });
 
@@ -1787,10 +1795,26 @@ function setupEventListeners() {
         renderCaja();
     });
 
+    const closuresFilterCaja = document.getElementById('closures-filter-caja');
+    if (closuresFilterCaja) {
+        closuresFilterCaja.addEventListener('change', () => {
+            closuresPage = 1;
+            renderCierresHistorial();
+        });
+    }
+
     // Cierre de Caja Listeners
     const doCloseBtn = document.getElementById('caja-do-close-btn');
     if (doCloseBtn) {
         doCloseBtn.addEventListener('click', openCierreCajaModal);
+    }
+    const cierreCajaTypeSelect = document.getElementById('cierre-caja-type');
+    if (cierreCajaTypeSelect) {
+        cierreCajaTypeSelect.addEventListener('change', (e) => {
+            if (typeof populateCierreModal === 'function') {
+                populateCierreModal(e.target.value);
+            }
+        });
     }
     const actualCashInput = document.getElementById('cierre-actual-cash');
     if (actualCashInput) {
@@ -4317,6 +4341,11 @@ window.openCustomerPaymentModal = function (customerId) {
     document.getElementById('cust-pay-amount').removeAttribute('max');
     document.getElementById('cust-pay-notes').value = '';
 
+    const destSelect = document.getElementById('cust-pay-destination');
+    if (destSelect) {
+        destSelect.value = (c.customerType === 'wholesale' || c.priceList === 'priceWholesale') ? 'wholesale' : 'local';
+    }
+
     openModal('modal-customer-payment');
 };
 
@@ -4341,6 +4370,8 @@ window.saveCustomerPayment = function (e) {
     const amount = parseFloat(document.getElementById('cust-pay-amount').value) || 0;
     const method = document.getElementById('cust-pay-method').value;
     const notes = document.getElementById('cust-pay-notes').value.trim();
+    const destSelect = document.getElementById('cust-pay-destination');
+    const cajaDestination = destSelect ? destSelect.value : ((c.customerType === 'wholesale' || c.priceList === 'priceWholesale') ? 'wholesale' : 'local');
 
     if (amount <= 0) {
         alert("Ingrese un monto válido a abonar.");
@@ -4367,10 +4398,11 @@ window.saveCustomerPayment = function (e) {
         id: `cm_${Date.now()}`,
         date: new Date().toISOString(),
         type: 'inflow',
+        cajaType: cajaDestination,
         amount: amount,
         paymentMethod: method,
         concept: `Cobro Cta. Cte. - ${c.name}`,
-        notes: notes || `Cobro de deuda de cliente vía ${getPaymentMethodLabel(method)}`
+        notes: notes || `Cobro de deuda de cliente vía ${getPaymentMethodLabel(method)} (${cajaDestination === 'wholesale' ? 'Mayorista' : 'Local'})`
     });
 
     saveDatabase();
@@ -5667,28 +5699,149 @@ function exportSalesCSV() {
    ========================================================================== */
 let activeCajaTab = 'movements'; // 'movements' | 'closures'
 let closuresPage = 1;
+let currentCashScope = 'local'; // 'local' | 'wholesale' | 'all'
 
-function getLastClosure() {
+window.setCashScope = function(scope) {
+    currentCashScope = scope;
+    const btnLocal = document.getElementById('caja-scope-local-btn');
+    const btnWholesale = document.getElementById('caja-scope-wholesale-btn');
+    const btnAll = document.getElementById('caja-scope-all-btn');
+
+    if (btnLocal) {
+        if (scope === 'local') {
+            btnLocal.className = 'btn btn-sm';
+            btnLocal.style.background = '#10b981';
+            btnLocal.style.color = '#ffffff';
+            btnLocal.style.border = '1px solid #10b981';
+        } else {
+            btnLocal.className = 'btn btn-secondary btn-sm';
+            btnLocal.style.background = '';
+            btnLocal.style.color = '';
+            btnLocal.style.border = '';
+        }
+    }
+    if (btnWholesale) {
+        if (scope === 'wholesale') {
+            btnWholesale.className = 'btn btn-sm';
+            btnWholesale.style.background = '#8b5cf6';
+            btnWholesale.style.color = '#ffffff';
+            btnWholesale.style.border = '1px solid #8b5cf6';
+        } else {
+            btnWholesale.className = 'btn btn-secondary btn-sm';
+            btnWholesale.style.background = '';
+            btnWholesale.style.color = '';
+            btnWholesale.style.border = '';
+        }
+    }
+    if (btnAll) {
+        if (scope === 'all') {
+            btnAll.className = 'btn btn-sm';
+            btnAll.style.background = '#2563eb';
+            btnAll.style.color = '#ffffff';
+            btnAll.style.border = '1px solid #2563eb';
+        } else {
+            btnAll.className = 'btn btn-secondary btn-sm';
+            btnAll.style.background = '';
+            btnAll.style.color = '';
+            btnAll.style.border = '';
+        }
+    }
+
+    cajaPage = 1;
+    renderCaja();
+};
+
+function getLastClosure(cajaType = null) {
     if (!state.cashClosures || state.cashClosures.length === 0) return null;
     const sorted = [...state.cashClosures].sort((a, b) => new Date(b.date) - new Date(a.date));
-    return sorted[0];
+    if (!cajaType || cajaType === 'all') {
+        return sorted[0];
+    }
+    if (cajaType === 'wholesale') {
+        return sorted.find(c => c.cajaType === 'wholesale') || null;
+    }
+    // cajaType === 'local' (default or legacy closures without cajaType)
+    return sorted.find(c => (c.cajaType || 'local') === 'local') || null;
 }
 
-function getShiftMetrics() {
+function getShiftMetrics(cajaType = currentCashScope) {
     const currency = state.settings.currency || '$';
-    const lastClosure = getLastClosure();
+
+    if (cajaType === 'all') {
+        const localM = getShiftMetrics('local');
+        const wholesaleM = getShiftMetrics('wholesale');
+
+        const initialBalance = localM.initialBalance + wholesaleM.initialBalance;
+        const cashSales = localM.cashSales + wholesaleM.cashSales;
+        const cashSalesCount = localM.cashSalesCount + wholesaleM.cashSalesCount;
+        const transferSales = localM.transferSales + wholesaleM.transferSales;
+        const transferSalesCount = localM.transferSalesCount + wholesaleM.transferSalesCount;
+        const mpSales = localM.mpSales + wholesaleM.mpSales;
+        const mpSalesCount = localM.mpSalesCount + wholesaleM.mpSalesCount;
+        const cardSales = localM.cardSales + wholesaleM.cardSales;
+        const cardSalesCount = localM.cardSalesCount + wholesaleM.cardSalesCount;
+        const creditSales = localM.creditSales + wholesaleM.creditSales;
+        const creditSalesCount = localM.creditSalesCount + wholesaleM.creditSalesCount;
+        const digitalTotal = localM.digitalTotal + wholesaleM.digitalTotal;
+        const otherSales = localM.otherSales + wholesaleM.otherSales;
+        const grandTotal = localM.grandTotal + wholesaleM.grandTotal;
+        const inflowsTotal = localM.inflowsTotal + wholesaleM.inflowsTotal;
+        const inflowsCount = localM.inflowsCount + wholesaleM.inflowsCount;
+        const outflowsTotal = localM.outflowsTotal + wholesaleM.outflowsTotal;
+        const outflowsCount = localM.outflowsCount + wholesaleM.outflowsCount;
+        const voidsTotal = localM.voidsTotal + wholesaleM.voidsTotal;
+        const expectedCash = localM.expectedCash + wholesaleM.expectedCash;
+
+        const shiftMovements = [...localM.shiftMovements, ...wholesaleM.shiftMovements].sort((a, b) => new Date(b.date) - new Date(a.date));
+        const shiftSales = [...localM.shiftSales, ...wholesaleM.shiftSales].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        return {
+            currency,
+            cajaType: 'all',
+            cajaTitle: 'Consolidado (Local + Mayorista)',
+            lastClosure: getLastClosure('all'),
+            shiftStartIso: null,
+            shiftStartFormatted: `Local: ${localM.shiftStartFormatted} | Mayorista: ${wholesaleM.shiftStartFormatted}`,
+            initialBalance,
+            cashSales,
+            cashSalesCount,
+            transferSales,
+            transferSalesCount,
+            mpSales,
+            mpSalesCount,
+            cardSales,
+            cardSalesCount,
+            creditSales,
+            creditSalesCount,
+            digitalTotal,
+            otherSales,
+            grandTotal,
+            inflowsTotal,
+            inflowsCount,
+            outflowsTotal,
+            outflowsCount,
+            voidsTotal,
+            expectedCash,
+            shiftMovements,
+            shiftSales
+        };
+    }
+
+    const targetType = cajaType === 'wholesale' ? 'wholesale' : 'local';
+    const lastClosure = getLastClosure(targetType);
     const shiftStartIso = lastClosure ? lastClosure.date : null;
     const shiftStartFormatted = lastClosure 
         ? new Date(lastClosure.date).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })
         : 'Inicio del Sistema';
 
-    // Base initial cash balance for active shift
+    // Base initial cash balance for active shift of this specific caja
     const initialBalance = lastClosure ? (lastClosure.actualCash || 0) : 0;
 
-    // Filter sales in current shift
+    // Filter sales in current shift for this specific caja
     const shiftSales = state.sales ? state.sales.filter(s => {
-        if (!shiftStartIso) return true;
-        return new Date(s.date) > new Date(shiftStartIso);
+        if (shiftStartIso && new Date(s.date) <= new Date(shiftStartIso)) return false;
+        const saleSource = s.stockSource || 'local';
+        return saleSource === targetType;
     }) : [];
 
     const completedSales = shiftSales.filter(s => s.status === 'completed');
@@ -5726,10 +5879,11 @@ function getShiftMetrics() {
         .reduce((sum, s) => sum + s.total, 0);
     const grandTotal = cashSales + otherSales;
 
-    // Filter cash movements in current shift
+    // Filter cash movements in current shift for this specific caja
     const shiftMovements = state.cashMovements ? state.cashMovements.filter(m => {
-        if (!shiftStartIso) return true;
-        return new Date(m.date) > new Date(shiftStartIso);
+        if (shiftStartIso && new Date(m.date) <= new Date(shiftStartIso)) return false;
+        const movementCaja = m.cajaType || 'local';
+        return movementCaja === targetType;
     }) : [];
 
     const inflowsTotal = shiftMovements.filter(m => m.type === 'inflow').reduce((sum, m) => sum + m.amount, 0);
@@ -5742,6 +5896,8 @@ function getShiftMetrics() {
 
     return {
         currency,
+        cajaType: targetType,
+        cajaTitle: targetType === 'wholesale' ? 'Caja Mayorista' : 'Caja Local (Mostrador)',
         lastClosure,
         shiftStartIso,
         shiftStartFormatted,
@@ -5771,11 +5927,39 @@ function getShiftMetrics() {
 }
 
 function renderCaja() {
-    const metrics = getShiftMetrics();
+    const metrics = getShiftMetrics(currentCashScope);
     const currency = metrics.currency;
 
-    // Update metric displays for active shift
-    document.getElementById('caja-metric-balance').textContent = `${currency}${metrics.expectedCash.toFixed(2)}`;
+    // Update shift status badge text
+    const shiftStatusEl = document.getElementById('caja-shift-status-text');
+    if (shiftStatusEl) {
+        if (currentCashScope === 'local') {
+            shiftStatusEl.textContent = `Turno Local: En curso (desde ${metrics.shiftStartFormatted})`;
+        } else if (currentCashScope === 'wholesale') {
+            shiftStatusEl.textContent = `Turno Mayorista: En curso (desde ${metrics.shiftStartFormatted})`;
+        } else {
+            shiftStatusEl.textContent = `Vista Consolidada (Local + Mayorista)`;
+        }
+    }
+
+    // Update metric card labels according to active scope
+    const balanceValEl = document.getElementById('caja-metric-balance');
+    if (balanceValEl) {
+        balanceValEl.textContent = `${currency}${metrics.expectedCash.toFixed(2)}`;
+        const balanceLabel = balanceValEl.previousElementSibling;
+        const balanceSubtext = balanceValEl.nextElementSibling;
+        if (balanceLabel) {
+            if (currentCashScope === 'local') balanceLabel.textContent = "Saldo en Caja (Efectivo Local)";
+            else if (currentCashScope === 'wholesale') balanceLabel.textContent = "Saldo en Caja (Efectivo Mayorista)";
+            else balanceLabel.textContent = "Saldo en Caja (Consolidado Ambas)";
+        }
+        if (balanceSubtext) {
+            if (currentCashScope === 'local') balanceSubtext.textContent = "Dinero físico disponible en Local";
+            else if (currentCashScope === 'wholesale') balanceSubtext.textContent = "Dinero físico disponible en Mayorista";
+            else balanceSubtext.textContent = "Total físico disponible en ambas cajas";
+        }
+    }
+
     document.getElementById('caja-metric-sales').textContent = `${currency}${metrics.cashSales.toFixed(2)}`;
     document.getElementById('caja-metric-sales-count').textContent = `${metrics.cashSalesCount} transacciones`;
 
@@ -5811,7 +5995,7 @@ function renderCaja() {
     const typeVal = document.getElementById('caja-filter-type').value;
     const tbody = document.getElementById('caja-table-body');
 
-    const allMovements = compileAllCashMovements(metrics.shiftStartIso);
+    const allMovements = compileAllCashMovements(metrics.shiftStartIso, currentCashScope);
 
     const filtered = allMovements.filter(m => {
         const matchesSearch = m.concept.toLowerCase().includes(searchVal) || m.notes.toLowerCase().includes(searchVal);
@@ -5830,7 +6014,7 @@ function renderCaja() {
     if (pageItems.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="5" class="text-center text-muted" style="padding: 40px;">
+                <td colspan="6" class="text-center text-muted" style="padding: 40px;">
                     No se registran movimientos en el turno actual con los filtros seleccionados.
                 </td>
             </tr>
@@ -5893,9 +6077,15 @@ function renderCaja() {
             amountClass = 'text-muted';
         }
 
+        const isWholesale = m.cajaType === 'wholesale';
+        const cajaBadge = isWholesale
+            ? `<span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6; font-weight: 700;"><i data-lucide="warehouse" style="width:12px;height:12px;vertical-align:middle;margin-right:2px;"></i> Mayorista</span>`
+            : `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700;"><i data-lucide="store" style="width:12px;height:12px;vertical-align:middle;margin-right:2px;"></i> Local</span>`;
+
         rowsHtml += `
             <tr>
                 <td>${new Date(m.date).toLocaleString('es-ES')}</td>
+                <td>${cajaBadge}</td>
                 <td><span class="badge ${typeBadgeClass}" ${customBadgeStyle ? `style="${customBadgeStyle}"` : ''}>${typeText}</span></td>
                 <td style="font-weight: 500;">${m.concept}</td>
                 <td class="text-right ${amountClass}" style="font-weight: 700;">
@@ -5952,7 +6142,16 @@ function renderCierresHistorial() {
     const tbody = document.getElementById('closures-table-body');
     if (!tbody) return;
 
-    const closures = state.cashClosures ? [...state.cashClosures].sort((a, b) => new Date(b.date) - new Date(a.date)) : [];
+    const filterSelect = document.getElementById('closures-filter-caja');
+    const filterVal = filterSelect ? filterSelect.value : 'all';
+
+    let closures = state.cashClosures ? [...state.cashClosures].sort((a, b) => new Date(b.date) - new Date(a.date)) : [];
+
+    if (filterVal === 'local') {
+        closures = closures.filter(c => (c.cajaType || 'local') === 'local');
+    } else if (filterVal === 'wholesale') {
+        closures = closures.filter(c => c.cajaType === 'wholesale');
+    }
 
     const totalItems = closures.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
@@ -5965,8 +6164,8 @@ function renderCierresHistorial() {
     if (pageItems.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="9" class="text-center text-muted" style="padding: 40px;">
-                    Aún no se han realizado cierres de caja en el sistema.
+                <td colspan="10" class="text-center text-muted" style="padding: 40px;">
+                    No se registran cierres de caja con los filtros seleccionados.
                 </td>
             </tr>
         `;
@@ -5991,10 +6190,16 @@ function renderCierresHistorial() {
             diffText = `${currency}0.00 (Cuadrada)`;
         }
 
+        const isWholesale = c.cajaType === 'wholesale';
+        const cajaBadge = isWholesale
+            ? `<span class="badge" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6; font-weight: 700;"><i data-lucide="warehouse" style="width:12px;height:12px;vertical-align:middle;margin-right:2px;"></i> Mayorista</span>`
+            : `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700;"><i data-lucide="store" style="width:12px;height:12px;vertical-align:middle;margin-right:2px;"></i> Local</span>`;
+
         rowsHtml += `
             <tr>
                 <td style="font-weight: 700; color: var(--primary);">#${c.closureNumber || 1}</td>
                 <td>${new Date(c.date).toLocaleString('es-ES')}</td>
+                <td>${cajaBadge}</td>
                 <td>${c.cashierName || c.closedBy}</td>
                 <td class="text-right" style="font-weight: 700;">${currency}${(c.actualCash || 0).toFixed(2)}</td>
                 <td class="text-right" style="color: #0284c7; font-weight: 600;">+${currency}${(c.transferSales || 0).toFixed(2)}</td>
@@ -6032,9 +6237,11 @@ window.changeClosuresPage = function(delta) {
     renderCierresHistorial();
 };
 
-function openCierreCajaModal() {
-    const metrics = getShiftMetrics();
+function populateCierreModal(cajaType) {
+    const selectedCaja = cajaType === 'wholesale' ? 'wholesale' : 'local';
+    const metrics = getShiftMetrics(selectedCaja);
     const currency = metrics.currency;
+    const cajaName = selectedCaja === 'wholesale' ? 'Mayorista' : 'Local (Mostrador)';
 
     document.getElementById('cierre-initial-balance-display').textContent = `${currency}${metrics.initialBalance.toFixed(2)}`;
     document.getElementById('cierre-cash-sales-display').textContent = `+${currency}${metrics.cashSales.toFixed(2)} (${metrics.cashSalesCount} ventas)`;
@@ -6061,23 +6268,37 @@ function openCierreCajaModal() {
     const elOther = document.getElementById('cierre-other-sales-display');
     if (elOther) elOther.textContent = `${currency}${metrics.otherSales.toFixed(2)}`;
 
-    document.getElementById('cierre-shift-period-text').textContent = `Turno desde: ${metrics.shiftStartFormatted}`;
+    document.getElementById('cierre-shift-period-text').textContent = `Turno ${cajaName} desde: ${metrics.shiftStartFormatted}`;
 
     const actualInput = document.getElementById('cierre-actual-cash');
     if (actualInput) {
         actualInput.value = metrics.expectedCash.toFixed(2);
     }
+
+    updateCierreDifferenceBadge();
+}
+
+function openCierreCajaModal() {
+    const typeSelect = document.getElementById('cierre-caja-type');
+    const defaultType = currentCashScope === 'wholesale' ? 'wholesale' : 'local';
+    if (typeSelect) {
+        typeSelect.value = defaultType;
+    }
+
+    populateCierreModal(defaultType);
+
     const notesInput = document.getElementById('cierre-notes');
     if (notesInput) {
         notesInput.value = '';
     }
 
-    updateCierreDifferenceBadge();
     openModal('modal-cierre-caja');
 }
 
 function updateCierreDifferenceBadge() {
-    const metrics = getShiftMetrics();
+    const typeSelect = document.getElementById('cierre-caja-type');
+    const selectedCaja = typeSelect ? (typeSelect.value || 'local') : 'local';
+    const metrics = getShiftMetrics(selectedCaja);
     const currency = metrics.currency;
     const actualVal = parseFloat(document.getElementById('cierre-actual-cash').value) || 0;
     const diff = actualVal - metrics.expectedCash;
@@ -6101,7 +6322,11 @@ function updateCierreDifferenceBadge() {
 
 async function processCierreCaja(e) {
     e.preventDefault();
-    const metrics = getShiftMetrics();
+    const typeSelect = document.getElementById('cierre-caja-type');
+    const cajaType = typeSelect ? (typeSelect.value || 'local') : 'local';
+    const cajaName = cajaType === 'wholesale' ? 'Mayorista' : 'Local (Mostrador)';
+
+    const metrics = getShiftMetrics(cajaType);
     const actualCash = parseFloat(document.getElementById('cierre-actual-cash').value) || 0;
     const difference = actualCash - metrics.expectedCash;
     const targetEmail = document.getElementById('cierre-target-email').value.trim() || 'dhmotopartes@gmail.com';
@@ -6113,10 +6338,17 @@ async function processCierreCaja(e) {
         cashierName = `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim();
     }
 
-    const closureNumber = state.cashClosures ? state.cashClosures.length + 1 : 1;
+    if (!state.cashClosures) state.cashClosures = [];
+    const closuresOfThisCaja = state.cashClosures.filter(c => (c.cajaType || 'local') === cajaType);
+    const closureNumber = closuresOfThisCaja.length + 1;
+    const globalClosureNumber = state.cashClosures.length + 1;
+
     const closureObj = {
         id: `CLO-${Date.now()}`,
+        cajaType: cajaType,
+        cajaName: cajaName,
         closureNumber: closureNumber,
+        globalClosureNumber: globalClosureNumber,
         date: new Date().toISOString(),
         openedAt: metrics.shiftStartIso || new Date().toISOString(),
         closedBy: cashierEmail,
@@ -6148,7 +6380,6 @@ async function processCierreCaja(e) {
         emailStatus: 'sent'
     };
 
-    if (!state.cashClosures) state.cashClosures = [];
     state.cashClosures.push(closureObj);
     saveDatabase();
 
@@ -6162,25 +6393,28 @@ async function processCierreCaja(e) {
     cajaPage = 1;
     renderCaja();
 
-    alert(`¡Cierre de Caja #${closureNumber} realizado con éxito!\nEl reporte fue procesado y enviado a ${targetEmail}.`);
+    alert(`¡Cierre de Caja ${cajaName} #${closureNumber} realizado con éxito!\nEl reporte fue procesado y enviado a ${targetEmail}.`);
 }
 
 async function sendCierreEmail(closureObj) {
     const targetEmail = closureObj.targetEmail || 'dhmotopartes@gmail.com';
     const storeName = (state.settings && state.settings.storeName) || 'DH Motopartes';
     const currency = (state.settings && state.settings.currency) || '$';
+    const cajaName = closureObj.cajaName || (closureObj.cajaType === 'wholesale' ? 'Mayorista' : 'Local (Mostrador)');
 
     try {
         if (supabaseClient) {
             const { data, error } = await supabaseClient.functions.invoke('send-cierre-email', {
                 body: {
                     closureId: closureObj.id,
+                    cajaType: closureObj.cajaType || 'local',
+                    cajaName: cajaName,
                     closureNumber: closureObj.closureNumber,
                     date: closureObj.date,
                     openedAt: closureObj.openedAt,
                     closedBy: closureObj.closedBy,
                     cashierName: closureObj.cashierName,
-                    storeName: storeName,
+                    storeName: `${storeName} - ${cajaName}`,
                     initialBalance: closureObj.initialBalance,
                     cashSales: closureObj.cashSales,
                     cashSalesCount: closureObj.cashSalesCount,
@@ -6222,6 +6456,11 @@ window.viewClosureDetail = function(closureId) {
     const currency = state.settings.currency || '$';
     const storeName = state.settings.storeName || 'DH Motopartes';
     const formattedDate = new Date(closure.date).toLocaleString('es-ES', { dateStyle: 'full', timeStyle: 'medium' });
+    const isWholesale = closure.cajaType === 'wholesale';
+    const cajaLabel = isWholesale ? 'MAYORISTA' : 'LOCAL (MOSTRADOR)';
+    const cajaBadgeStyle = isWholesale 
+        ? 'background: rgba(139, 92, 246, 0.15); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3);' 
+        : 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);';
 
     const diff = closure.difference || 0;
     let diffColor = '#10b981';
@@ -6238,12 +6477,18 @@ window.viewClosureDetail = function(closureId) {
         <div class="closure-ticket-view" style="font-family: monospace; font-size: 13px; color: var(--text-main); line-height: 1.5; padding: 10px;">
             <div style="text-align: center; border-bottom: 1px dashed var(--border-color); padding-bottom: 10px; margin-bottom: 10px;">
                 <h3 style="margin: 0; font-size: 18px; font-weight: 800;">${storeName}</h3>
+                <div style="margin: 6px 0;">
+                    <span style="display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 800; text-transform: uppercase; ${cajaBadgeStyle}">
+                        ${isWholesale ? '🏢' : '🏪'} CAJA ${cajaLabel}
+                    </span>
+                </div>
                 <p style="margin: 2px 0 0 0; font-size: 12px; color: var(--text-muted);">COMPROBANTE DE CIERRE DE CAJA #${closure.closureNumber || 1}</p>
                 <div style="margin-top: 6px; font-weight: 700; color: ${diffColor}; font-size: 13px;">${diffText}</div>
             </div>
 
             <div style="margin-bottom: 10px; font-size: 12px;">
                 <div><strong>Folio:</strong> ${closure.id}</div>
+                <div><strong>Caja:</strong> ${closure.cajaName || (isWholesale ? 'Mayorista' : 'Local')}</div>
                 <div><strong>Fecha Cierre:</strong> ${formattedDate}</div>
                 <div><strong>Cajero:</strong> ${closure.cashierName || closure.closedBy}</div>
                 <div><strong>Enviado a:</strong> ${closure.targetEmail || 'dhmotopartes@gmail.com'}</div>
@@ -6308,11 +6553,15 @@ window.viewClosureDetail = function(closureId) {
     `;
 
     document.getElementById('cierre-detail-content').innerHTML = detailHtml;
-    document.getElementById('cierre-print-btn').onclick = () => window.print();
-    document.getElementById('cierre-resend-email-btn').onclick = async () => {
-        await sendCierreEmail(closure);
-        alert(`Reporte de Cierre #${closure.closureNumber} reenviado a ${closure.targetEmail || 'dhmotopartes@gmail.com'}`);
-    };
+    const printBtn = document.getElementById('cierre-print-btn');
+    if (printBtn) printBtn.onclick = () => window.print();
+    const resendBtn = document.getElementById('cierre-resend-email-btn');
+    if (resendBtn) {
+        resendBtn.onclick = async () => {
+            await sendCierreEmail(closure);
+            alert(`Reporte de Cierre ${closure.cajaName || ''} #${closure.closureNumber} reenviado a ${closure.targetEmail || 'dhmotopartes@gmail.com'}`);
+        };
+    }
 
     openModal('modal-cierre-detail');
 };
@@ -6321,6 +6570,8 @@ function saveCajaMovement(e) {
     e.preventDefault();
 
     const type = document.getElementById('caja-movement-type-field').value;
+    const destSelect = document.getElementById('caja-movement-destination');
+    const cajaType = destSelect ? destSelect.value : (currentCashScope === 'wholesale' ? 'wholesale' : 'local');
     const amount = parseFloat(document.getElementById('caja-movement-amount').value) || 0;
     const concept = document.getElementById('caja-movement-concept').value.trim();
     const notes = document.getElementById('caja-movement-notes').value.trim();
@@ -6334,11 +6585,13 @@ function saveCajaMovement(e) {
         id: `cm_${Date.now()}`,
         date: new Date().toISOString(),
         type,
+        cajaType,
         amount,
         concept,
         notes
     };
 
+    if (!state.cashMovements) state.cashMovements = [];
     state.cashMovements.push(movement);
     saveDatabase();
 
@@ -6349,15 +6602,31 @@ function saveCajaMovement(e) {
     playScanSound('success');
 }
 
-function compileAllCashMovements(shiftStartIso) {
+function compileAllCashMovements(shiftStartIso, cajaScope = currentCashScope) {
     let movements = [];
+    const lastLocalClosure = getLastClosure('local');
+    const lastWholesaleClosure = getLastClosure('wholesale');
+
     // Add manual cash movements
     if (state.cashMovements) {
         state.cashMovements.forEach(m => {
-            if (shiftStartIso && new Date(m.date) <= new Date(shiftStartIso)) return;
+            const mCaja = m.cajaType || 'local';
+            if (cajaScope !== 'all' && mCaja !== cajaScope) return;
+
+            // Check shift boundary
+            if (cajaScope === 'all') {
+                const shiftBoundary = mCaja === 'wholesale' 
+                    ? (lastWholesaleClosure ? lastWholesaleClosure.date : null) 
+                    : (lastLocalClosure ? lastLocalClosure.date : null);
+                if (shiftBoundary && new Date(m.date) <= new Date(shiftBoundary)) return;
+            } else {
+                if (shiftStartIso && new Date(m.date) <= new Date(shiftStartIso)) return;
+            }
+
             movements.push({
                 id: m.id,
                 date: m.date,
+                cajaType: mCaja,
                 type: m.type, // 'inflow' | 'outflow'
                 amount: m.amount,
                 concept: m.concept,
@@ -6365,10 +6634,23 @@ function compileAllCashMovements(shiftStartIso) {
             });
         });
     }
+
     // Add all sales during this shift (Cash, Transfer, Mercado Pago, Card, Credit)
     if (state.sales) {
         state.sales.forEach(s => {
-            if (shiftStartIso && new Date(s.date) <= new Date(shiftStartIso)) return;
+            const sCaja = s.stockSource || 'local';
+            if (cajaScope !== 'all' && sCaja !== cajaScope) return;
+
+            // Check shift boundary
+            if (cajaScope === 'all') {
+                const shiftBoundary = sCaja === 'wholesale' 
+                    ? (lastWholesaleClosure ? lastWholesaleClosure.date : null) 
+                    : (lastLocalClosure ? lastLocalClosure.date : null);
+                if (shiftBoundary && new Date(s.date) <= new Date(shiftBoundary)) return;
+            } else {
+                if (shiftStartIso && new Date(s.date) <= new Date(shiftStartIso)) return;
+            }
+
             if (s.status === 'completed') {
                 let mType = 'sale';
                 let mConcept = `Venta en Efectivo (Folio: ${s.id})`;
@@ -6388,6 +6670,7 @@ function compileAllCashMovements(shiftStartIso) {
                 movements.push({
                     id: s.id,
                     date: s.date,
+                    cajaType: sCaja,
                     type: mType,
                     amount: s.total,
                     concept: mConcept,
@@ -6398,6 +6681,7 @@ function compileAllCashMovements(shiftStartIso) {
                 movements.push({
                     id: s.id,
                     date: s.date,
+                    cajaType: sCaja,
                     type: 'voided',
                     amount: s.total,
                     concept: `Anulación Venta (${methodLabel} - Folio: ${s.id})`,
@@ -6406,6 +6690,7 @@ function compileAllCashMovements(shiftStartIso) {
             }
         });
     }
+
     return movements.sort((a, b) => new Date(b.date) - new Date(a.date)); // descending date (newest first)
 }
 
