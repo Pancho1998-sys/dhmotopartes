@@ -363,7 +363,7 @@ function getPaymentMethodLabel(method, short = false) {
         case 'mercadopago':
         case 'mp':
             return 'Mercado Pago';
-        case 'credit': return short ? 'Cta. Cte.' : 'Cuenta Corriente (Fiado)';
+        case 'credit': return short ? 'Cta. Cte.' : 'Cuenta Corriente';
         default: return method || 'Otro';
     }
 }
