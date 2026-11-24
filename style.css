@@ -2867,6 +2867,20 @@ body.catalog-fullscreen .content-container {
     max-width: 96vw;
 }
 
+.modal-excel-box {
+    width: 1200px;
+    max-width: 96vw;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-excel-box .modal-body {
+    overflow-y: auto;
+    flex: 1;
+    max-height: calc(92vh - 140px);
+}
+
 .reception-ai-icon-badge {
     width: 36px;
     height: 36px;

@@ -97,23 +97,23 @@ const server = http.createServer((req, res) => {
     const realFilePath = path.join(REAL_DIR, cleanRelPath);
     const embeddedFilePath = path.join(__dirname, cleanRelPath);
 
-    let targetPath = null;
-    if (fs.existsSync(realFilePath) && fs.statSync(realFilePath).isFile()) {
-        targetPath = realFilePath;
-    } else if (fs.existsSync(embeddedFilePath) && fs.statSync(embeddedFilePath).isFile()) {
-        targetPath = embeddedFilePath;
-    }
+        let targetPath = null;
+        if (fs.existsSync(realFilePath) && fs.statSync(realFilePath).isFile()) {
+            targetPath = realFilePath;
+        } else if (fs.existsSync(embeddedFilePath) && fs.statSync(embeddedFilePath).isFile()) {
+            targetPath = embeddedFilePath;
+        }
 
-    if (targetPath) {
-        const ext = path.extname(targetPath).toLowerCase();
-        const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-        res.writeHead(200, { 'Content-Type': contentType });
-        fs.createReadStream(targetPath).pipe(res);
-    } else {
-        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('404 Not Found');
-    }
-});
+        if (targetPath) {
+            const ext = path.extname(targetPath).toLowerCase();
+            const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+            res.writeHead(200, { 'Content-Type': contentType });
+            fs.createReadStream(targetPath).pipe(res);
+        } else {
+            res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end('404 Not Found');
+        }
+    });
 
 function getLocalIp() {
     const interfaces = os.networkInterfaces();
