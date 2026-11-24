@@ -1519,18 +1519,40 @@ function setupEventListeners() {
 
             const cashSection = document.getElementById('checkout-cash-inputs');
             const creditInfo = document.getElementById('checkout-credit-info');
+            const digitalInfo = document.getElementById('checkout-digital-info');
 
             if (btn.dataset.method === 'cash') {
                 cashSection.style.display = 'block';
                 if (creditInfo) creditInfo.style.display = 'none';
+                if (digitalInfo) digitalInfo.style.display = 'none';
                 calculateChange();
             } else if (btn.dataset.method === 'credit') {
                 cashSection.style.display = 'none';
                 if (creditInfo) creditInfo.style.display = 'block';
+                if (digitalInfo) digitalInfo.style.display = 'none';
                 updateCreditCheckoutValidation();
+            } else if (btn.dataset.method === 'transfer' || btn.dataset.method === 'mercadopago') {
+                cashSection.style.display = 'none';
+                if (creditInfo) creditInfo.style.display = 'none';
+                if (digitalInfo) {
+                    digitalInfo.style.display = 'block';
+                    const aliasEl = document.getElementById('checkout-digital-alias');
+                    const holderEl = document.getElementById('checkout-digital-holder');
+                    const titleEl = document.getElementById('checkout-digital-title');
+                    if (aliasEl) aliasEl.textContent = (state.settings && state.settings.storeAlias) || 'DHMOTOPARTES';
+                    if (holderEl) holderEl.textContent = (state.settings && state.settings.storeHolder) || 'DANIEL OSCAR HIDALGO';
+                    if (titleEl) {
+                        titleEl.innerHTML = btn.dataset.method === 'mercadopago'
+                            ? '<i data-lucide="qr-code" style="width: 16px; height: 16px; vertical-align: middle;"></i> Datos para Cobro con Mercado Pago / CVU'
+                            : '<i data-lucide="arrow-left-right" style="width: 16px; height: 16px; vertical-align: middle;"></i> Datos para Transferencia Bancaria / CBU';
+                        if (window.lucide) lucide.createIcons();
+                    }
+                }
+                document.getElementById('checkout-confirm-btn').disabled = false;
             } else {
                 cashSection.style.display = 'none';
                 if (creditInfo) creditInfo.style.display = 'none';
+                if (digitalInfo) digitalInfo.style.display = 'none';
                 document.getElementById('checkout-confirm-btn').disabled = false;
             }
         }
@@ -3387,6 +3409,8 @@ function openCheckoutModal() {
     document.getElementById('checkout-cash-inputs').style.display = 'block';
     const creditInfo = document.getElementById('checkout-credit-info');
     if (creditInfo) creditInfo.style.display = 'none';
+    const digitalInfo = document.getElementById('checkout-digital-info');
+    if (digitalInfo) digitalInfo.style.display = 'none';
 
     openModal('modal-checkout');
 }
@@ -4344,6 +4368,7 @@ window.saveCustomerPayment = function (e) {
         date: new Date().toISOString(),
         type: 'inflow',
         amount: amount,
+        paymentMethod: method,
         concept: `Cobro Cta. Cte. - ${c.name}`,
         notes: notes || `Cobro de deuda de cliente vía ${getPaymentMethodLabel(method)}`
     });
@@ -5666,14 +5691,40 @@ function getShiftMetrics() {
         return new Date(s.date) > new Date(shiftStartIso);
     }) : [];
 
-    const cashSalesList = shiftSales.filter(s => s.paymentMethod === 'cash');
-    const cashSales = cashSalesList.filter(s => s.status === 'completed').reduce((sum, s) => sum + s.total, 0);
-    const cashSalesCount = cashSalesList.filter(s => s.status === 'completed').length;
-    const voidsTotal = cashSalesList.filter(s => s.status === 'voided').reduce((sum, s) => sum + s.total, 0);
+    const completedSales = shiftSales.filter(s => s.status === 'completed');
 
-    const otherSales = shiftSales
-        .filter(s => s.paymentMethod !== 'cash' && s.status === 'completed')
+    // 1. Efectivo
+    const cashSalesList = completedSales.filter(s => s.paymentMethod === 'cash');
+    const cashSales = cashSalesList.reduce((sum, s) => sum + s.total, 0);
+    const cashSalesCount = cashSalesList.length;
+    const voidsTotal = shiftSales.filter(s => s.paymentMethod === 'cash' && s.status === 'voided').reduce((sum, s) => sum + s.total, 0);
+
+    // 2. Transferencias Bancarias
+    const transferSalesList = completedSales.filter(s => s.paymentMethod === 'transfer');
+    const transferSales = transferSalesList.reduce((sum, s) => sum + s.total, 0);
+    const transferSalesCount = transferSalesList.length;
+
+    // 3. Mercado Pago
+    const mpSalesList = completedSales.filter(s => s.paymentMethod === 'mercadopago' || s.paymentMethod === 'mp');
+    const mpSales = mpSalesList.reduce((sum, s) => sum + s.total, 0);
+    const mpSalesCount = mpSalesList.length;
+
+    // 4. Tarjetas Débito / Crédito
+    const cardSalesList = completedSales.filter(s => s.paymentMethod === 'card');
+    const cardSales = cardSalesList.reduce((sum, s) => sum + s.total, 0);
+    const cardSalesCount = cardSalesList.length;
+
+    // 5. Cuenta Corriente
+    const creditSalesList = completedSales.filter(s => s.paymentMethod === 'credit');
+    const creditSales = creditSalesList.reduce((sum, s) => sum + s.total, 0);
+    const creditSalesCount = creditSalesList.length;
+
+    // Totales Digitales y Generales
+    const digitalTotal = transferSales + mpSales + cardSales;
+    const otherSales = completedSales
+        .filter(s => s.paymentMethod !== 'cash')
         .reduce((sum, s) => sum + s.total, 0);
+    const grandTotal = cashSales + otherSales;
 
     // Filter cash movements in current shift
     const shiftMovements = state.cashMovements ? state.cashMovements.filter(m => {
@@ -5697,7 +5748,17 @@ function getShiftMetrics() {
         initialBalance,
         cashSales,
         cashSalesCount,
+        transferSales,
+        transferSalesCount,
+        mpSales,
+        mpSalesCount,
+        cardSales,
+        cardSalesCount,
+        creditSales,
+        creditSalesCount,
+        digitalTotal,
         otherSales,
+        grandTotal,
         inflowsTotal,
         inflowsCount,
         outflowsTotal,
@@ -5717,6 +5778,17 @@ function renderCaja() {
     document.getElementById('caja-metric-balance').textContent = `${currency}${metrics.expectedCash.toFixed(2)}`;
     document.getElementById('caja-metric-sales').textContent = `${currency}${metrics.cashSales.toFixed(2)}`;
     document.getElementById('caja-metric-sales-count').textContent = `${metrics.cashSalesCount} transacciones`;
+
+    const elTransfer = document.getElementById('caja-metric-transfer');
+    if (elTransfer) elTransfer.textContent = `${currency}${metrics.transferSales.toFixed(2)}`;
+    const elTransferCount = document.getElementById('caja-metric-transfer-count');
+    if (elTransferCount) elTransferCount.textContent = `${metrics.transferSalesCount} transacciones`;
+
+    const elMp = document.getElementById('caja-metric-mp');
+    if (elMp) elMp.textContent = `${currency}${metrics.mpSales.toFixed(2)}`;
+    const elMpCount = document.getElementById('caja-metric-mp-count');
+    if (elMpCount) elMpCount.textContent = `${metrics.mpSalesCount} transacciones`;
+
     document.getElementById('caja-metric-inflows').textContent = `${currency}${metrics.inflowsTotal.toFixed(2)}`;
     document.getElementById('caja-metric-inflows-count').textContent = `${metrics.inflowsCount} movimientos`;
     document.getElementById('caja-metric-outflows').textContent = `${currency}${metrics.outflowsTotal.toFixed(2)}`;
@@ -5770,6 +5842,7 @@ function renderCaja() {
     let rowsHtml = '';
     pageItems.forEach(m => {
         let typeBadgeClass = 'badge-primary';
+        let customBadgeStyle = '';
         let typeText = 'Venta';
         let amountPrefix = '+';
         let amountClass = 'text-success';
@@ -5794,12 +5867,36 @@ function renderCaja() {
             typeText = 'Venta Efectivo';
             amountPrefix = '+';
             amountClass = 'text-success';
+        } else if (m.type === 'sale_transfer') {
+            typeBadgeClass = '';
+            customBadgeStyle = 'background: rgba(2, 132, 199, 0.15); color: #0284c7; font-weight: 700;';
+            typeText = 'Transferencia';
+            amountPrefix = '+';
+            amountClass = 'text-success';
+        } else if (m.type === 'sale_mp') {
+            typeBadgeClass = '';
+            customBadgeStyle = 'background: rgba(0, 158, 227, 0.15); color: #009ee3; font-weight: 700;';
+            typeText = 'Mercado Pago';
+            amountPrefix = '+';
+            amountClass = 'text-success';
+        } else if (m.type === 'sale_card') {
+            typeBadgeClass = '';
+            customBadgeStyle = 'background: rgba(139, 92, 246, 0.15); color: #8b5cf6; font-weight: 700;';
+            typeText = 'Tarjeta';
+            amountPrefix = '+';
+            amountClass = 'text-success';
+        } else if (m.type === 'sale_credit') {
+            typeBadgeClass = '';
+            customBadgeStyle = 'background: rgba(245, 158, 11, 0.15); color: #d97706; font-weight: 700;';
+            typeText = 'Cta. Cte.';
+            amountPrefix = '+';
+            amountClass = 'text-muted';
         }
 
         rowsHtml += `
             <tr>
                 <td>${new Date(m.date).toLocaleString('es-ES')}</td>
-                <td><span class="badge ${typeBadgeClass}">${typeText}</span></td>
+                <td><span class="badge ${typeBadgeClass}" ${customBadgeStyle ? `style="${customBadgeStyle}"` : ''}>${typeText}</span></td>
                 <td style="font-weight: 500;">${m.concept}</td>
                 <td class="text-right ${amountClass}" style="font-weight: 700;">
                     ${amountPrefix}${currency}${m.amount.toFixed(2)}
@@ -5868,7 +5965,7 @@ function renderCierresHistorial() {
     if (pageItems.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" class="text-center text-muted" style="padding: 40px;">
+                <td colspan="9" class="text-center text-muted" style="padding: 40px;">
                     Aún no se han realizado cierres de caja en el sistema.
                 </td>
             </tr>
@@ -5899,8 +5996,9 @@ function renderCierresHistorial() {
                 <td style="font-weight: 700; color: var(--primary);">#${c.closureNumber || 1}</td>
                 <td>${new Date(c.date).toLocaleString('es-ES')}</td>
                 <td>${c.cashierName || c.closedBy}</td>
-                <td class="text-right">${currency}${(c.expectedCash || 0).toFixed(2)}</td>
                 <td class="text-right" style="font-weight: 700;">${currency}${(c.actualCash || 0).toFixed(2)}</td>
+                <td class="text-right" style="color: #0284c7; font-weight: 600;">+${currency}${(c.transferSales || 0).toFixed(2)}</td>
+                <td class="text-right" style="color: #009ee3; font-weight: 600;">+${currency}${(c.mpSales || 0).toFixed(2)}</td>
                 <td class="text-right"><span class="badge ${diffBadgeClass}">${diffText}</span></td>
                 <td class="text-center">
                     <span class="badge ${c.emailSentTo ? 'badge-success' : 'badge-warning'}">
@@ -5944,7 +6042,25 @@ function openCierreCajaModal() {
     document.getElementById('cierre-outflows-display').textContent = `-${currency}${metrics.outflowsTotal.toFixed(2)} (${metrics.outflowsCount} mov.)`;
     document.getElementById('cierre-voids-display').textContent = `-${currency}${metrics.voidsTotal.toFixed(2)}`;
     document.getElementById('cierre-expected-display').textContent = `${currency}${metrics.expectedCash.toFixed(2)}`;
-    document.getElementById('cierre-other-sales-display').textContent = `${currency}${metrics.otherSales.toFixed(2)}`;
+
+    const elCierreTransf = document.getElementById('cierre-transfer-sales-display');
+    if (elCierreTransf) elCierreTransf.textContent = `+${currency}${metrics.transferSales.toFixed(2)} (${metrics.transferSalesCount} ventas)`;
+
+    const elCierreMp = document.getElementById('cierre-mp-sales-display');
+    if (elCierreMp) elCierreMp.textContent = `+${currency}${metrics.mpSales.toFixed(2)} (${metrics.mpSalesCount} ventas)`;
+
+    const elCierreCard = document.getElementById('cierre-card-sales-display');
+    if (elCierreCard) elCierreCard.textContent = `+${currency}${metrics.cardSales.toFixed(2)} (${metrics.cardSalesCount} ventas)`;
+
+    const elCierreDigital = document.getElementById('cierre-digital-total-display');
+    if (elCierreDigital) elCierreDigital.textContent = `${currency}${metrics.digitalTotal.toFixed(2)}`;
+
+    const elCierreGrand = document.getElementById('cierre-grand-total-display');
+    if (elCierreGrand) elCierreGrand.textContent = `${currency}${metrics.grandTotal.toFixed(2)}`;
+
+    const elOther = document.getElementById('cierre-other-sales-display');
+    if (elOther) elOther.textContent = `${currency}${metrics.otherSales.toFixed(2)}`;
+
     document.getElementById('cierre-shift-period-text').textContent = `Turno desde: ${metrics.shiftStartFormatted}`;
 
     const actualInput = document.getElementById('cierre-actual-cash');
@@ -6008,7 +6124,17 @@ async function processCierreCaja(e) {
         initialBalance: metrics.initialBalance,
         cashSales: metrics.cashSales,
         cashSalesCount: metrics.cashSalesCount,
+        transferSales: metrics.transferSales,
+        transferSalesCount: metrics.transferSalesCount,
+        mpSales: metrics.mpSales,
+        mpSalesCount: metrics.mpSalesCount,
+        cardSales: metrics.cardSales,
+        cardSalesCount: metrics.cardSalesCount,
+        creditSales: metrics.creditSales,
+        creditSalesCount: metrics.creditSalesCount,
+        digitalTotal: metrics.digitalTotal,
         otherSales: metrics.otherSales,
+        grandTotal: metrics.grandTotal,
         inflows: metrics.inflowsTotal,
         inflowsCount: metrics.inflowsCount,
         outflows: metrics.outflowsTotal,
@@ -6058,7 +6184,15 @@ async function sendCierreEmail(closureObj) {
                     initialBalance: closureObj.initialBalance,
                     cashSales: closureObj.cashSales,
                     cashSalesCount: closureObj.cashSalesCount,
+                    transferSales: closureObj.transferSales || 0,
+                    transferSalesCount: closureObj.transferSalesCount || 0,
+                    mpSales: closureObj.mpSales || 0,
+                    mpSalesCount: closureObj.mpSalesCount || 0,
+                    cardSales: closureObj.cardSales || 0,
+                    cardSalesCount: closureObj.cardSalesCount || 0,
+                    digitalTotal: closureObj.digitalTotal || 0,
                     otherSales: closureObj.otherSales,
+                    grandTotal: closureObj.grandTotal || ((closureObj.cashSales || 0) + (closureObj.otherSales || 0)),
                     inflows: closureObj.inflows,
                     inflowsCount: closureObj.inflowsCount,
                     outflows: closureObj.outflows,
@@ -6137,11 +6271,33 @@ window.viewClosureDetail = function(closureId) {
                 </tbody>
             </table>
 
-            ${closure.otherSales > 0 ? `
-            <div style="border-top: 1px dashed var(--border-color); padding-top: 6px; font-size: 11px; color: var(--text-muted);">
-                Ventas en otros medios de pago (Transferencias / Tarjetas): <strong>${currency}${(closure.otherSales).toFixed(2)}</strong>
+            <div style="border-top: 1px dashed var(--border-color); padding-top: 8px; margin-top: 6px; font-size: 12px;">
+                <div style="font-weight: 700; margin-bottom: 6px; text-transform: uppercase; color: var(--text-muted); font-size: 11px;">
+                    COBROS DIGITALES REGISTRADOS:
+                </div>
+                <div style="display: flex; justify-content: space-between; color: #0284c7; margin-bottom: 3px;">
+                    <span>Transferencias Bancarias:</span>
+                    <strong>${currency}${(closure.transferSales || 0).toFixed(2)} (${closure.transferSalesCount || 0} v.)</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; color: #009ee3; margin-bottom: 3px;">
+                    <span>Mercado Pago:</span>
+                    <strong>${currency}${(closure.mpSales || 0).toFixed(2)} (${closure.mpSalesCount || 0} v.)</strong>
+                </div>
+                ${(closure.cardSales || 0) > 0 ? `
+                <div style="display: flex; justify-content: space-between; color: #8b5cf6; margin-bottom: 3px;">
+                    <span>Tarjetas Débito/Crédito:</span>
+                    <strong>${currency}${(closure.cardSales || 0).toFixed(2)} (${closure.cardSalesCount || 0} v.)</strong>
+                </div>
+                ` : ''}
+                <div style="display: flex; justify-content: space-between; font-weight: 700; border-top: 1px dotted var(--border-color); margin-top: 5px; padding-top: 5px;">
+                    <span>TOTAL COBROS DIGITALES:</span>
+                    <strong>${currency}${((closure.digitalTotal !== undefined ? closure.digitalTotal : (closure.transferSales || 0) + (closure.mpSales || 0) + (closure.cardSales || 0)) || closure.otherSales || 0).toFixed(2)}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 13px; margin-top: 6px; padding-top: 4px; border-top: 1px solid var(--border-color); color: var(--primary);">
+                    <span>TOTAL FACTURADO DEL TURNO:</span>
+                    <strong>${currency}${((closure.grandTotal !== undefined ? closure.grandTotal : ((closure.cashSales || 0) + (closure.otherSales || 0)))).toFixed(2)}</strong>
+                </div>
             </div>
-            ` : ''}
 
             ${closure.notes ? `
             <div style="border-top: 1px dashed var(--border-color); padding-top: 6px; margin-top: 6px; font-size: 12px; font-style: italic;">
@@ -6209,30 +6365,44 @@ function compileAllCashMovements(shiftStartIso) {
             });
         });
     }
-    // Add cash sales
+    // Add all sales during this shift (Cash, Transfer, Mercado Pago, Card, Credit)
     if (state.sales) {
         state.sales.forEach(s => {
             if (shiftStartIso && new Date(s.date) <= new Date(shiftStartIso)) return;
-            if (s.paymentMethod === 'cash') {
-                if (s.status === 'completed') {
-                    movements.push({
-                        id: s.id,
-                        date: s.date,
-                        type: 'sale',
-                        amount: s.total,
-                        concept: `Venta en Efectivo (Folio: ${s.id})`,
-                        notes: `Cliente: ${s.customerName}`
-                    });
-                } else if (s.status === 'voided') {
-                    movements.push({
-                        id: s.id,
-                        date: s.date,
-                        type: 'voided',
-                        amount: s.total,
-                        concept: `Anulación Venta Efectivo (Folio: ${s.id})`,
-                        notes: `Reembolso de venta por anulación`
-                    });
+            if (s.status === 'completed') {
+                let mType = 'sale';
+                let mConcept = `Venta en Efectivo (Folio: ${s.id})`;
+                if (s.paymentMethod === 'transfer') {
+                    mType = 'sale_transfer';
+                    mConcept = `Venta Transferencia Bancaria (Folio: ${s.id})`;
+                } else if (s.paymentMethod === 'mercadopago' || s.paymentMethod === 'mp') {
+                    mType = 'sale_mp';
+                    mConcept = `Venta Mercado Pago (Folio: ${s.id})`;
+                } else if (s.paymentMethod === 'card') {
+                    mType = 'sale_card';
+                    mConcept = `Venta con Tarjeta (Folio: ${s.id})`;
+                } else if (s.paymentMethod === 'credit') {
+                    mType = 'sale_credit';
+                    mConcept = `Venta Cuenta Corriente (Folio: ${s.id})`;
                 }
+                movements.push({
+                    id: s.id,
+                    date: s.date,
+                    type: mType,
+                    amount: s.total,
+                    concept: mConcept,
+                    notes: `Cliente: ${s.customerName || 'Consumidor Final'}`
+                });
+            } else if (s.status === 'voided') {
+                const methodLabel = typeof getPaymentMethodLabel === 'function' ? getPaymentMethodLabel(s.paymentMethod) : (s.paymentMethod || 'Venta');
+                movements.push({
+                    id: s.id,
+                    date: s.date,
+                    type: 'voided',
+                    amount: s.total,
+                    concept: `Anulación Venta (${methodLabel} - Folio: ${s.id})`,
+                    notes: `Reembolso de venta por anulación`
+                });
             }
         });
     }
