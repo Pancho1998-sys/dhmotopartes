@@ -1474,8 +1474,10 @@ function setupEventListeners() {
         const dniInput = document.getElementById('cust-dni');
         if (dniInput) {
             dniInput.readOnly = false;
-            dniInput.required = true;
+            dniInput.required = false;
         }
+        const debtInput = document.getElementById('cust-initial-debt');
+        if (debtInput) debtInput.value = '0.00';
         openModal('modal-customer');
     });
 
@@ -1494,7 +1496,7 @@ function setupEventListeners() {
                 } else {
                     if (dniInput.value === '0') dniInput.value = '';
                     dniInput.readOnly = false;
-                    dniInput.required = true;
+                    dniInput.required = false;
                 }
             }
         });
@@ -1689,8 +1691,10 @@ function setupEventListeners() {
         const dniInput = document.getElementById('cust-dni');
         if (dniInput) {
             dniInput.readOnly = false;
-            dniInput.required = true;
+            dniInput.required = false;
         }
+        const debtInput = document.getElementById('cust-initial-debt');
+        if (debtInput) debtInput.value = '0.00';
         openModal('modal-customer');
     });
 
@@ -4221,11 +4225,24 @@ function saveCustomer(e) {
     const defaultPriceList = document.getElementById('cust-price-list').value;
     const hasCreditAccount = document.getElementById('cust-has-credit') ? document.getElementById('cust-has-credit').checked : true;
     const creditLimit = parseFloat(document.getElementById('cust-credit-limit') ? document.getElementById('cust-credit-limit').value : 0) || 0;
+    const debtInput = document.getElementById('cust-initial-debt');
+    const enteredDebt = debtInput ? (parseFloat(debtInput.value) || 0) : 0;
 
     const compiledName = `${firstName} ${lastName}`;
 
     if (!id) {
         // Create new
+        const newCustomerMovements = [];
+        if (enteredDebt !== 0) {
+            newCustomerMovements.push({
+                id: `cc_${Date.now()}`,
+                date: new Date().toISOString(),
+                type: enteredDebt > 0 ? 'initial_balance' : 'payment',
+                amount: Math.abs(enteredDebt),
+                description: 'Saldo inicial cargado manualmente'
+            });
+        }
+
         state.customers.push({
             id: `c_${Date.now()}`,
             firstName,
@@ -4240,8 +4257,8 @@ function saveCustomer(e) {
             defaultPriceList,
             hasCreditAccount,
             creditLimit,
-            deuda: 0,
-            ctaCteMovements: [],
+            deuda: enteredDebt,
+            ctaCteMovements: newCustomerMovements,
             dateRegistered: new Date().toISOString().split('T')[0]
         });
     } else {
@@ -4260,6 +4277,21 @@ function saveCustomer(e) {
             customer.defaultPriceList = defaultPriceList;
             customer.hasCreditAccount = hasCreditAccount;
             customer.creditLimit = creditLimit;
+
+            // Handle manual debt adjustment during edit
+            const currentDebt = customer.deuda || 0;
+            if (Math.abs(enteredDebt - currentDebt) > 0.001) {
+                const diff = Math.round((enteredDebt - currentDebt) * 100) / 100;
+                customer.deuda = enteredDebt;
+                if (!customer.ctaCteMovements) customer.ctaCteMovements = [];
+                customer.ctaCteMovements.push({
+                    id: `cc_${Date.now()}`,
+                    date: new Date().toISOString(),
+                    type: diff > 0 ? 'initial_balance' : 'payment',
+                    amount: Math.abs(diff),
+                    description: `Ajuste manual de saldo (${diff > 0 ? 'Incremento' : 'Disminución'})`
+                });
+            }
         }
     }
 
@@ -4292,6 +4324,8 @@ window.editCustomer = function (id) {
     if (hasCreditCheckbox) hasCreditCheckbox.checked = c.hasCreditAccount !== false;
     const creditLimitInput = document.getElementById('cust-credit-limit');
     if (creditLimitInput) creditLimitInput.value = c.creditLimit || '';
+    const debtInput = document.getElementById('cust-initial-debt');
+    if (debtInput) debtInput.value = (c.deuda || 0).toFixed(2);
 
     const docTipoSelect = document.getElementById('cust-doc-tipo');
     const dniInput = document.getElementById('cust-dni');
@@ -4312,7 +4346,7 @@ window.editCustomer = function (id) {
             dniInput.required = false;
         } else {
             dniInput.readOnly = false;
-            dniInput.required = true;
+            dniInput.required = false;
         }
     }
 
@@ -4465,10 +4499,15 @@ window.openCustomerMovementsModal = function (customerId) {
         let rowsHtml = '';
         movements.forEach(m => {
             const dateFormatted = new Date(m.date).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
-            const isCharge = m.type === 'charge';
-            const badge = isCharge 
-                ? `<span class="badge badge-danger">Cargo (Compra)</span>` 
-                : `<span class="badge badge-success">Abono (Pago)</span>`;
+            const isCharge = m.type === 'charge' || m.type === 'initial_balance';
+            let badge = '';
+            if (m.type === 'charge') {
+                badge = `<span class="badge badge-danger">Cargo (Compra)</span>`;
+            } else if (m.type === 'initial_balance') {
+                badge = `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #d97706; font-weight: 700; border: 1px solid rgba(245, 158, 11, 0.3);">Saldo Inicial</span>`;
+            } else {
+                badge = `<span class="badge badge-success">Abono (Pago)</span>`;
+            }
             const amountFormatted = isCharge 
                 ? `+${state.settings.currency}${m.amount.toFixed(2)}` 
                 : `-${state.settings.currency}${m.amount.toFixed(2)}`;
@@ -4521,8 +4560,8 @@ window.printCustomerStatement = function () {
 
     movements.forEach(m => {
         const dateFormatted = new Date(m.date).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
-        const isCharge = m.type === 'charge';
-        const typeStr = isCharge ? 'Cargo' : 'Abono';
+        const isCharge = m.type === 'charge' || m.type === 'initial_balance';
+        const typeStr = m.type === 'charge' ? 'Cargo' : (m.type === 'initial_balance' ? 'Saldo Inicial' : 'Abono');
         const sign = isCharge ? '+' : '-';
         printContent += `
             <tr style="border-bottom: 1px solid #eee;">
