@@ -1170,7 +1170,7 @@ function initRouter() {
 
 function handleRoute() {
     const hash = window.location.hash || '#dashboard';
-    const views = ['dashboard', 'pos', 'inventario', 'clientes', 'proveedores', 'historial', 'caja', 'configuracion', 'saas', 'catalogo'];
+    const views = ['dashboard', 'pos', 'inventario', 'clientes', 'proveedores', 'historial', 'caja', 'metricas', 'configuracion', 'saas', 'catalogo'];
 
     // Parse target view
     let targetView = hash.replace('#', '');
@@ -1195,7 +1195,7 @@ function handleRoute() {
 
     // Route protection for saas_admin
     if (currentUserRole === 'saas_admin') {
-        const forbiddenViewsForSaaSAdmin = ['pos', 'inventario', 'clientes', 'proveedores', 'caja', 'configuracion'];
+        const forbiddenViewsForSaaSAdmin = ['pos', 'inventario', 'clientes', 'proveedores', 'caja', 'metricas', 'configuracion'];
         if (forbiddenViewsForSaaSAdmin.includes(targetView)) {
             window.location.hash = '#dashboard';
             return;
@@ -2352,6 +2352,8 @@ function renderApp() {
         renderHistory();
     } else if (targetView === 'caja') {
         renderCaja();
+    } else if (targetView === 'metricas') {
+        renderMetricas();
     }
 }
 
@@ -7158,7 +7160,7 @@ function renderMetricasChart(containerId, series, currency, mode) {
     container.innerHTML = svg;
 }
 
-window.renderMetricas = function() {
+function renderMetricas() {
     const currency = (state.settings && state.settings.currency) || '$';
     const { start, end } = getMetricasDateRange();
 
@@ -7387,7 +7389,8 @@ window.renderMetricas = function() {
     }
 
     if (window.lucide) lucide.createIcons();
-};
+}
+window.renderMetricas = renderMetricas;
 
 window.exportMetricasCSV = function() {
     const currency = (state.settings && state.settings.currency) || '$';
