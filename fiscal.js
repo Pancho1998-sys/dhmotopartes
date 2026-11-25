@@ -230,12 +230,15 @@ async function loadFiscalConfig() {
                 .eq('store_id', myStoreId)
                 .maybeSingle();
 
-            if (error) {
-                console.error("Error al obtener configuración fiscal de Supabase:", error);
+            if (!error) {
+                if (data) {
+                    localStorage.setItem(`dhmotopartes_fiscal_${myStoreId}`, JSON.stringify(data));
+                }
+                return data || null;
             }
-            return data || null;
+            console.warn("No se pudo obtener configuración fiscal de Supabase, usando caché local:", error);
         } catch (e) {
-            console.error("Excepción al cargar configuración fiscal:", e);
+            console.warn("Excepción al cargar configuración fiscal, usando caché local:", e);
         }
     }
     

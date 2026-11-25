@@ -5,7 +5,7 @@ a = Analysis(
     ['server.py'],
     pathex=[],
     binaries=[],
-    datas=[('index.html', '.'), ('style.css', '.'), ('components.js', '.'), ('fiscal.js', '.'), ('app.js', '.'), ('supabase-config.js', '.'), ('xlsx.full.min.js', '.')],
+    datas=[('index.html', '.'), ('style.css', '.'), ('components.js', '.'), ('fiscal.js', '.'), ('app.js', '.'), ('supabase-config.js', '.'), ('supabase.min.js', '.'), ('lucide.min.js', '.'), ('xlsx.full.min.js', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

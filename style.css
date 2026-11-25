@@ -5,7 +5,7 @@
 /* Theme Variables (Default Dark Mode) */
 :root {
     --font-body: 'Inter', system-ui, -apple-system, sans-serif;
-    --font-title: 'Outfit', sans-serif;
+    --font-title: 'Outfit', system-ui, -apple-system, sans-serif;
 
     /* Orange Theme Accent (Default) */
     --primary: #f97316;

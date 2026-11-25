@@ -253,6 +253,20 @@ let currentUserRole = 'usuario';
 let currentUserProfile = null;
 let myStoreId = null;
 let isExecutable = false;
+let isLocalOfflineMode = false;
+
+function isNetworkOfflineError(error) {
+    if (!window.navigator.onLine) return true;
+    if (!error) return false;
+    const msg = String(error.message || error).toLowerCase();
+    return msg.includes('failed to fetch') ||
+        msg.includes('networkerror') ||
+        msg.includes('fetch') ||
+        msg.includes('enotfound') ||
+        msg.includes('internet') ||
+        error.code === 'PGRST102' ||
+        error.status === 0;
+}
 
 // Setup Supabase Auth & Login UI flow
 async function setupAuthentication() {
@@ -282,10 +296,11 @@ async function setupAuthentication() {
         localLoginConfirmBtn.onclick = async () => {
             const roleSelect = document.getElementById('local-role-select');
             currentUserRole = roleSelect ? roleSelect.value : 'superadmin';
+            isLocalOfflineMode = true;
             
             // Set dummy user profile locally
             currentUserProfile = {
-                first_name: "Usuario",
+                first_name: currentUserRole === 'cajero' ? "Cajero" : "Usuario",
                 last_name: "Local",
                 dni: "",
                 role: currentUserRole,
@@ -293,17 +308,29 @@ async function setupAuthentication() {
             };
             myStoreId = null;
 
+            const avatarEl = document.getElementById('user-avatar');
+            const nameEl = document.getElementById('user-name-display');
+            if (avatarEl) avatarEl.textContent = currentUserRole === 'cajero' ? 'CL' : 'UL';
+            if (nameEl) nameEl.textContent = `${currentUserProfile.first_name} Local`;
+            if (btnLogout) btnLogout.style.display = 'inline-flex';
+
             if (loginOverlay) {
                 loginOverlay.classList.remove('active');
                 loginOverlay.style.display = 'none';
             }
 
             // Show/hide navigation tabs
-            const allNavIds = ['nav-dashboard', 'nav-pos', 'nav-inventario', 'nav-clientes', 'nav-proveedores', 'nav-historial', 'nav-caja', 'nav-configuracion'];
+            const allNavIds = ['nav-dashboard', 'nav-pos', 'nav-inventario', 'nav-clientes', 'nav-proveedores', 'nav-historial', 'nav-caja', 'nav-metricas', 'nav-configuracion'];
             allNavIds.forEach(id => {
                 const el = document.getElementById(id);
                 if (el && el.parentElement) el.parentElement.style.display = 'block';
             });
+
+            const navSaas = document.getElementById('nav-item-saas');
+            if (navSaas) navSaas.style.display = 'none';
+
+            const cajerosPanel = document.getElementById('superadmin-cajeros-panel');
+            if (cajerosPanel) cajerosPanel.style.display = 'none';
 
             if (currentUserRole === 'cajero') {
                 const navItemsToHide = ['nav-dashboard', 'nav-inventario', 'nav-clientes', 'nav-proveedores', 'nav-historial', 'nav-caja', 'nav-metricas', 'nav-configuracion'];
@@ -353,40 +380,51 @@ async function setupAuthentication() {
     // Set up logout button click listener
     if (btnLogout) {
         btnLogout.addEventListener('click', async () => {
-            if (supabaseInitialized && supabaseClient) {
-                resetStateToDefault();
+            const wasLocalOffline = isLocalOfflineMode;
+            isLocalOfflineMode = false;
+            currentUserRole = 'usuario';
+            currentUserProfile = null;
+            myStoreId = null;
+            resetStateToDefault();
+
+            const hasCloudSession = !wasLocalOffline && supabaseInitialized && supabaseClient
+                ? !!(await supabaseClient.auth.getSession()).data.session
+                : false;
+
+            if (hasCloudSession) {
                 await supabaseClient.auth.signOut();
                 playScanSound('warning');
             } else {
-                alert("Sesión local finalizada.");
-                window.location.reload();
+                renderApp();
+                const localLoginSection = document.getElementById('local-login-section');
+                if (loginForm) loginForm.style.display = 'block';
+                if (localLoginSection) localLoginSection.style.display = 'none';
+                if (loginOverlay) {
+                    loginOverlay.classList.add('active');
+                    loginOverlay.style.display = 'flex';
+                }
+                btnLogout.style.display = 'none';
+                playScanSound('warning');
             }
         });
     }
 
     if (!supabaseInitialized) {
-        // Supabase is not configured yet.
+        // Supabase is not available or not configured; allow local offline mode seamlessly.
         if (loginOverlay) {
             loginOverlay.classList.add('active');
             loginOverlay.style.display = 'flex';
         }
         
-        if (isExecutable) {
-            if (loginStatus) {
-                loginStatus.innerHTML = `⚠️ <strong>Acceso denegado: Base de datos no configurada.</strong><br>Contacte al administrador del sistema para configurar Supabase.`;
-            }
-            if (loginBtnLocal) {
-                loginBtnLocal.style.display = 'none';
-            }
-        } else {
-            if (loginStatus) {
-                loginStatus.innerHTML = `⚠️ <strong>Base de datos en la nube no configurada.</strong><br>Completa las credenciales en <code>supabase-config.js</code> para conectar el sistema a internet.`;
-            }
-            if (loginBtnLocal) {
-                loginBtnLocal.style.display = 'block';
-            }
+        if (loginStatus) {
+            loginStatus.innerHTML = isExecutable
+                ? `ℹ️ <strong>Sin conexión a la nube.</strong><br>Podés usar el botón de <strong>Modo Local</strong> para trabajar sin internet.`
+                : `⚠️ <strong>Base de datos en la nube no disponible.</strong><br>Podés usar el <strong>Modo Local</strong> o verificar <code>supabase-config.js</code>.`;
         }
-        // Disable submit button since there is no Supabase to authenticate against
+        if (loginBtnLocal) {
+            loginBtnLocal.style.display = 'block';
+        }
+        // Disable cloud submit button since Supabase is unavailable
         const btnSubmit = document.getElementById('login-btn-submit');
         if (btnSubmit) btnSubmit.disabled = true;
         return;
@@ -408,6 +446,7 @@ async function setupAuthentication() {
 
     supabaseClient.auth.onAuthStateChange(async (event, session) => {
         if (session && session.user) {
+            isLocalOfflineMode = false;
             const user = session.user;
             console.log("Usuario autenticado en Supabase:", user.email);
             try {
@@ -419,10 +458,8 @@ async function setupAuthentication() {
                     .single();
  
                 if (error || !profile) {
-                    console.error("Error al obtener perfil, reintentando...", error);
-                    // Check if we are offline or if it is a fetch connection error
-                    const isOfflineError = !window.navigator.onLine || error?.message?.includes('Fetch') || error?.code === 'PGRST102' || error?.status === 0;
-                    if (isOfflineError) {
+                    console.error("Error al obtener perfil, verificando respaldo local...", error);
+                    if (isNetworkOfflineError(error)) {
                         const cached = localStorage.getItem('dhmotopartes_cached_profile');
                         if (cached) {
                             try {
@@ -790,10 +827,10 @@ async function loadDatabase() {
         return;
     }
     resetStateToDefault(); // Clean local memory first to prevent leakage
-    const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
+    const session = (!isLocalOfflineMode && supabaseClient) ? (await supabaseClient.auth.getSession()).data.session : null;
     
     // Check if we have unsynced local data that must be pushed first
-    const needsSync = myStoreId && localStorage.getItem('dhmotopartes_needs_sync_' + myStoreId) === 'true';
+    const needsSync = !isLocalOfflineMode && myStoreId && localStorage.getItem('dhmotopartes_needs_sync_' + myStoreId) === 'true';
     
     if (needsSync) {
         console.log("Unsynced local changes detected. Loading from LocalStorage first to prevent data loss.");
@@ -802,10 +839,11 @@ async function loadDatabase() {
             try {
                 state = ensureStateProperties(JSON.parse(localData));
                 syncSettingsInputs();
+                await syncFiscalSettingsInputs();
                 renderApp();
                 
                 // If we are online, attempt to sync now
-                if (supabaseInitialized && session && session.user) {
+                if (supabaseInitialized && session && session.user && window.navigator.onLine) {
                     updateSidebarStatus('pending', "Sincronizando...");
                     await saveDatabase();
                 } else {
@@ -823,7 +861,7 @@ async function loadDatabase() {
         }
     }
 
-    if (supabaseInitialized && session && session.user) {
+    if (!isLocalOfflineMode && supabaseInitialized && session && session.user) {
         try {
             if (!supabaseSyncActive && myStoreId) {
                 // Load current global state
@@ -834,7 +872,6 @@ async function loadDatabase() {
                     .single();
 
                 if (error) {
-                    console.error("Error loading state from Supabase:", error);
                     if (error.code === 'PGRST116') {
                         // Store state row doesn't exist yet, we will create it when saving
                         console.log("No existe estado previo para esta tienda. Iniciando vacío.");
@@ -846,8 +883,12 @@ async function loadDatabase() {
                         if (currentUserProfile && currentUserProfile.stores && currentUserProfile.stores.name) {
                             state.settings.storeName = currentUserProfile.stores.name;
                         }
+                        localStorage.setItem(getStorageKey(), JSON.stringify(state));
                         syncSettingsInputs();
+                        await syncFiscalSettingsInputs();
                         renderApp();
+                    } else {
+                        throw error;
                     }
                 } else if (data && data.state) {
                     state = ensureStateProperties(data.state);
@@ -856,7 +897,10 @@ async function loadDatabase() {
                             state.settings.storeName = currentUserProfile.stores.name;
                         }
                     }
+                    // Keep an offline snapshot in LocalStorage for seamless offline startup
+                    localStorage.setItem(getStorageKey(), JSON.stringify(state));
                     syncSettingsInputs();
+                    await syncFiscalSettingsInputs();
                     renderApp();
                 }
 
@@ -865,12 +909,25 @@ async function loadDatabase() {
             updateSidebarStatus('online', "Conectado Nube");
             return;
         } catch (e) {
-            console.error("Error setting up Supabase sync:", e);
+            console.warn("No se pudo cargar desde Supabase, intentando caché local offline:", e);
+            const cachedLocal = localStorage.getItem(getStorageKey());
+            if (cachedLocal) {
+                try {
+                    state = ensureStateProperties(JSON.parse(cachedLocal));
+                    syncSettingsInputs();
+                    await syncFiscalSettingsInputs();
+                    renderApp();
+                    updateSidebarStatus('offline', "Modo Offline (Caché)");
+                    return;
+                } catch (parseErr) {
+                    console.error("Error al leer caché local de tienda:", parseErr);
+                }
+            }
         }
     }
 
-    // Public Guest Visitor Mode (Unauthenticated Web Catalog)
-    if (supabaseInitialized && (!session || !session.user)) {
+    // Public Guest Visitor Mode (Unauthenticated Web Catalog, skipped in explicit Local Offline Mode)
+    if (!isLocalOfflineMode && supabaseInitialized && (!session || !session.user) && window.navigator.onLine) {
         try {
             const publicStoreId = '3cd7c0ff-735b-430f-8da6-c538e4d5ed77';
             const { data, error } = await supabaseClient.rpc('get_public_catalog', { target_store_id: publicStoreId });
@@ -883,7 +940,7 @@ async function loadDatabase() {
                 }
                 console.log("Catálogo público de DHMotopartes cargado desde la nube con éxito.");
                 syncSettingsInputs();
-                syncFiscalSettingsInputs();
+                await syncFiscalSettingsInputs();
                 return;
             }
         } catch (pubErr) {
@@ -894,7 +951,7 @@ async function loadDatabase() {
     updateSidebarStatus('offline', "Modo Local");
     let loadedLocal = false;
     
-    // First try to fetch from local Python server API (/api/db)
+    // First try to fetch from local server API (/api/db)
     try {
         const response = await fetch('/api/db', {
             method: 'GET',
@@ -933,7 +990,7 @@ async function loadDatabase() {
         }
     }
     syncSettingsInputs();
-    syncFiscalSettingsInputs();
+    await syncFiscalSettingsInputs();
 }
 
 // Save DB state to LocalStorage and background push to Supabase
@@ -948,8 +1005,13 @@ async function saveDatabase(retryCount = 0) {
     // Save to LocalStorage immediately to guarantee no data loss
     localStorage.setItem(getStorageKey(), JSON.stringify(state));
 
-    const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
-    if (supabaseInitialized && session && session.user && myStoreId) {
+    const session = (!isLocalOfflineMode && supabaseClient) ? (await supabaseClient.auth.getSession()).data.session : null;
+    if (!isLocalOfflineMode && supabaseInitialized && session && session.user && myStoreId) {
+        if (!window.navigator.onLine) {
+            localStorage.setItem('dhmotopartes_needs_sync_' + myStoreId, 'true');
+            updateSidebarStatus('pending', "Modo Offline (Pendiente)");
+            return;
+        }
         isSyncing = true;
         try {
             let oldVersion = state.version || 0;

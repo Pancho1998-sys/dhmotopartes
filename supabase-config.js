@@ -7,7 +7,7 @@ const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 let supabaseClient = null;
 let supabaseInitialized = false;
 
-if (supabaseUrl && supabaseUrl !== "TU_SUPABASE_URL_AQUI" && supabaseKey && supabaseKey !== "TU_SUPABASE_ANON_KEY_AQUI") {
+if (supabaseUrl && supabaseUrl !== "TU_SUPABASE_URL_AQUI" && supabaseKey && supabaseKey !== "TU_SUPABASE_ANON_KEY_AQUI" && typeof supabase !== "undefined" && typeof supabase.createClient === "function") {
     try {
         supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
         supabaseInitialized = true;

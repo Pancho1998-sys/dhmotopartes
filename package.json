@@ -16,11 +16,13 @@
       "fiscal.js",
       "style.css",
       "supabase-config.js",
+      "supabase.min.js",
+      "lucide.min.js",
       "xlsx.full.min.js"
     ]
   },
   "scripts": {
     "start": "node server.js",
-    "pkg:build": "npx @yao-pkg/pkg server.js --targets node22-win-x64 --output DHMotopartes-Server.exe"
+    "pkg:build": "npx @yao-pkg/pkg . --targets node22-win-x64 --output DHMotopartes-Server.exe"
   }
 }
