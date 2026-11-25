@@ -2852,11 +2852,20 @@ body.catalog-fullscreen .content-container {
     display: inline-block;
 }
 
-/* Caja View Mode Tabs */
-.caja-view-tabs .btn-secondary.active-tab {
-    background-color: var(--primary);
-    color: #ffffff;
-    border-color: var(--primary);
+/* Tab Active States */
+.caja-view-tabs .btn-secondary.active-tab,
+.btn.active-tab,
+.btn-secondary.active-tab {
+    background-color: var(--primary) !important;
+    color: #ffffff !important;
+    border-color: var(--primary) !important;
+}
+
+/* Metricas & Rendimiento Styles */
+@media (max-width: 1024px) {
+    .metricas-charts-grid {
+        grid-template-columns: 1fr !important;
+    }
 }
 
 /* ==========================================================================

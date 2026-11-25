@@ -140,6 +140,12 @@
                             <span>Caja y Movimientos</span>
                         </a>
                     </li>
+                    <li>
+                        <a href="#metricas" class="nav-link" id="nav-metricas">
+                            <i data-lucide="line-chart"></i>
+                            <span>Métricas y Rendimiento</span>
+                        </a>
+                    </li>
                     <li id="nav-item-saas" style="display: none;">
                         <a href="#saas" class="nav-link" id="nav-saas">
                             <i data-lucide="globe"></i>
@@ -972,6 +978,303 @@
                         </div>
                         <div class="table-footer-pagination" id="closures-pagination">
                             <!-- Pagination information -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 5.6. MÉTRICAS Y RENDIMIENTO VIEW -->
+                <section id="view-metricas" class="app-view">
+                    <!-- Filters & Period Bar -->
+                    <div class="metricas-toolbar" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 14px 18px; margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+                            <!-- Left: Date Range Presets -->
+                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <span style="font-weight: 700; font-size: 13px; text-transform: uppercase; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+                                    <i data-lucide="calendar" style="width: 15px; height: 15px; color: var(--primary);"></i> Período:
+                                </span>
+                                <div class="btn-group" id="metricas-period-btn-group" style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                    <button type="button" class="btn btn-sm btn-secondary" id="metricas-period-today" onclick="setMetricasPeriod('today')">Hoy</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" id="metricas-period-7days" onclick="setMetricasPeriod('7days')">7 Días</button>
+                                    <button type="button" class="btn btn-sm active-tab" id="metricas-period-month" onclick="setMetricasPeriod('this_month')" style="font-weight: 700;">Este Mes</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" id="metricas-period-lastmonth" onclick="setMetricasPeriod('last_month')">Mes Anterior</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" id="metricas-period-year" onclick="setMetricasPeriod('this_year')">Este Año</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" id="metricas-period-custom" onclick="setMetricasPeriod('custom')">Personalizado</button>
+                                </div>
+                            </div>
+
+                            <!-- Right: Channel & Export Buttons -->
+                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <label for="metricas-channel-select" style="font-size: 13px; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+                                        <i data-lucide="layers" style="width: 14px; height: 14px;"></i> Canal:
+                                    </label>
+                                    <select id="metricas-channel-select" class="filter-select" style="font-size: 13px; font-weight: 600; padding: 6px 12px;" onchange="applyMetricasFilter()">
+                                        <option value="all">📊 Consolidado (Local + Mayorista)</option>
+                                        <option value="local">🏪 Solo Local (Mostrador)</option>
+                                        <option value="wholesale">🏢 Solo Mayorista</option>
+                                    </select>
+                                </div>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="exportMetricasCSV()" style="font-weight: 600;">
+                                    <i data-lucide="download"></i> Exportar CSV
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Custom Date Pickers (visible only when custom is selected) -->
+                        <div id="metricas-custom-dates-row" style="display: none; align-items: center; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border-color); flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <label for="metricas-date-from" style="font-size: 13px; font-weight: 600; color: var(--text-muted);">Desde:</label>
+                                <input type="date" id="metricas-date-from" class="form-control" style="font-size: 13px; padding: 6px 10px;" onchange="applyMetricasFilter()">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <label for="metricas-date-to" style="font-size: 13px; font-weight: 600; color: var(--text-muted);">Hasta:</label>
+                                <input type="date" id="metricas-date-to" class="form-control" style="font-size: 13px; padding: 6px 10px;" onchange="applyMetricasFilter()">
+                            </div>
+                            <span class="small text-muted" id="metricas-custom-dates-info">Seleccione el rango de fechas para actualizar las métricas.</span>
+                        </div>
+                    </div>
+
+                    <!-- Metrics Cards Grid (Row 1) -->
+                    <div class="metrics-grid" style="margin-bottom: 20px;">
+                        <!-- Total Sales / Facturación -->
+                        <div class="metric-card card-gradient-primary">
+                            <div class="metric-icon">
+                                <i data-lucide="dollar-sign"></i>
+                            </div>
+                            <div class="metric-details">
+                                <span class="metric-label" id="metricas-lbl-sales">Facturación Total</span>
+                                <h3 class="metric-value" id="metricas-val-sales">$0.00</h3>
+                                <span class="metric-subtext" id="metricas-sub-sales">0 transacciones registradas</span>
+                            </div>
+                        </div>
+
+                        <!-- Total COGS / Costo Mercadería -->
+                        <div class="metric-card">
+                            <div class="metric-icon bg-amber" style="color: #f59e0b;">
+                                <i data-lucide="shopping-bag"></i>
+                            </div>
+                            <div class="metric-details">
+                                <span class="metric-label">Costo de Mercadería</span>
+                                <h3 class="metric-value text-amber" id="metricas-val-cost">$0.00</h3>
+                                <span class="metric-subtext" id="metricas-sub-cost">Costo total de reposición</span>
+                            </div>
+                        </div>
+
+                        <!-- Ganancia Neta / Utilidad -->
+                        <div class="metric-card">
+                            <div class="metric-icon bg-emerald" style="color: #10b981;">
+                                <i data-lucide="trending-up"></i>
+                            </div>
+                            <div class="metric-details">
+                                <span class="metric-label">Ganancia Bruta Neta</span>
+                                <h3 class="metric-value text-emerald" id="metricas-val-profit">$0.00</h3>
+                                <span class="metric-trend text-emerald" id="metricas-trend-profit">Utilidad estimada</span>
+                            </div>
+                        </div>
+
+                        <!-- Margen de Ganancia Promedio -->
+                        <div class="metric-card">
+                            <div class="metric-icon bg-violet" style="color: #8b5cf6;">
+                                <i data-lucide="percent"></i>
+                            </div>
+                            <div class="metric-details">
+                                <span class="metric-label">Margen de Rentabilidad</span>
+                                <h3 class="metric-value text-primary" id="metricas-val-margin">0.0%</h3>
+                                <span class="metric-subtext" id="metricas-sub-margin">Retorno sobre ventas</span>
+                            </div>
+                        </div>
+
+                        <!-- Ticket Promedio -->
+                        <div class="metric-card">
+                            <div class="metric-icon" style="background: rgba(2, 132, 199, 0.15); color: #0284c7;">
+                                <i data-lucide="receipt"></i>
+                            </div>
+                            <div class="metric-details">
+                                <span class="metric-label">Ticket Promedio</span>
+                                <h3 class="metric-value" style="color: #0284c7;" id="metricas-val-ticket">$0.00</h3>
+                                <span class="metric-subtext" id="metricas-sub-ticket">Gasto medio por venta</span>
+                            </div>
+                        </div>
+
+                        <!-- Unidades Vendidas -->
+                        <div class="metric-card">
+                            <div class="metric-icon" style="background: rgba(16, 185, 129, 0.15); color: #059669;">
+                                <i data-lucide="package-check"></i>
+                            </div>
+                            <div class="metric-details">
+                                <span class="metric-label">Unidades Vendidas</span>
+                                <h3 class="metric-value" style="color: #059669;" id="metricas-val-items">0</h3>
+                                <span class="metric-subtext" id="metricas-sub-items">Repuestos despachados</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Channel Comparison Row: Local vs Mayorista (Row 2) -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px; margin-bottom: 20px;">
+                        <!-- Local Channel Performance -->
+                        <div class="dashboard-panel" style="border-top: 4px solid #10b981;">
+                            <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                                <h3 class="panel-title" style="color: #10b981; display: flex; align-items: center; gap: 8px;">
+                                    <i data-lucide="store"></i> Canal Local (Mostrador)
+                                </h3>
+                                <span class="badge" id="metricas-local-pct-badge" style="background: rgba(16,185,129,0.15); color: #10b981; font-weight: 700; font-size: 13px;">0% del total</span>
+                            </div>
+                            <div class="panel-body" style="padding: 18px;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+                                    <div style="background: var(--bg-hover); padding: 12px; border-radius: var(--radius-md);">
+                                        <span class="small text-muted" style="display: block; font-weight: 600;">Facturado:</span>
+                                        <strong id="metricas-local-sales" style="font-size: 18px; color: var(--text-main);">$0.00</strong>
+                                        <span class="small text-muted" id="metricas-local-count" style="display: block; font-size: 11px;">0 ventas</span>
+                                    </div>
+                                    <div style="background: var(--bg-hover); padding: 12px; border-radius: var(--radius-md);">
+                                        <span class="small text-muted" style="display: block; font-weight: 600;">Ganancia Neta:</span>
+                                        <strong id="metricas-local-profit" style="font-size: 18px; color: #10b981;">$0.00</strong>
+                                        <span class="small text-muted" id="metricas-local-margin" style="display: block; font-size: 11px;">0% margen</span>
+                                    </div>
+                                </div>
+
+                                <div style="font-size: 13px; line-height: 1.8;">
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span class="text-muted">Costo mercadería:</span>
+                                        <strong id="metricas-local-cost">$0.00</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span class="text-muted">Ticket promedio:</span>
+                                        <strong id="metricas-local-ticket">$0.00</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span class="text-muted">Unidades vendidas:</span>
+                                        <strong id="metricas-local-items">0 un.</strong>
+                                    </div>
+                                </div>
+
+                                <!-- Progress bar share -->
+                                <div style="margin-top: 14px;">
+                                    <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; margin-bottom: 4px;">
+                                        <span>Participación de ventas:</span>
+                                        <span id="metricas-local-bar-label">0%</span>
+                                    </div>
+                                    <div style="background: var(--border-color); height: 8px; border-radius: 4px; overflow: hidden;">
+                                        <div id="metricas-local-bar" style="background: #10b981; height: 100%; width: 0%; transition: width 0.4s ease;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Wholesale Channel Performance -->
+                        <div class="dashboard-panel" style="border-top: 4px solid #8b5cf6;">
+                            <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                                <h3 class="panel-title" style="color: #8b5cf6; display: flex; align-items: center; gap: 8px;">
+                                    <i data-lucide="warehouse"></i> Canal Mayorista
+                                </h3>
+                                <span class="badge" id="metricas-wholesale-pct-badge" style="background: rgba(139,92,246,0.15); color: #8b5cf6; font-weight: 700; font-size: 13px;">0% del total</span>
+                            </div>
+                            <div class="panel-body" style="padding: 18px;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+                                    <div style="background: var(--bg-hover); padding: 12px; border-radius: var(--radius-md);">
+                                        <span class="small text-muted" style="display: block; font-weight: 600;">Facturado:</span>
+                                        <strong id="metricas-wholesale-sales" style="font-size: 18px; color: var(--text-main);">$0.00</strong>
+                                        <span class="small text-muted" id="metricas-wholesale-count" style="display: block; font-size: 11px;">0 ventas</span>
+                                    </div>
+                                    <div style="background: var(--bg-hover); padding: 12px; border-radius: var(--radius-md);">
+                                        <span class="small text-muted" style="display: block; font-weight: 600;">Ganancia Neta:</span>
+                                        <strong id="metricas-wholesale-profit" style="font-size: 18px; color: #8b5cf6;">$0.00</strong>
+                                        <span class="small text-muted" id="metricas-wholesale-margin" style="display: block; font-size: 11px;">0% margen</span>
+                                    </div>
+                                </div>
+
+                                <div style="font-size: 13px; line-height: 1.8;">
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span class="text-muted">Costo mercadería:</span>
+                                        <strong id="metricas-wholesale-cost">$0.00</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span class="text-muted">Ticket promedio:</span>
+                                        <strong id="metricas-wholesale-ticket">$0.00</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span class="text-muted">Unidades vendidas:</span>
+                                        <strong id="metricas-wholesale-items">0 un.</strong>
+                                    </div>
+                                </div>
+
+                                <!-- Progress bar share -->
+                                <div style="margin-top: 14px;">
+                                    <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; margin-bottom: 4px;">
+                                        <span>Participación de ventas:</span>
+                                        <span id="metricas-wholesale-bar-label">0%</span>
+                                    </div>
+                                    <div style="background: var(--border-color); height: 8px; border-radius: 4px; overflow: hidden;">
+                                        <div id="metricas-wholesale-bar" style="background: #8b5cf6; height: 100%; width: 0%; transition: width 0.4s ease;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts & Payments Row (Row 3) -->
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 18px; margin-bottom: 20px;" class="metricas-charts-grid">
+                        <!-- Evolution Chart -->
+                        <div class="dashboard-panel">
+                            <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                                <h3 class="panel-title" id="metricas-chart-title">Evolución en el Período</h3>
+                                <div style="display: flex; gap: 8px;">
+                                    <button type="button" class="btn btn-secondary btn-sm" id="metricas-chart-toggle-btn" onclick="toggleMetricasChartMode()" style="font-size: 11px; padding: 4px 10px;">
+                                        Ver: Local vs Mayorista
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="panel-body" style="padding: 16px;">
+                                <div id="metricas-chart-container" style="min-height: 250px; width: 100%;">
+                                    <!-- Dynamic SVG Trend Chart rendered here -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Payment Methods Distribution -->
+                        <div class="dashboard-panel">
+                            <div class="panel-header">
+                                <h3 class="panel-title">Cobros por Método de Pago</h3>
+                            </div>
+                            <div class="panel-body" style="padding: 16px;">
+                                <div id="metricas-payments-container">
+                                    <!-- Payment bars rendered dynamically -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Top Repuestos Ranking Table (Row 4) -->
+                    <div class="dashboard-panel">
+                        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                            <div>
+                                <h3 class="panel-title">Top Repuestos y Productos de Mayor Rendimiento</h3>
+                                <span class="small text-muted">Productos más vendidos y con mayor ganancia generada en el período</span>
+                            </div>
+                            <div style="display: flex; gap: 6px;">
+                                <button type="button" class="btn btn-secondary btn-sm active-tab" id="metricas-top-by-revenue-btn" onclick="setMetricasTopSort('revenue')">Por Facturación</button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="metricas-top-by-units-btn" onclick="setMetricasTopSort('units')">Por Unidades</button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="metricas-top-by-profit-btn" onclick="setMetricasTopSort('profit')">Por Ganancia</button>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table" id="metricas-top-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 50px;">#</th>
+                                        <th>Producto / Repuesto</th>
+                                        <th>Categoría</th>
+                                        <th class="text-center">Unidades</th>
+                                        <th class="text-right">Facturado</th>
+                                        <th class="text-right">Costo Merc.</th>
+                                        <th class="text-right">Ganancia Neta</th>
+                                        <th class="text-right">Margen</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="metricas-top-table-body">
+                                    <!-- Top products rows rendered dynamically -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </section>

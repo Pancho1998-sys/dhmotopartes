@@ -306,7 +306,7 @@ async function setupAuthentication() {
             });
 
             if (currentUserRole === 'cajero') {
-                const navItemsToHide = ['nav-dashboard', 'nav-inventario', 'nav-clientes', 'nav-proveedores', 'nav-historial', 'nav-caja', 'nav-configuracion'];
+                const navItemsToHide = ['nav-dashboard', 'nav-inventario', 'nav-clientes', 'nav-proveedores', 'nav-historial', 'nav-caja', 'nav-metricas', 'nav-configuracion'];
                 navItemsToHide.forEach(id => {
                     const el = document.getElementById(id);
                     if (el && el.parentElement) el.parentElement.style.display = 'none';
@@ -510,7 +510,7 @@ async function setupAuthentication() {
 
                 // Show/Hide panels based on role
                 if (currentUserRole === 'cajero') {
-                    const navItemsToHide = ['nav-dashboard', 'nav-inventario', 'nav-clientes', 'nav-proveedores', 'nav-historial', 'nav-caja', 'nav-configuracion'];
+                    const navItemsToHide = ['nav-dashboard', 'nav-inventario', 'nav-clientes', 'nav-proveedores', 'nav-historial', 'nav-caja', 'nav-metricas', 'nav-configuracion'];
                     navItemsToHide.forEach(id => {
                         const el = document.getElementById(id);
                         if (el && el.parentElement) el.parentElement.style.display = 'none';
@@ -519,13 +519,13 @@ async function setupAuthentication() {
                         window.location.hash = '#pos';
                     }
                 } else if (currentUserRole === 'saas_admin') {
-                    const navItemsToHide = ['nav-pos', 'nav-inventario', 'nav-clientes', 'nav-proveedores', 'nav-caja', 'nav-configuracion'];
+                    const navItemsToHide = ['nav-pos', 'nav-inventario', 'nav-clientes', 'nav-proveedores', 'nav-caja', 'nav-metricas', 'nav-configuracion'];
                     navItemsToHide.forEach(id => {
                         const el = document.getElementById(id);
                         if (el && el.parentElement) el.parentElement.style.display = 'none';
                     });
                     const targetView = window.location.hash.replace('#', '');
-                    const forbiddenViewsForSaaSAdmin = ['pos', 'inventario', 'clientes', 'proveedores', 'caja', 'configuracion'];
+                    const forbiddenViewsForSaaSAdmin = ['pos', 'inventario', 'clientes', 'proveedores', 'caja', 'metricas', 'configuracion'];
                     if (window.location.hash === '' || forbiddenViewsForSaaSAdmin.includes(targetView)) {
                         window.location.hash = '#dashboard';
                     }
@@ -1240,6 +1240,7 @@ function handleRoute() {
         'proveedores': 'Gestión de Proveedores',
         'historial': 'Historial de Ventas',
         'caja': 'Control de Caja y Movimientos',
+        'metricas': 'Métricas y Rendimiento',
         'configuracion': 'Configuración del Sistema',
         'saas': 'Panel SaaS Global',
         'catalogo': 'Catálogo de Clientes'
@@ -1265,6 +1266,8 @@ function handleRoute() {
         renderHistory();
     } else if (targetView === 'caja') {
         renderCaja();
+    } else if (targetView === 'metricas') {
+        renderMetricas();
     } else if (targetView === 'catalogo') {
         renderCatalog();
     } else if (targetView === 'saas') {
@@ -6693,6 +6696,713 @@ function compileAllCashMovements(shiftStartIso, cajaScope = currentCashScope) {
 
     return movements.sort((a, b) => new Date(b.date) - new Date(a.date)); // descending date (newest first)
 }
+
+/* ==========================================================================
+   7.5. MÉTRICAS Y RENDIMIENTO CONTROLLER
+   ========================================================================== */
+let metricasPeriod = 'this_month'; // 'today' | '7days' | 'this_month' | 'last_month' | 'this_year' | 'custom'
+let metricasChannel = 'all'; // 'all' | 'local' | 'wholesale'
+let metricasTopSort = 'revenue'; // 'revenue' | 'units' | 'profit'
+let metricasChartMode = 'revenue_profit'; // 'revenue_profit' | 'local_wholesale'
+
+function getMetricasDateRange() {
+    const now = new Date();
+    let start = new Date(now);
+    let end = new Date(now);
+
+    if (metricasPeriod === 'today') {
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+    } else if (metricasPeriod === '7days') {
+        start.setDate(now.getDate() - 6);
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+    } else if (metricasPeriod === 'this_month') {
+        start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+    } else if (metricasPeriod === 'last_month') {
+        start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+        end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+    } else if (metricasPeriod === 'this_year') {
+        start = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+    } else if (metricasPeriod === 'custom') {
+        const fromInput = document.getElementById('metricas-date-from');
+        const toInput = document.getElementById('metricas-date-to');
+        if (fromInput && fromInput.value) {
+            const parts = fromInput.value.split('-');
+            start = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 0, 0, 0, 0);
+        } else {
+            start.setDate(now.getDate() - 30);
+            start.setHours(0, 0, 0, 0);
+        }
+        if (toInput && toInput.value) {
+            const parts = toInput.value.split('-');
+            end = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 23, 59, 59, 999);
+        } else {
+            end.setHours(23, 59, 59, 999);
+        }
+    }
+
+    return { start, end };
+}
+
+window.setMetricasPeriod = function(period) {
+    metricasPeriod = period;
+
+    const btnIds = {
+        'today': 'metricas-period-today',
+        '7days': 'metricas-period-7days',
+        'this_month': 'metricas-period-month',
+        'last_month': 'metricas-period-lastmonth',
+        'this_year': 'metricas-period-year',
+        'custom': 'metricas-period-custom'
+    };
+
+    Object.keys(btnIds).forEach(k => {
+        const btn = document.getElementById(btnIds[k]);
+        if (btn) {
+            if (k === period) {
+                btn.className = 'btn btn-sm active-tab';
+                btn.style.fontWeight = '700';
+            } else {
+                btn.className = 'btn btn-sm btn-secondary';
+                btn.style.fontWeight = 'normal';
+            }
+        }
+    });
+
+    const customRow = document.getElementById('metricas-custom-dates-row');
+    if (customRow) {
+        customRow.style.display = period === 'custom' ? 'flex' : 'none';
+        if (period === 'custom') {
+            const fromInput = document.getElementById('metricas-date-from');
+            const toInput = document.getElementById('metricas-date-to');
+            const now = new Date();
+            if (fromInput && !fromInput.value) {
+                const past = new Date();
+                past.setDate(now.getDate() - 30);
+                fromInput.value = past.toISOString().slice(0, 10);
+            }
+            if (toInput && !toInput.value) {
+                toInput.value = now.toISOString().slice(0, 10);
+            }
+        }
+    }
+
+    renderMetricas();
+};
+
+window.applyMetricasFilter = function() {
+    const channelSelect = document.getElementById('metricas-channel-select');
+    if (channelSelect) {
+        metricasChannel = channelSelect.value;
+    }
+    renderMetricas();
+};
+
+window.setMetricasTopSort = function(sortKey) {
+    metricasTopSort = sortKey;
+    const btnRev = document.getElementById('metricas-top-by-revenue-btn');
+    const btnUnits = document.getElementById('metricas-top-by-units-btn');
+    const btnProfit = document.getElementById('metricas-top-by-profit-btn');
+
+    if (btnRev) btnRev.className = sortKey === 'revenue' ? 'btn btn-secondary btn-sm active-tab' : 'btn btn-secondary btn-sm';
+    if (btnUnits) btnUnits.className = sortKey === 'units' ? 'btn btn-secondary btn-sm active-tab' : 'btn btn-secondary btn-sm';
+    if (btnProfit) btnProfit.className = sortKey === 'profit' ? 'btn btn-secondary btn-sm active-tab' : 'btn btn-secondary btn-sm';
+
+    renderMetricas();
+};
+
+window.toggleMetricasChartMode = function() {
+    metricasChartMode = metricasChartMode === 'revenue_profit' ? 'local_wholesale' : 'revenue_profit';
+    const toggleBtn = document.getElementById('metricas-chart-toggle-btn');
+    const chartTitle = document.getElementById('metricas-chart-title');
+    if (toggleBtn) {
+        toggleBtn.textContent = metricasChartMode === 'revenue_profit' ? 'Ver: Local vs Mayorista' : 'Ver: Facturación vs Ganancia';
+    }
+    if (chartTitle) {
+        chartTitle.textContent = metricasChartMode === 'revenue_profit' ? 'Evolución: Facturación vs Ganancia' : 'Evolución: Canal Local vs Mayorista';
+    }
+    renderMetricas();
+};
+
+function calcSalesPerformance(salesList) {
+    let totalSales = 0;
+    let totalCost = 0;
+    let totalItems = 0;
+    const payments = {
+        cash: 0,
+        transfer: 0,
+        mercadopago: 0,
+        card: 0,
+        credit: 0
+    };
+    const paymentCounts = {
+        cash: 0,
+        transfer: 0,
+        mercadopago: 0,
+        card: 0,
+        credit: 0
+    };
+
+    salesList.forEach(s => {
+        totalSales += s.total || 0;
+
+        let saleCost = 0;
+        if (s.items && Array.isArray(s.items)) {
+            s.items.forEach(item => {
+                const prod = state.products ? state.products.find(p => p.id === item.id) : null;
+                const unitCost = prod && prod.cost !== undefined ? prod.cost : (item.cost || 0);
+                const q = item.quantity || 1;
+                saleCost += unitCost * q;
+                totalItems += q;
+            });
+        }
+        totalCost += saleCost;
+
+        const pm = (s.paymentMethod === 'mp' ? 'mercadopago' : s.paymentMethod) || 'cash';
+        if (payments[pm] !== undefined) {
+            payments[pm] += s.total || 0;
+            paymentCounts[pm] = (paymentCounts[pm] || 0) + 1;
+        } else {
+            payments['cash'] += s.total || 0;
+            paymentCounts['cash'] = (paymentCounts['cash'] || 0) + 1;
+        }
+    });
+
+    const totalProfit = Math.max(0, totalSales - totalCost);
+    const profitMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
+    const avgTicket = salesList.length > 0 ? totalSales / salesList.length : 0;
+
+    return {
+        totalSales,
+        totalCost,
+        totalProfit,
+        profitMargin,
+        totalTransactions: salesList.length,
+        avgTicket,
+        totalItems,
+        payments,
+        paymentCounts
+    };
+}
+
+function buildMetricasTimeSeries(salesList, start, end) {
+    const diffDays = Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24)));
+    const series = [];
+
+    if (diffDays <= 1) {
+        const hours = [8, 10, 12, 14, 16, 18, 20];
+        hours.forEach(h => {
+            const slotStart = new Date(start);
+            slotStart.setHours(h, 0, 0, 0);
+            const slotEnd = new Date(start);
+            slotEnd.setHours(h + 2, 0, 0, 0);
+
+            const slotSales = salesList.filter(s => {
+                const d = new Date(s.date);
+                return d >= slotStart && d < slotEnd;
+            });
+            const p = calcSalesPerformance(slotSales);
+            const localS = slotSales.filter(s => (s.stockSource || 'local') === 'local');
+            const wholesS = slotSales.filter(s => (s.stockSource || 'local') === 'wholesale');
+            series.push({
+                label: `${String(h).padStart(2, '0')}:00`,
+                revenue: p.totalSales,
+                profit: p.totalProfit,
+                localSales: localS.reduce((sum, s) => sum + s.total, 0),
+                wholesaleSales: wholesS.reduce((sum, s) => sum + s.total, 0)
+            });
+        });
+    } else if (diffDays <= 31) {
+        const daysWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+        const cur = new Date(start);
+        while (cur <= end) {
+            const dayStr = cur.toDateString();
+            const slotSales = salesList.filter(s => new Date(s.date).toDateString() === dayStr);
+            const p = calcSalesPerformance(slotSales);
+            const localS = slotSales.filter(s => (s.stockSource || 'local') === 'local');
+            const wholesS = slotSales.filter(s => (s.stockSource || 'local') === 'wholesale');
+
+            const label = diffDays <= 7 ? `${daysWeek[cur.getDay()]} ${cur.getDate()}` : `${cur.getDate()}/${cur.getMonth() + 1}`;
+            series.push({
+                label,
+                revenue: p.totalSales,
+                profit: p.totalProfit,
+                localSales: localS.reduce((sum, s) => sum + s.total, 0),
+                wholesaleSales: wholesS.reduce((sum, s) => sum + s.total, 0)
+            });
+            cur.setDate(cur.getDate() + 1);
+        }
+    } else {
+        const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        const cur = new Date(start.getFullYear(), start.getMonth(), 1);
+        while (cur <= end) {
+            const m = cur.getMonth();
+            const y = cur.getFullYear();
+            const slotSales = salesList.filter(s => {
+                const d = new Date(s.date);
+                return d.getMonth() === m && d.getFullYear() === y;
+            });
+            const p = calcSalesPerformance(slotSales);
+            const localS = slotSales.filter(s => (s.stockSource || 'local') === 'local');
+            const wholesS = slotSales.filter(s => (s.stockSource || 'local') === 'wholesale');
+
+            series.push({
+                label: `${monthNames[m]}`,
+                revenue: p.totalSales,
+                profit: p.totalProfit,
+                localSales: localS.reduce((sum, s) => sum + s.total, 0),
+                wholesaleSales: wholesS.reduce((sum, s) => sum + s.total, 0)
+            });
+            cur.setMonth(cur.getMonth() + 1);
+        }
+    }
+
+    return series;
+}
+
+function renderMetricasChart(containerId, series, currency, mode) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    if (!series || series.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state-small" style="padding: 40px; text-align: center; color: var(--text-muted);">
+                <i data-lucide="bar-chart-2"></i>
+                <p>No se registran datos para graficar en este período.</p>
+            </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+        return;
+    }
+
+    const width = 800;
+    const height = 280;
+    const paddingLeft = 70;
+    const paddingRight = 30;
+    const paddingTop = 45;
+    const paddingBottom = 40;
+
+    const chartWidth = width - paddingLeft - paddingRight;
+    const chartHeight = height - paddingTop - paddingBottom;
+
+    // Series definitions based on mode
+    let key1, key2, name1, name2, color1, color2;
+    if (mode === 'revenue_profit') {
+        key1 = 'revenue';
+        key2 = 'profit';
+        name1 = 'Facturación';
+        name2 = 'Ganancia Neta';
+        color1 = '#2563eb';
+        color2 = '#10b981';
+    } else {
+        key1 = 'localSales';
+        key2 = 'wholesaleSales';
+        name1 = 'Canal Local';
+        name2 = 'Canal Mayorista';
+        color1 = '#10b981';
+        color2 = '#8b5cf6';
+    }
+
+    const allValues = series.flatMap(s => [s[key1] || 0, s[key2] || 0]);
+    const maxVal = Math.max(...allValues, 100);
+
+    const points1 = series.map((item, idx) => {
+        const x = paddingLeft + (idx * (chartWidth / Math.max(series.length - 1, 1)));
+        const val = item[key1] || 0;
+        const y = paddingTop + chartHeight - ((val / maxVal) * chartHeight);
+        return { x, y, val, label: item.label };
+    });
+
+    const points2 = series.map((item, idx) => {
+        const x = paddingLeft + (idx * (chartWidth / Math.max(series.length - 1, 1)));
+        const val = item[key2] || 0;
+        const y = paddingTop + chartHeight - ((val / maxVal) * chartHeight);
+        return { x, y, val, label: item.label };
+    });
+
+    const linePointsStr1 = points1.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    const linePointsStr2 = points2.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+    const fillStr1 = `${points1[0].x.toFixed(1)},${paddingTop + chartHeight} ${linePointsStr1} ${points1[points1.length - 1].x.toFixed(1)},${paddingTop + chartHeight}`;
+    const fillStr2 = `${points2[0].x.toFixed(1)},${paddingTop + chartHeight} ${linePointsStr2} ${points2[points2.length - 1].x.toFixed(1)},${paddingTop + chartHeight}`;
+
+    // Grid lines
+    let gridHtml = '';
+    const divisions = 4;
+    for (let i = 0; i <= divisions; i++) {
+        const val = maxVal * (i / divisions);
+        const y = paddingTop + chartHeight - ((val / maxVal) * chartHeight);
+        gridHtml += `
+            <line x1="${paddingLeft}" y1="${y}" x2="${width - paddingRight}" y2="${y}" stroke="var(--border-color)" stroke-width="1" stroke-dasharray="3,3" />
+            <text x="${paddingLeft - 8}" y="${y + 4}" fill="var(--text-muted)" font-size="10.5" font-weight="600" text-anchor="end">${currency}${val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val.toFixed(0)}</text>
+        `;
+    }
+
+    // X Axis Labels
+    let xLabelsHtml = '';
+    const step = Math.ceil(series.length / 8);
+    series.forEach((s, idx) => {
+        if (idx % step === 0 || idx === series.length - 1) {
+            const x = paddingLeft + (idx * (chartWidth / Math.max(series.length - 1, 1)));
+            xLabelsHtml += `
+                <text x="${x}" y="${height - paddingBottom + 20}" fill="var(--text-muted)" font-size="11" font-weight="600" text-anchor="middle">${s.label}</text>
+            `;
+        }
+    });
+
+    // Total sums for legend
+    const sum1 = series.reduce((sum, s) => sum + (s[key1] || 0), 0);
+    const sum2 = series.reduce((sum, s) => sum + (s[key2] || 0), 0);
+
+    let circlesHtml1 = '';
+    points1.forEach(p => {
+        circlesHtml1 += `
+            <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="${color1}" stroke="#ffffff" stroke-width="2" style="cursor: pointer;">
+                <title>${name1} (${p.label}): ${currency}${p.val.toFixed(2)}</title>
+            </circle>
+        `;
+    });
+
+    let circlesHtml2 = '';
+    points2.forEach(p => {
+        circlesHtml2 += `
+            <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="${color2}" stroke="#ffffff" stroke-width="2" style="cursor: pointer;">
+                <title>${name2} (${p.label}): ${currency}${p.val.toFixed(2)}</title>
+            </circle>
+        `;
+    });
+
+    const svg = `
+        <svg viewBox="0 0 ${width} ${height}" style="width: 100%; height: 100%; overflow: visible;" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="metricas-grad-1" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="${color1}" stop-opacity="0.25" />
+                    <stop offset="100%" stop-color="${color1}" stop-opacity="0.0" />
+                </linearGradient>
+                <linearGradient id="metricas-grad-2" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="${color2}" stop-opacity="0.25" />
+                    <stop offset="100%" stop-color="${color2}" stop-opacity="0.0" />
+                </linearGradient>
+            </defs>
+
+            <!-- Chart Legend -->
+            <g class="chart-legend" transform="translate(${paddingLeft}, 20)">
+                <circle cx="6" cy="0" r="5" fill="${color1}" />
+                <text x="16" y="4" fill="var(--text-main)" font-size="12" font-weight="700">${name1} (${currency}${sum1.toFixed(0)})</text>
+                <circle cx="230" cy="0" r="5" fill="${color2}" />
+                <text x="240" y="4" fill="var(--text-main)" font-size="12" font-weight="700">${name2} (${currency}${sum2.toFixed(0)})</text>
+            </g>
+
+            <!-- Grid -->
+            ${gridHtml}
+
+            <!-- Area Fills -->
+            <polygon points="${fillStr1}" fill="url(#metricas-grad-1)" />
+            <polygon points="${fillStr2}" fill="url(#metricas-grad-2)" />
+
+            <!-- Polylines -->
+            <polyline points="${linePointsStr1}" fill="none" stroke="${color1}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+            <polyline points="${linePointsStr2}" fill="none" stroke="${color2}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+
+            <!-- X Labels -->
+            ${xLabelsHtml}
+
+            <!-- Interactive Circles -->
+            ${circlesHtml1}
+            ${circlesHtml2}
+        </svg>
+    `;
+
+    container.innerHTML = svg;
+}
+
+window.renderMetricas = function() {
+    const currency = (state.settings && state.settings.currency) || '$';
+    const { start, end } = getMetricasDateRange();
+
+    // 1. Filter completed sales in range
+    const completedInRange = (state.sales || []).filter(s => {
+        if (s.status !== 'completed') return false;
+        const d = new Date(s.date);
+        return d >= start && d <= end;
+    });
+
+    const localSales = completedInRange.filter(s => (s.stockSource || 'local') === 'local');
+    const wholesaleSales = completedInRange.filter(s => (s.stockSource || 'local') === 'wholesale');
+
+    const localPerf = calcSalesPerformance(localSales);
+    const wholesalePerf = calcSalesPerformance(wholesaleSales);
+
+    // Active filtered sales for KPIs according to metricasChannel
+    let activeSales = completedInRange;
+    if (metricasChannel === 'local') activeSales = localSales;
+    else if (metricasChannel === 'wholesale') activeSales = wholesaleSales;
+
+    const mainPerf = calcSalesPerformance(activeSales);
+
+    // 2. Update KPI Cards
+    const elSales = document.getElementById('metricas-val-sales');
+    if (elSales) elSales.textContent = `${currency}${mainPerf.totalSales.toFixed(2)}`;
+    const elSubSales = document.getElementById('metricas-sub-sales');
+    if (elSubSales) elSubSales.textContent = `${mainPerf.totalTransactions} ventas en el período`;
+
+    const elCost = document.getElementById('metricas-val-cost');
+    if (elCost) elCost.textContent = `${currency}${mainPerf.totalCost.toFixed(2)}`;
+    const elSubCost = document.getElementById('metricas-sub-cost');
+    if (elSubCost) elSubCost.textContent = `Costo directo de reposición`;
+
+    const elProfit = document.getElementById('metricas-val-profit');
+    if (elProfit) elProfit.textContent = `${currency}${mainPerf.totalProfit.toFixed(2)}`;
+    const elTrendProfit = document.getElementById('metricas-trend-profit');
+    if (elTrendProfit) elTrendProfit.textContent = `Utilidad neta calculada`;
+
+    const elMargin = document.getElementById('metricas-val-margin');
+    if (elMargin) elMargin.textContent = `${mainPerf.profitMargin.toFixed(1)}%`;
+    const elSubMargin = document.getElementById('metricas-sub-margin');
+    if (elSubMargin) elSubMargin.textContent = mainPerf.profitMargin >= 30 ? 'Margen comercial saludable' : 'Margen ajustado';
+
+    const elTicket = document.getElementById('metricas-val-ticket');
+    if (elTicket) elTicket.textContent = `${currency}${mainPerf.avgTicket.toFixed(2)}`;
+    const elSubTicket = document.getElementById('metricas-sub-ticket');
+    if (elSubTicket) elSubTicket.textContent = `Promedio por transacción`;
+
+    const elItems = document.getElementById('metricas-val-items');
+    if (elItems) elItems.textContent = `${mainPerf.totalItems} un.`;
+    const elSubItems = document.getElementById('metricas-sub-items');
+    if (elSubItems) elSubItems.textContent = `Total repuestos vendidos`;
+
+    // 3. Update Local vs. Wholesale Channel Cards
+    const grandGross = localPerf.totalSales + wholesalePerf.totalSales;
+    const localShare = grandGross > 0 ? (localPerf.totalSales / grandGross) * 100 : 0;
+    const wholesaleShare = grandGross > 0 ? (wholesalePerf.totalSales / grandGross) * 100 : 0;
+
+    // Local Card
+    const elLocSales = document.getElementById('metricas-local-sales');
+    if (elLocSales) elLocSales.textContent = `${currency}${localPerf.totalSales.toFixed(2)}`;
+    const elLocCount = document.getElementById('metricas-local-count');
+    if (elLocCount) elLocCount.textContent = `${localPerf.totalTransactions} ventas`;
+    const elLocProfit = document.getElementById('metricas-local-profit');
+    if (elLocProfit) elLocProfit.textContent = `${currency}${localPerf.totalProfit.toFixed(2)}`;
+    const elLocMargin = document.getElementById('metricas-local-margin');
+    if (elLocMargin) elLocMargin.textContent = `${localPerf.profitMargin.toFixed(1)}% margen`;
+    const elLocCost = document.getElementById('metricas-local-cost');
+    if (elLocCost) elLocCost.textContent = `${currency}${localPerf.totalCost.toFixed(2)}`;
+    const elLocTicket = document.getElementById('metricas-local-ticket');
+    if (elLocTicket) elLocTicket.textContent = `${currency}${localPerf.avgTicket.toFixed(2)}`;
+    const elLocItems = document.getElementById('metricas-local-items');
+    if (elLocItems) elLocItems.textContent = `${localPerf.totalItems} un.`;
+    const elLocBadge = document.getElementById('metricas-local-pct-badge');
+    if (elLocBadge) elLocBadge.textContent = `${localShare.toFixed(1)}% del total`;
+    const elLocBar = document.getElementById('metricas-local-bar');
+    if (elLocBar) elLocBar.style.width = `${localShare.toFixed(1)}%`;
+    const elLocBarLbl = document.getElementById('metricas-local-bar-label');
+    if (elLocBarLbl) elLocBarLbl.textContent = `${localShare.toFixed(1)}% (${currency}${localPerf.totalSales.toFixed(0)})`;
+
+    // Wholesale Card
+    const elWholesSales = document.getElementById('metricas-wholesale-sales');
+    if (elWholesSales) elWholesSales.textContent = `${currency}${wholesalePerf.totalSales.toFixed(2)}`;
+    const elWholesCount = document.getElementById('metricas-wholesale-count');
+    if (elWholesCount) elWholesCount.textContent = `${wholesalePerf.totalTransactions} ventas`;
+    const elWholesProfit = document.getElementById('metricas-wholesale-profit');
+    if (elWholesProfit) elWholesProfit.textContent = `${currency}${wholesalePerf.totalProfit.toFixed(2)}`;
+    const elWholesMargin = document.getElementById('metricas-wholesale-margin');
+    if (elWholesMargin) elWholesMargin.textContent = `${wholesalePerf.profitMargin.toFixed(1)}% margen`;
+    const elWholesCost = document.getElementById('metricas-wholesale-cost');
+    if (elWholesCost) elWholesCost.textContent = `${currency}${wholesalePerf.totalCost.toFixed(2)}`;
+    const elWholesTicket = document.getElementById('metricas-wholesale-ticket');
+    if (elWholesTicket) elWholesTicket.textContent = `${currency}${wholesalePerf.avgTicket.toFixed(2)}`;
+    const elWholesItems = document.getElementById('metricas-wholesale-items');
+    if (elWholesItems) elWholesItems.textContent = `${wholesalePerf.totalItems} un.`;
+    const elWholesBadge = document.getElementById('metricas-wholesale-pct-badge');
+    if (elWholesBadge) elWholesBadge.textContent = `${wholesaleShare.toFixed(1)}% del total`;
+    const elWholesBar = document.getElementById('metricas-wholesale-bar');
+    if (elWholesBar) elWholesBar.style.width = `${wholesaleShare.toFixed(1)}%`;
+    const elWholesBarLbl = document.getElementById('metricas-wholesale-bar-label');
+    if (elWholesBarLbl) elWholesBarLbl.textContent = `${wholesaleShare.toFixed(1)}% (${currency}${wholesalePerf.totalSales.toFixed(0)})`;
+
+    // 4. Time Series Chart
+    const timeSeries = buildMetricasTimeSeries(activeSales, start, end);
+    renderMetricasChart('metricas-chart-container', timeSeries, currency, metricasChartMode);
+
+    // 5. Payment Methods Breakdown
+    const payContainer = document.getElementById('metricas-payments-container');
+    if (payContainer) {
+        const payRows = [
+            { key: 'cash', label: 'Efectivo', color: '#10b981', icon: 'wallet', total: mainPerf.payments.cash, count: mainPerf.paymentCounts.cash },
+            { key: 'transfer', label: 'Transferencias', color: '#0284c7', icon: 'arrow-left-right', total: mainPerf.payments.transfer, count: mainPerf.paymentCounts.transfer },
+            { key: 'mercadopago', label: 'Mercado Pago', color: '#009ee3', icon: 'qr-code', total: mainPerf.payments.mercadopago, count: mainPerf.paymentCounts.mercadopago },
+            { key: 'card', label: 'Tarjetas', color: '#8b5cf6', icon: 'credit-card', total: mainPerf.payments.card, count: mainPerf.paymentCounts.card },
+            { key: 'credit', label: 'Cuenta Corriente', color: '#f59e0b', icon: 'book-open', total: mainPerf.payments.credit, count: mainPerf.paymentCounts.credit }
+        ];
+
+        let payHtml = '';
+        payRows.forEach(row => {
+            const pct = mainPerf.totalSales > 0 ? (row.total / mainPerf.totalSales) * 100 : 0;
+            payHtml += `
+                <div style="margin-bottom: 14px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 13px;">
+                        <span style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+                            <i data-lucide="${row.icon}" style="width: 14px; height: 14px; color: ${row.color};"></i>
+                            ${row.label}
+                        </span>
+                        <span>
+                            <strong>${currency}${row.total.toFixed(2)}</strong>
+                            <span class="small text-muted">(${pct.toFixed(1)}%)</span>
+                        </span>
+                    </div>
+                    <div style="background: var(--border-color); height: 6px; border-radius: 3px; overflow: hidden;">
+                        <div style="background: ${row.color}; width: ${pct.toFixed(1)}%; height: 100%; border-radius: 3px; transition: width 0.4s ease;"></div>
+                    </div>
+                </div>
+            `;
+        });
+        payContainer.innerHTML = payHtml;
+    }
+
+    // 6. Top Repuestos Ranking Table
+    const productStats = {};
+    activeSales.forEach(s => {
+        if (!s.items || !Array.isArray(s.items)) return;
+        const source = s.stockSource || 'local';
+        s.items.forEach(item => {
+            if (!productStats[item.id]) {
+                const prod = state.products ? state.products.find(p => p.id === item.id) : null;
+                const unitCost = prod && prod.cost !== undefined ? prod.cost : (item.cost || 0);
+                productStats[item.id] = {
+                    id: item.id,
+                    name: item.name || (prod ? prod.name : 'Desconocido'),
+                    sku: item.sku || (prod ? prod.sku : ''),
+                    category: prod ? (prod.category || 'General') : 'General',
+                    units: 0,
+                    localUnits: 0,
+                    wholesaleUnits: 0,
+                    revenue: 0,
+                    cost: 0,
+                    unitCost: unitCost
+                };
+            }
+            const q = item.quantity || 1;
+            const rev = (item.price || 0) * q;
+            const cst = productStats[item.id].unitCost * q;
+            productStats[item.id].units += q;
+            if (source === 'wholesale') productStats[item.id].wholesaleUnits += q;
+            else productStats[item.id].localUnits += q;
+            productStats[item.id].revenue += rev;
+            productStats[item.id].cost += cst;
+        });
+    });
+
+    const topList = Object.values(productStats).map(p => {
+        const profit = Math.max(0, p.revenue - p.cost);
+        const margin = p.revenue > 0 ? (profit / p.revenue) * 100 : 0;
+        return { ...p, profit, margin };
+    });
+
+    if (metricasTopSort === 'revenue') {
+        topList.sort((a, b) => b.revenue - a.revenue);
+    } else if (metricasTopSort === 'units') {
+        topList.sort((a, b) => b.units - a.units);
+    } else if (metricasTopSort === 'profit') {
+        topList.sort((a, b) => b.profit - a.profit);
+    }
+
+    const tbody = document.getElementById('metricas-top-table-body');
+    if (tbody) {
+        if (topList.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center text-muted" style="padding: 30px;">
+                        No se registran ventas en el período seleccionado.
+                    </td>
+                </tr>
+            `;
+        } else {
+            let rowsHtml = '';
+            topList.slice(0, 12).forEach((p, idx) => {
+                let badgeClass = 'badge-secondary';
+                if (idx === 0) badgeClass = 'badge-primary';
+                else if (idx === 1) badgeClass = 'badge-success';
+                else if (idx === 2) badgeClass = 'badge-warning';
+
+                rowsHtml += `
+                    <tr>
+                        <td><span class="badge ${badgeClass}">#${idx + 1}</span></td>
+                        <td>
+                            <strong style="color: var(--text-main); display: block;">${p.name}</strong>
+                            <span class="small text-muted">SKU: ${p.sku || '-'} | L: ${p.localUnits} / M: ${p.wholesaleUnits}</span>
+                        </td>
+                        <td><span class="badge" style="background: var(--bg-hover);">${p.category}</span></td>
+                        <td class="text-center" style="font-weight: 700;">${p.units}</td>
+                        <td class="text-right" style="font-weight: 700; color: var(--text-main);">${currency}${p.revenue.toFixed(2)}</td>
+                        <td class="text-right text-muted">${currency}${p.cost.toFixed(2)}</td>
+                        <td class="text-right" style="font-weight: 700; color: #10b981;">+${currency}${p.profit.toFixed(2)}</td>
+                        <td class="text-right"><span class="badge ${p.margin >= 30 ? 'badge-success' : 'badge-warning'}">${p.margin.toFixed(0)}%</span></td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = rowsHtml;
+        }
+    }
+
+    if (window.lucide) lucide.createIcons();
+};
+
+window.exportMetricasCSV = function() {
+    const currency = (state.settings && state.settings.currency) || '$';
+    const { start, end } = getMetricasDateRange();
+
+    const completedInRange = (state.sales || []).filter(s => {
+        if (s.status !== 'completed') return false;
+        const d = new Date(s.date);
+        return d >= start && d <= end;
+    });
+
+    const localSales = completedInRange.filter(s => (s.stockSource || 'local') === 'local');
+    const wholesaleSales = completedInRange.filter(s => (s.stockSource || 'local') === 'wholesale');
+
+    const mainPerf = calcSalesPerformance(completedInRange);
+    const localPerf = calcSalesPerformance(localSales);
+    const wholesalePerf = calcSalesPerformance(wholesaleSales);
+
+    let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+    csvContent += "REPORTE DE MÉTRICAS Y RENDIMIENTO - DH MOTOPARTES\r\n";
+    csvContent += `Generado el: ${new Date().toLocaleString('es-ES')}\r\n`;
+    csvContent += `Período: ${start.toLocaleDateString('es-ES')} hasta ${end.toLocaleDateString('es-ES')}\r\n\r\n`;
+
+    csvContent += "RESUMEN GENERAL CONSOLIDADO\r\n";
+    csvContent += `Facturacion Total,${mainPerf.totalSales.toFixed(2)}\r\n`;
+    csvContent += `Costo de Mercaderia,${mainPerf.totalCost.toFixed(2)}\r\n`;
+    csvContent += `Ganancia Neta,${mainPerf.totalProfit.toFixed(2)}\r\n`;
+    csvContent += `Margen Promedio,${mainPerf.profitMargin.toFixed(1)}%\r\n`;
+    csvContent += `Ventas Realizadas,${mainPerf.totalTransactions}\r\n`;
+    csvContent += `Ticket Promedio,${mainPerf.avgTicket.toFixed(2)}\r\n`;
+    csvContent += `Unidades Vendidas,${mainPerf.totalItems}\r\n\r\n`;
+
+    csvContent += "COMPARATIVA CANAL LOCAL VS MAYORISTA\r\n";
+    csvContent += "Canal,Facturacion,Costo,Ganancia,Margen %,Ventas,Ticket Promedio,Unidades\r\n";
+    csvContent += `Local (Mostrador),${localPerf.totalSales.toFixed(2)},${localPerf.totalCost.toFixed(2)},${localPerf.totalProfit.toFixed(2)},${localPerf.profitMargin.toFixed(1)}%,${localPerf.totalTransactions},${localPerf.avgTicket.toFixed(2)},${localPerf.totalItems}\r\n`;
+    csvContent += `Mayorista,${wholesalePerf.totalSales.toFixed(2)},${wholesalePerf.totalCost.toFixed(2)},${wholesalePerf.totalProfit.toFixed(2)},${wholesalePerf.profitMargin.toFixed(1)}%,${wholesalePerf.totalTransactions},${wholesalePerf.avgTicket.toFixed(2)},${wholesalePerf.totalItems}\r\n\r\n`;
+
+    csvContent += "COBROS POR METODO DE PAGO\r\n";
+    csvContent += "Metodo,Monto Facturado,Cantidad Ventas\r\n";
+    csvContent += `Efectivo,${mainPerf.payments.cash.toFixed(2)},${mainPerf.paymentCounts.cash}\r\n`;
+    csvContent += `Transferencias Bancarias,${mainPerf.payments.transfer.toFixed(2)},${mainPerf.paymentCounts.transfer}\r\n`;
+    csvContent += `Mercado Pago,${mainPerf.payments.mercadopago.toFixed(2)},${mainPerf.paymentCounts.mercadopago}\r\n`;
+    csvContent += `Tarjetas,${mainPerf.payments.card.toFixed(2)},${mainPerf.paymentCounts.card}\r\n`;
+    csvContent += `Cuenta Corriente,${mainPerf.payments.credit.toFixed(2)},${mainPerf.paymentCounts.credit}\r\n\r\n`;
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `metricas_rendimiento_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    playScanSound('success');
+};
 
 /* ==========================================================================
    8. EXCEL MASS IMPORT CONTROLLER
