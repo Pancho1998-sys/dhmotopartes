@@ -218,8 +218,13 @@ function getActiveModalId() {
     return activeModals[activeModals.length - 1].id || null;
 }
 
+function isPOSViewActive() {
+    const posView = document.getElementById('view-pos');
+    return (posView && posView.classList.contains('active-view')) || window.location.hash === '#pos';
+}
+
 function focusPOSSearch(selectAll = false) {
-    if (window.location.hash !== '#pos') return;
+    if (!isPOSViewActive()) return;
     const input = document.getElementById('pos-search-input');
     if (!input) return;
     input.focus();
@@ -2007,7 +2012,7 @@ function setupEventListeners() {
             e.preventDefault();
             movePOSCardSelection(-1);
         } else if (e.key === 'Escape') {
-            if (posSearchInput.value) {
+            if (!getActiveModalId() && posSearchInput.value) {
                 e.preventDefault();
                 e.stopPropagation();
                 clearPOSSearch(true);
@@ -2016,6 +2021,7 @@ function setupEventListeners() {
             const isLikelyHardwareScan = !e.ctrlKey && !e.altKey && !e.metaKey && barcodeBuffer.trim().length >= 3 && (Date.now() - lastKeyTime <= 50);
             if (!isLikelyHardwareScan) {
                 e.preventDefault();
+                e.stopPropagation();
                 addSelectedPOSProductFromSearch(e.ctrlKey);
             }
         }
@@ -2491,7 +2497,7 @@ function setupEventListeners() {
     window.addEventListener('keydown', (e) => {
         if (!e || !e.key) return;
         const activeModalId = getActiveModalId();
-        const isPosView = window.location.hash === '#pos';
+        const isPosView = isPOSViewActive();
 
         // Escape: close top modal or clear POS search
         if (e.key === 'Escape') {
@@ -2537,7 +2543,7 @@ function setupEventListeners() {
                     return;
                 }
             }
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.metaKey) {
                 const activeEl = document.activeElement;
                 const isCancelOrClose = activeEl && (activeEl.hasAttribute('data-close-modal') || activeEl.classList.contains('method-btn') || activeEl.classList.contains('quick-cash-btn'));
                 const confirmBtn = document.getElementById('checkout-confirm-btn');
@@ -3149,15 +3155,13 @@ function openModal(modalId) {
     }
 }
 
-function closeModal(modalId) {
+function closeModal(modalId, restoreFocus = true) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.classList.remove('active');
         const posReturnModals = ['modal-checkout', 'modal-receipt', 'modal-discount', 'modal-fractional-qty', 'modal-pos-shortcuts'];
-        if (posReturnModals.includes(modalId) && window.location.hash === '#pos' && window.innerWidth > 768) {
-            setTimeout(() => {
-                if (!getActiveModalId()) focusPOSSearch(false);
-            }, 50);
+        if (restoreFocus && posReturnModals.includes(modalId) && isPOSViewActive() && !getActiveModalId()) {
+            focusPOSSearch(false);
         }
     }
 }
@@ -4012,7 +4016,7 @@ window.confirmFractionalSale = function(goToCheckout = false) {
     }
 
     playScanSound('success');
-    closeModal('modal-fractional-qty');
+    closeModal('modal-fractional-qty', !goToCheckout);
     renderCart();
     if (goToCheckout) {
         openCheckoutModal();

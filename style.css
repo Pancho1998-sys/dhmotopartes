@@ -2147,12 +2147,17 @@ textarea:focus {
 @media (max-width: 1024px) {
     .pos-layout {
         grid-template-columns: 1fr;
-        grid-template-rows: 1fr 340px;
+        grid-template-rows: auto auto;
         height: auto;
         overflow: visible;
     }
     .pos-cart-panel {
-        height: 340px;
+        height: auto;
+        min-height: 460px;
+    }
+    .cart-items-wrapper {
+        min-height: 160px;
+        max-height: 320px;
     }
     .settings-grid {
         grid-template-columns: 1fr;
