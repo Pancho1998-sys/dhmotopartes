@@ -2227,6 +2227,17 @@ function setupEventListeners() {
 
     document.getElementById('product-form').addEventListener('submit', saveProduct);
 
+    const btnGenerateSku = document.getElementById('btn-generate-sku');
+    if (btnGenerateSku) {
+        btnGenerateSku.addEventListener('click', () => {
+            const skuInput = document.getElementById('prod-sku');
+            if (skuInput && !skuInput.readOnly) {
+                skuInput.value = generateUniqueProductSku();
+                skuInput.focus();
+            }
+        });
+    }
+
     // Combo Type Switcher Listeners
     const typeSimple = document.getElementById('prod-type-simple');
     const typeCombo = document.getElementById('prod-type-combo');
@@ -4741,12 +4752,62 @@ window.changeInventoryPage = function (delta) {
     renderInventoryTable();
 };
 
+/**
+ * Generates a random uppercase SKU (e.g. "DH-7K4M9P") guaranteed not to collide
+ * with any existing product SKU or any additional SKUs in the provided collection.
+ */
+function generateUniqueProductSku(extraUsedSkus = null) {
+    const used = new Set();
+    if (typeof state !== 'undefined' && Array.isArray(state.products)) {
+        state.products.forEach(p => {
+            const s = (p && p.sku ? String(p.sku) : '').trim().toUpperCase();
+            if (s) used.add(s);
+        });
+    }
+    if (extraUsedSkus) {
+        extraUsedSkus.forEach(s => {
+            const norm = (s ? String(s) : '').trim().toUpperCase();
+            if (norm) used.add(norm);
+        });
+    }
+
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const randomChunk = (len) => {
+        let out = '';
+        if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+            const bytes = new Uint32Array(len);
+            crypto.getRandomValues(bytes);
+            for (let i = 0; i < len; i++) {
+                out += alphabet[bytes[i] % alphabet.length];
+            }
+        } else {
+            for (let i = 0; i < len; i++) {
+                out += alphabet[Math.floor(Math.random() * alphabet.length)];
+            }
+        }
+        return out;
+    };
+
+    for (let attempt = 0; attempt < 1000; attempt++) {
+        const candidate = `DH-${randomChunk(6)}`;
+        if (!used.has(candidate)) {
+            return candidate;
+        }
+    }
+
+    let fallback = `DH-${Date.now().toString(36).toUpperCase()}-${randomChunk(4)}`;
+    while (used.has(fallback)) {
+        fallback = `DH-${Date.now().toString(36).toUpperCase()}-${randomChunk(4)}`;
+    }
+    return fallback;
+}
+
 // Create or edit product in DB
 function saveProduct(e) {
     e.preventDefault();
 
     const id = document.getElementById('product-id-field').value;
-    const sku = document.getElementById('prod-sku').value.trim().toUpperCase();
+    let sku = document.getElementById('prod-sku').value.trim().toUpperCase();
     const name = document.getElementById('prod-name').value.trim();
     const category = document.getElementById('prod-category').value;
     const cost = parseFloat(document.getElementById('prod-cost').value) || 0;
@@ -4767,9 +4828,12 @@ function saveProduct(e) {
     const finalStock = isCombo ? 0 : stock;
     const finalStockWholesale = isCombo ? 0 : stockWholesale;
 
-    // Check SKU duplicate on creation
+    // Auto-generate unique random SKU on creation if omitted; require non-empty on edit
     if (!id) {
-        const skuExists = state.products.find(p => p.sku === sku);
+        if (!sku) {
+            sku = generateUniqueProductSku();
+        }
+        const skuExists = state.products.find(p => (p.sku || '').trim().toUpperCase() === sku);
         if (skuExists) {
             alert(`Ya existe un repuesto con el SKU: ${sku}`);
             return;
@@ -4789,7 +4853,12 @@ function saveProduct(e) {
             components: isCombo ? [...tempComboComponents] : []
         });
     } else {
-        const skuExists = state.products.find(p => p.sku === sku && p.id !== id);
+        if (!sku) {
+            alert('El SKU / Código Único no puede estar vacío al editar un repuesto.');
+            document.getElementById('prod-sku').focus();
+            return;
+        }
+        const skuExists = state.products.find(p => (p.sku || '').trim().toUpperCase() === sku && p.id !== id);
         if (skuExists) {
             alert(`Ya existe otro repuesto con el SKU: ${sku}`);
             return;
@@ -8420,9 +8489,13 @@ async function handleExcelImport(e) {
                 if (!row || row.length === 0) continue;
 
                 const rawSku = row[skuIdx];
-                if (rawSku === undefined || rawSku === null || rawSku.toString().trim() === '') continue;
+                const hasSku = rawSku !== undefined && rawSku !== null && rawSku.toString().trim() !== '';
+                const hasName = nameIdx !== -1 && row[nameIdx] !== undefined && row[nameIdx] !== null && row[nameIdx].toString().trim() !== '';
+                if (!hasSku && !hasName) continue;
 
-                const sku = rawSku.toString().trim().toUpperCase();
+                const sku = hasSku
+                    ? rawSku.toString().trim().toUpperCase()
+                    : generateUniqueProductSku(duplicates);
                 if (duplicates.has(sku)) continue; // skip duplicates in the spreadsheet
                 duplicates.add(sku);
 
@@ -9189,8 +9262,11 @@ function processExtractedReceiptData(receiptData) {
 
     const defaultMargin = parseFloat(document.getElementById('staging-global-margin')?.value) || 40;
 
+    const usedStagingSkus = new Set();
     tempStagingItems = receiptData.items.map((item, index) => {
-        const itemCode = (item.codigo || `REP-${Date.now()}-${index + 1}`).trim().toUpperCase();
+        const rawItemCode = (item.codigo || '').toString().trim().toUpperCase();
+        const itemCode = rawItemCode || generateUniqueProductSku(usedStagingSkus);
+        usedStagingSkus.add(itemCode);
         const itemName = (item.descripcion || 'Repuesto sin descripción').trim();
         const itemQty = Math.max(1, parseFloat(item.cantidad) || 1);
         const itemCost = Math.max(0, parseFloat(item.costo_unitario) || 0);
@@ -9388,10 +9464,11 @@ window.removeStagingRow = function(index) {
 window.addManualStagingRow = function() {
     const defaultMargin = parseFloat(document.getElementById('staging-global-margin')?.value) || 40;
     const categories = (state.settings && state.settings.categories) || ['Repuestos de Motor'];
+    const usedStagingSkus = new Set(tempStagingItems.map(i => i.sku));
     tempStagingItems.push({
         id: null,
         isNew: true,
-        sku: `REP-${Date.now().toString().slice(-6)}`,
+        sku: generateUniqueProductSku(usedStagingSkus),
         name: 'Nuevo Repuesto',
         category: categories[0] || 'Repuestos de Motor',
         quantity: 1,
@@ -9422,12 +9499,18 @@ window.authorizeStockReception = function() {
         return;
     }
 
-    // Validate that items have SKU and description
+    // Validate that items have SKU (auto-generate for new items without code) and description
+    const usedInStaging = new Set(tempStagingItems.map(i => i.sku));
     for (let i = 0; i < tempStagingItems.length; i++) {
         const it = tempStagingItems[i];
         if (!it.sku || !it.sku.trim()) {
-            alert(`El artículo #${i + 1} no tiene un Código/SKU válido. Por favor complétalo.`);
-            return;
+            if (it.isNew) {
+                it.sku = generateUniqueProductSku(usedInStaging);
+                usedInStaging.add(it.sku);
+            } else {
+                alert(`El artículo #${i + 1} no tiene un Código/SKU válido. Por favor complétalo.`);
+                return;
+            }
         }
         if (!it.name || !it.name.trim()) {
             alert(`El artículo con SKU ${it.sku} no tiene descripción. Por favor complétala.`);
