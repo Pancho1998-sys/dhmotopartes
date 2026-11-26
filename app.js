@@ -181,6 +181,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initDatetime();
     setupEventListeners();
     setupBarcodeListener();
+    initAutoBackupSystem();
     // setupCajeroRegistration();
 
     // Listen for custom hash changes
@@ -891,7 +892,24 @@ async function loadDatabase() {
                         throw error;
                     }
                 } else if (data && data.state) {
-                    state = ensureStateProperties(data.state);
+                    const incomingState = ensureStateProperties(data.state);
+                    const incomingHasData = (incomingState.products && incomingState.products.length > 0) ||
+                        (incomingState.sales && incomingState.sales.length > 0) ||
+                        (incomingState.customers && incomingState.customers.length > 0);
+                    const prevRaw = localStorage.getItem(getStorageKey());
+                    if (!incomingHasData && prevRaw) {
+                        try {
+                            const prevParsed = JSON.parse(prevRaw);
+                            const prevHasData = (prevParsed.products && prevParsed.products.length > 0) ||
+                                (prevParsed.sales && prevParsed.sales.length > 0);
+                            if (prevHasData) {
+                                localStorage.setItem(`dhmotopartes_emergency_backup_${myStoreId}`, prevRaw);
+                                console.warn("La nube devolvió estado vacío; copia previa resguardada en dhmotopartes_emergency_backup_" + myStoreId);
+                            }
+                        } catch (backupErr) { }
+                    }
+
+                    state = incomingState;
                     if (currentUserProfile && currentUserProfile.stores && currentUserProfile.stores.name) {
                         if (!state.settings.storeName || state.settings.storeName === "Bigtech") {
                             state.settings.storeName = currentUserProfile.stores.name;
@@ -902,6 +920,7 @@ async function loadDatabase() {
                     syncSettingsInputs();
                     await syncFiscalSettingsInputs();
                     renderApp();
+                    checkMissedDailyAutoBackup();
                 }
 
                 setupSupabaseRealtime();
@@ -1012,13 +1031,44 @@ async function saveDatabase(retryCount = 0) {
             updateSidebarStatus('pending', "Modo Offline (Pendiente)");
             return;
         }
+
+        const isStateEmpty = (!state.products || state.products.length === 0) &&
+            (!state.sales || state.sales.length === 0) &&
+            (!state.customers || state.customers.length === 0);
+        if (isStateEmpty && !window._explicitResetConfirmed) {
+            console.warn("Guardado bloqueado en la nube: intento de guardar estado vacío sin confirmación explícita.");
+            return;
+        }
+
         isSyncing = true;
         try {
             let oldVersion = state.version || 0;
             state.version = oldVersion + 1;
 
             if (oldVersion === 0) {
-                // Primera vez que se guarda (creacion)
+                // Verificar si ya existe un estado con datos en la nube antes de hacer upsert
+                const existingRes = await supabaseClient
+                    .from('store_states')
+                    .select('state')
+                    .eq('store_id', myStoreId)
+                    .maybeSingle();
+
+                const existingState = existingRes && existingRes.data ? existingRes.data.state : null;
+                const existingHasData = existingState && (
+                    (existingState.version || 0) > 0 ||
+                    (existingState.products && existingState.products.length > 0) ||
+                    (existingState.sales && existingState.sales.length > 0)
+                );
+
+                if (existingHasData && !window._explicitResetConfirmed) {
+                    console.warn("Protección anti-sobrescritura: la tienda ya tiene datos en Supabase. Sincronizando versión antes de guardar...");
+                    state.version = existingState.version || 1;
+                    // Forzar rama de colisión en el siguiente intento para fusionar en vez de pisar
+                    isSyncing = false;
+                    return saveDatabase(retryCount + 1);
+                }
+
+                // Primera vez que se guarda (creacion) o reinicio explícito confirmado
                 const { error } = await supabaseClient
                     .from('store_states')
                     .upsert({ store_id: myStoreId, state: state, updated_at: new Date().toISOString() });
@@ -1901,32 +1951,46 @@ function setupEventListeners() {
     document.getElementById('excel-download-template-btn').addEventListener('click', downloadExcelTemplate);
 
     // Data backups & resets
-    document.getElementById('data-load-demo-btn').addEventListener('click', () => {
+    document.getElementById('data-load-demo-btn').addEventListener('click', async () => {
         if (confirm("¿Estás seguro de que deseas sobrescribir los datos actuales con la base de datos demo de la repuestera?")) {
-            loadDemoData();
-            syncSettingsInputs(); // sync settings inputs
-            renderApp();
-            playScanSound('success');
-            alert("Base de datos demo cargada con éxito.");
+            window._explicitResetConfirmed = true;
+            try {
+                loadDemoData();
+                syncSettingsInputs(); // sync settings inputs
+                renderApp();
+                playScanSound('success');
+                alert("Base de datos demo cargada con éxito.");
+            } finally {
+                window._explicitResetConfirmed = false;
+            }
         }
     });
 
-    document.getElementById('data-reset-btn').addEventListener('click', () => {
+    document.getElementById('data-reset-btn').addEventListener('click', async () => {
         if (confirm("ATENCIÓN: Se eliminarán todos los productos, ventas y clientes de forma permanente. ¿Deseas continuar?")) {
-            state.products = [];
-            state.sales = [];
-            state.customers = [];
-            state.cart = [];
-            saveDatabase();
-            renderApp();
-            playScanSound('fail');
-            alert("El sistema ha sido reiniciado por completo.");
+            if (confirm("Última confirmación: ¿realmente deseas borrar toda la base de datos de la tienda?")) {
+                await runDailyAutoBackup('pre_reset', true);
+                window._explicitResetConfirmed = true;
+                try {
+                    state.products = [];
+                    state.sales = [];
+                    state.customers = [];
+                    state.cart = [];
+                    await saveDatabase();
+                    renderApp();
+                    playScanSound('fail');
+                    alert("El sistema ha sido reiniciado por completo.");
+                } finally {
+                    window._explicitResetConfirmed = false;
+                }
+            }
         }
     });
 
     document.getElementById('data-export-btn').addEventListener('click', exportJSONBackup);
     document.getElementById('data-import-input').addEventListener('change', importJSONBackup);
     document.getElementById('data-export-csv-btn').addEventListener('click', exportSalesCSV);
+    setupAutoBackupListeners();
 
     // Keyboard Shortcuts (F8 for Cobrar, F9 for Imprimir)
     window.addEventListener('keydown', (e) => {
@@ -5716,33 +5780,41 @@ function renderCatalogProductGrid() {
 
 // Export database as JSON file download
 function exportJSONBackup() {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+    const dateStr = typeof getLocalDateStr === 'function' ? getLocalDateStr() : new Date().toISOString().slice(0, 10);
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
     const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `aurapos_backup_${new Date().toISOString().slice(0, 10)}.json`);
+    downloadAnchor.setAttribute("href", blobUrl);
+    downloadAnchor.setAttribute("download", `dhmotopartes_backup_${dateStr}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
     playScanSound('success');
 }
 
 // Restore database from JSON backup upload
 function importJSONBackup(e) {
     const fileReader = new FileReader();
-    fileReader.onload = function (event) {
+    fileReader.onload = async function (event) {
         try {
             const parsedData = JSON.parse(event.target.result);
 
             // Validate schema
             if (parsedData.products && parsedData.sales && parsedData.customers && parsedData.settings) {
-                state = parsedData;
-                saveDatabase();
+                await runDailyAutoBackup('pre_import', true);
+                const prevVersion = state && state.version ? state.version : 0;
+                state = ensureStateProperties(parsedData);
+                if (prevVersion > (state.version || 0)) {
+                    state.version = prevVersion;
+                }
+                await saveDatabase();
                 syncSettingsInputs(); // sync settings inputs
                 renderApp();
                 playScanSound('success');
                 alert("Base de datos restaurada con éxito.");
             } else {
-                throw new Error("El archivo no contiene el formato correcto de AuraPOS.");
+                throw new Error("El archivo no contiene el formato correcto de DHMotopartes.");
             }
         } catch (error) {
             playScanSound('fail');
@@ -6488,6 +6560,9 @@ async function processCierreCaja(e) {
 
     state.cashClosures.push(closureObj);
     saveDatabase();
+
+    // Guardar respaldo automático al cerrar caja
+    runDailyAutoBackup('cierre', true).catch(err => console.warn('Backup post-cierre:', err));
 
     closeModal('modal-cierre-caja');
     playScanSound('success');
@@ -9466,3 +9541,550 @@ window.addComboComponentById = function(prodId) {
 
     window.updateComboComponentsTable();
 };
+
+/* ==========================================================================
+   AUTOMATIC NIGHTLY BACKUP SYSTEM (IndexedDB + Local Server + Folder + Cloud)
+   ========================================================================== */
+const AUTOBACKUP_DB_NAME = 'DHMotopartesBackupsDB';
+const AUTOBACKUP_DB_VERSION = 1;
+const AUTOBACKUP_MAX_DAYS = 30;
+let autoBackupIntervalId = null;
+
+function getLocalDateStr(d = new Date()) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function getLocalTimeHHMM(d = new Date()) {
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${hh}:${mm}`;
+}
+
+function hasSubstantialStateData(st) {
+    if (!st || typeof st !== 'object') return false;
+    return (Array.isArray(st.products) && st.products.length > 0) ||
+           (Array.isArray(st.sales) && st.sales.length > 0) ||
+           (Array.isArray(st.customers) && st.customers.length > 0);
+}
+
+function getAutoBackupConfigKey() {
+    return `dhmotopartes_autobackup_cfg_${getStorageKey()}`;
+}
+
+function getAutoBackupConfig() {
+    const defaults = {
+        enabled: true,
+        hour: '21:00',
+        autoDownload: false,
+        lastBackupDate: '',
+        lastBackupAt: '',
+        lastActiveDate: '',
+        dirName: ''
+    };
+    try {
+        const raw = localStorage.getItem(getAutoBackupConfigKey());
+        if (!raw) return defaults;
+        return { ...defaults, ...JSON.parse(raw) };
+    } catch (e) {
+        return defaults;
+    }
+}
+
+function saveAutoBackupConfig(cfg) {
+    try {
+        localStorage.setItem(getAutoBackupConfigKey(), JSON.stringify(cfg));
+    } catch (e) {
+        console.warn('No se pudo guardar config de backup automático:', e);
+    }
+}
+
+function openAutoBackupDB() {
+    return new Promise((resolve, reject) => {
+        if (typeof indexedDB === 'undefined') {
+            reject(new Error('IndexedDB no disponible'));
+            return;
+        }
+        const req = indexedDB.open(AUTOBACKUP_DB_NAME, AUTOBACKUP_DB_VERSION);
+        req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('backups')) {
+                db.createObjectStore('backups', { keyPath: 'id' });
+            }
+            if (!db.objectStoreNames.contains('handles')) {
+                db.createObjectStore('handles', { keyPath: 'id' });
+            }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error || new Error('Error abriendo IndexedDB'));
+    });
+}
+
+async function idbPutRecord(storeName, record) {
+    const db = await openAutoBackupDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).put(record);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+}
+
+async function idbGetRecord(storeName, key) {
+    const db = await openAutoBackupDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readonly');
+        const req = tx.objectStore(storeName).get(key);
+        req.onsuccess = () => { db.close(); resolve(req.result || null); };
+        req.onerror = () => { db.close(); reject(req.error); };
+    });
+}
+
+async function idbGetAllBackupsForStore(storeKey) {
+    const db = await openAutoBackupDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('backups', 'readonly');
+        const req = tx.objectStore('backups').getAll();
+        req.onsuccess = () => {
+            db.close();
+            const items = (req.result || [])
+                .filter(b => b.storeKey === storeKey)
+                .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+            resolve(items);
+        };
+        req.onerror = () => { db.close(); reject(req.error); };
+    });
+}
+
+async function idbPruneBackupsForStore(storeKey) {
+    const db = await openAutoBackupDB();
+    const all = await new Promise((resolve, reject) => {
+        const tx = db.transaction('backups', 'readonly');
+        const req = tx.objectStore('backups').getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+    });
+    const mine = all.filter(b => b.storeKey === storeKey).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    if (mine.length > AUTOBACKUP_MAX_DAYS) {
+        const toDelete = mine.slice(AUTOBACKUP_MAX_DAYS);
+        await new Promise((resolve, reject) => {
+            const tx = db.transaction('backups', 'readwrite');
+            const st = tx.objectStore('backups');
+            toDelete.forEach(item => st.delete(item.id));
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+    db.close();
+}
+
+async function writeBackupToPickedDirectory(filename, jsonContent, interactive = false) {
+    try {
+        const rec = await idbGetRecord('handles', `dir_${getStorageKey()}`);
+        if (!rec || !rec.handle) return false;
+        const handle = rec.handle;
+        let perm = await handle.queryPermission({ mode: 'readwrite' });
+        if (perm !== 'granted' && interactive && handle.requestPermission) {
+            perm = await handle.requestPermission({ mode: 'readwrite' });
+        }
+        if (perm !== 'granted') return false;
+        const fileHandle = await handle.getFileHandle(filename, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(jsonContent);
+        await writable.close();
+        return true;
+    } catch (e) {
+        console.warn('No se pudo escribir backup en carpeta elegida:', e);
+        return false;
+    }
+}
+
+async function trySaveBackupToLocalServer(dateStr, snapshotState) {
+    if (window.location.protocol === 'file:') return false;
+    try {
+        const res = await fetch('/api/backup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date: dateStr, state: snapshotState })
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        return !!(data && data.saved);
+    } catch (e) {
+        return false;
+    }
+}
+
+async function trySaveBackupToSupabaseCloud(dateStr, reason, snapshotState) {
+    if (isLocalOfflineMode || !supabaseInitialized || !supabaseClient || !myStoreId || !window.navigator.onLine) {
+        return false;
+    }
+    try {
+        const session = (await supabaseClient.auth.getSession()).data.session;
+        if (!session || !session.user) return false;
+        const { error } = await supabaseClient
+            .from('store_backups')
+            .upsert({
+                store_id: myStoreId,
+                backup_date: dateStr,
+                source: reason,
+                products_count: (snapshotState.products || []).length,
+                sales_count: (snapshotState.sales || []).length,
+                state: snapshotState
+            }, { onConflict: 'store_id,backup_date' });
+        return !error;
+    } catch (e) {
+        return false;
+    }
+}
+
+function triggerJsonDownload(filename, jsonString) {
+    const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+async function runDailyAutoBackup(reason = 'nightly', force = false, targetDateStr = null) {
+    if (currentUserRole === 'saas_admin') return false;
+    if (!hasSubstantialStateData(state)) return false;
+
+    const dateStr = targetDateStr || getLocalDateStr();
+    const storeKey = getStorageKey();
+    const cfg = getAutoBackupConfig();
+
+    if (!force && cfg.lastBackupDate === dateStr && reason === 'nightly') {
+        return false;
+    }
+
+    const snapshotState = JSON.parse(JSON.stringify(state));
+    const jsonString = JSON.stringify(snapshotState, null, 2);
+    const filename = `dhmotopartes_backup_${dateStr}.json`;
+
+    const record = {
+        id: `${storeKey}_${dateStr}`,
+        storeKey,
+        storeId: myStoreId || null,
+        date: dateStr,
+        createdAt: new Date().toISOString(),
+        reason,
+        productsCount: (snapshotState.products || []).length,
+        salesCount: (snapshotState.sales || []).length,
+        state: snapshotState
+    };
+
+    try {
+        await idbPutRecord('backups', record);
+        await idbPruneBackupsForStore(storeKey);
+    } catch (e) {
+        console.warn('Error guardando backup en IndexedDB:', e);
+    }
+
+    const savedOnServer = await trySaveBackupToLocalServer(dateStr, snapshotState);
+    const savedOnPickedDir = await writeBackupToPickedDirectory(filename, jsonString, force && reason === 'manual');
+    await trySaveBackupToSupabaseCloud(dateStr, reason, snapshotState);
+
+    if (cfg.autoDownload && !savedOnServer && !savedOnPickedDir && (reason === 'nightly' || reason === 'catchup')) {
+        triggerJsonDownload(filename, jsonString);
+    }
+
+    cfg.lastBackupDate = dateStr;
+    cfg.lastBackupAt = new Date().toISOString();
+    cfg.lastActiveDate = getLocalDateStr();
+    saveAutoBackupConfig(cfg);
+
+    syncAutoBackupUI();
+    renderAutoBackupHistory();
+    console.log(`💾 Respaldo automático (${reason}) guardado para ${dateStr}: ${record.productsCount} productos, ${record.salesCount} ventas.`);
+    return true;
+}
+
+async function checkMissedDailyAutoBackup() {
+    if (!hasSubstantialStateData(state)) return;
+    const cfg = getAutoBackupConfig();
+    if (!cfg.enabled) return;
+
+    const today = getLocalDateStr();
+    if (cfg.lastActiveDate && cfg.lastActiveDate < today && cfg.lastBackupDate !== cfg.lastActiveDate) {
+        await runDailyAutoBackup('catchup', true, cfg.lastActiveDate);
+    } else if (!cfg.lastBackupDate) {
+        await runDailyAutoBackup('initial', true, today);
+    } else {
+        cfg.lastActiveDate = today;
+        saveAutoBackupConfig(cfg);
+    }
+    await checkNightlyAutoBackupTick();
+}
+
+async function checkNightlyAutoBackupTick() {
+    if (!hasSubstantialStateData(state)) return;
+    const cfg = getAutoBackupConfig();
+    if (!cfg.enabled) return;
+
+    const today = getLocalDateStr();
+    const nowHHMM = getLocalTimeHHMM();
+    const targetHour = cfg.hour || '21:00';
+
+    if (nowHHMM >= targetHour && cfg.lastBackupDate !== today) {
+        await runDailyAutoBackup('nightly', false, today);
+    }
+}
+
+function syncAutoBackupUI() {
+    const cfg = getAutoBackupConfig();
+    const enabledEl = document.getElementById('autobackup-enabled');
+    const timeEl = document.getElementById('autobackup-time');
+    const autoDlEl = document.getElementById('autobackup-autodownload');
+    const badgeEl = document.getElementById('autobackup-status-badge');
+    const lastRunEl = document.getElementById('autobackup-last-run');
+    const dirLabelEl = document.getElementById('autobackup-dir-label');
+
+    if (enabledEl) enabledEl.checked = cfg.enabled !== false;
+    if (timeEl) timeEl.value = cfg.hour || '21:00';
+    if (autoDlEl) autoDlEl.checked = !!cfg.autoDownload;
+
+    if (badgeEl) {
+        badgeEl.textContent = cfg.enabled ? `Activo (${cfg.hour || '21:00'} hs)` : 'Pausado';
+        badgeEl.className = cfg.enabled ? 'badge badge-success' : 'badge badge-warning';
+    }
+    if (dirLabelEl) {
+        dirLabelEl.textContent = cfg.dirName
+            ? `Carpeta seleccionada: "${cfg.dirName}" (más historial interno)`
+            : 'Guardando en historial interno del sistema (y servidor local si está activo)';
+    }
+    if (lastRunEl) {
+        if (cfg.lastBackupAt) {
+            const dt = new Date(cfg.lastBackupAt).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+            lastRunEl.textContent = `Último respaldo automático: ${cfg.lastBackupDate} (${dt})`;
+        } else {
+            lastRunEl.textContent = 'Último respaldo automático: Sin registros todavía';
+        }
+    }
+}
+
+async function renderAutoBackupHistory() {
+    const tbody = document.getElementById('autobackup-history-body');
+    if (!tbody) return;
+
+    let rows = [];
+    try {
+        rows = await idbGetAllBackupsForStore(getStorageKey());
+    } catch (e) {
+        rows = [];
+    }
+
+    let serverBackups = [];
+    if (window.location.protocol !== 'file:') {
+        try {
+            const res = await fetch('/api/backups');
+            if (res.ok) {
+                const data = await res.json();
+                serverBackups = (data && data.backups) ? data.backups : [];
+            }
+        } catch (e) { }
+    }
+
+    if (rows.length === 0 && serverBackups.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Aún no hay respaldos automáticos guardados en este equipo.</td></tr>';
+        return;
+    }
+
+    const reasonLabels = {
+        nightly: 'Nocturno automático',
+        cierre: 'Cierre de Caja',
+        manual: 'Manual',
+        catchup: 'Recuperación diaria',
+        initial: 'Inicial',
+        pre_reset: 'Previo a reinicio',
+        pre_import: 'Previo a importación'
+    };
+
+    let html = '';
+    rows.slice(0, 15).forEach(b => {
+        const dt = b.createdAt ? new Date(b.createdAt).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : b.date;
+        html += `
+            <tr>
+                <td><strong>${b.date}</strong><br><span class="text-muted small">${dt}</span></td>
+                <td><span class="badge badge-primary">${reasonLabels[b.reason] || b.reason || 'Automático'}</span></td>
+                <td>${b.productsCount || 0}</td>
+                <td>${b.salesCount || 0}</td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-secondary btn-small" onclick="downloadAutoBackupById('${b.id}')" title="Descargar JSON"><i data-lucide="download"></i></button>
+                    <button type="button" class="btn btn-primary btn-small" onclick="restoreAutoBackupById('${b.id}')" title="Restaurar este respaldo" style="margin-left: 4px;"><i data-lucide="rotate-ccw"></i></button>
+                </td>
+            </tr>
+        `;
+    });
+
+    serverBackups.slice(0, 10).forEach(sb => {
+        const alreadyListed = rows.some(r => `dhmotopartes_backup_${r.date}.json` === sb.filename);
+        if (alreadyListed) return;
+        const sizeKB = (sb.size / 1024).toFixed(0);
+        html += `
+            <tr>
+                <td><strong>${sb.filename.replace('dhmotopartes_backup_', '').replace('.json', '')}</strong><br><span class="text-muted small">${sizeKB} KB (Servidor Local)</span></td>
+                <td><span class="badge badge-secondary">Disco Local</span></td>
+                <td>-</td>
+                <td>-</td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-secondary btn-small" onclick="downloadServerBackup('${sb.filename}')" title="Descargar JSON"><i data-lucide="download"></i></button>
+                    <button type="button" class="btn btn-primary btn-small" onclick="restoreServerBackup('${sb.filename}')" title="Restaurar" style="margin-left: 4px;"><i data-lucide="rotate-ccw"></i></button>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+    if (window.lucide) lucide.createIcons();
+}
+
+window.downloadAutoBackupById = async function (id) {
+    try {
+        const rec = await idbGetRecord('backups', id);
+        if (!rec || !rec.state) return alert('No se encontró el respaldo seleccionado.');
+        triggerJsonDownload(`dhmotopartes_backup_${rec.date}.json`, JSON.stringify(rec.state, null, 2));
+        playScanSound('success');
+    } catch (e) {
+        alert('Error al descargar respaldo: ' + e.message);
+    }
+};
+
+window.restoreAutoBackupById = async function (id) {
+    try {
+        const rec = await idbGetRecord('backups', id);
+        if (!rec || !rec.state) return alert('No se encontró el respaldo seleccionado.');
+        if (!confirm(`¿Restaurar el respaldo del ${rec.date} (${rec.productsCount} productos, ${rec.salesCount} ventas)? Se guardará una copia de seguridad del estado actual antes de restaurar.`)) {
+            return;
+        }
+        await runDailyAutoBackup('pre_import', true);
+        const prevVersion = state && state.version ? state.version : 0;
+        state = ensureStateProperties(rec.state);
+        if (prevVersion > (state.version || 0)) {
+            state.version = prevVersion;
+        }
+        await saveDatabase();
+        syncSettingsInputs();
+        renderApp();
+        playScanSound('success');
+        alert(`Respaldo del ${rec.date} restaurado con éxito.`);
+    } catch (e) {
+        alert('Error al restaurar respaldo: ' + e.message);
+    }
+};
+
+window.downloadServerBackup = async function (filename) {
+    try {
+        const res = await fetch(`/api/backups/${encodeURIComponent(filename)}`);
+        if (!res.ok) throw new Error('No disponible');
+        const text = await res.text();
+        triggerJsonDownload(filename, text);
+    } catch (e) {
+        alert('Error descargando respaldo del servidor local: ' + e.message);
+    }
+};
+
+window.restoreServerBackup = async function (filename) {
+    try {
+        const res = await fetch(`/api/backups/${encodeURIComponent(filename)}`);
+        if (!res.ok) throw new Error('No disponible');
+        const parsed = await res.json();
+        if (!confirm(`¿Restaurar el archivo ${filename} del servidor local?`)) return;
+        await runDailyAutoBackup('pre_import', true);
+        const prevVersion = state && state.version ? state.version : 0;
+        state = ensureStateProperties(parsed);
+        if (prevVersion > (state.version || 0)) {
+            state.version = prevVersion;
+        }
+        await saveDatabase();
+        syncSettingsInputs();
+        renderApp();
+        playScanSound('success');
+        alert(`Archivo ${filename} restaurado con éxito.`);
+    } catch (e) {
+        alert('Error restaurando respaldo: ' + e.message);
+    }
+};
+
+function setupAutoBackupListeners() {
+    const enabledEl = document.getElementById('autobackup-enabled');
+    const timeEl = document.getElementById('autobackup-time');
+    const autoDlEl = document.getElementById('autobackup-autodownload');
+    const nowBtn = document.getElementById('autobackup-now-btn');
+    const pickDirBtn = document.getElementById('autobackup-pick-dir-btn');
+
+    if (enabledEl) {
+        enabledEl.addEventListener('change', () => {
+            const cfg = getAutoBackupConfig();
+            cfg.enabled = enabledEl.checked;
+            saveAutoBackupConfig(cfg);
+            syncAutoBackupUI();
+        });
+    }
+    if (timeEl) {
+        timeEl.addEventListener('change', () => {
+            const cfg = getAutoBackupConfig();
+            cfg.hour = timeEl.value || '21:00';
+            saveAutoBackupConfig(cfg);
+            syncAutoBackupUI();
+        });
+    }
+    if (autoDlEl) {
+        autoDlEl.addEventListener('change', () => {
+            const cfg = getAutoBackupConfig();
+            cfg.autoDownload = autoDlEl.checked;
+            saveAutoBackupConfig(cfg);
+        });
+    }
+    if (nowBtn) {
+        nowBtn.addEventListener('click', async () => {
+            const ok = await runDailyAutoBackup('manual', true);
+            if (ok) {
+                playScanSound('success');
+                alert('Respaldo manual guardado correctamente en el historial y en disco.');
+            } else {
+                alert('No hay datos cargados para respaldar en este momento.');
+            }
+        });
+    }
+    if (pickDirBtn) {
+        pickDirBtn.addEventListener('click', async () => {
+            if (typeof window.showDirectoryPicker !== 'function') {
+                alert('Tu navegador no permite elegir carpeta directa. Usa el servidor local o activa la descarga automática.');
+                return;
+            }
+            try {
+                const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                await idbPutRecord('handles', { id: `dir_${getStorageKey()}`, handle });
+                const cfg = getAutoBackupConfig();
+                cfg.dirName = handle.name || 'Carpeta elegida';
+                saveAutoBackupConfig(cfg);
+                syncAutoBackupUI();
+                await runDailyAutoBackup('manual', true);
+                playScanSound('success');
+            } catch (e) {
+                if (e && e.name !== 'AbortError') {
+                    alert('No se pudo seleccionar la carpeta: ' + e.message);
+                }
+            }
+        });
+    }
+
+    syncAutoBackupUI();
+    renderAutoBackupHistory();
+}
+
+function initAutoBackupSystem() {
+    syncAutoBackupUI();
+    renderAutoBackupHistory();
+    if (autoBackupIntervalId) clearInterval(autoBackupIntervalId);
+    autoBackupIntervalId = setInterval(() => {
+        checkNightlyAutoBackupTick();
+    }, 60 * 1000);
+}

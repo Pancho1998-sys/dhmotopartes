@@ -15,5 +15,12 @@ dist/
 # Ignore local database and binaries
 dhmotopartes_db.json
 DHMotopartes-Server.spec
+dhmotopartes.spec
 dhmotopartes.exe
 DHMotopartes-Server.exe
+
+# Ignore local backups and Windows backup scripts
+backups/
+backup-config.json
+backup_nocturno.ps1
+instalar_backup_nocturno.bat

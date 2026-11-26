@@ -1594,6 +1594,65 @@
                                         </button>
                                     </div>
                                 </div>
+
+                                <!-- Respaldo Automático Nocturno -->
+                                <div class="data-op-card" style="margin-top: 20px; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
+                                        <div>
+                                            <h4 style="margin: 0 0 4px 0;"><i data-lucide="moon" class="icon-inline text-primary"></i> Respaldo Automático Nocturno (Fin de Día)</h4>
+                                            <p class="text-muted small" style="margin: 0;">Guarda automáticamente una copia completa al final de cada jornada (al llegar la hora nocturna o al hacer el Cierre de Caja).</p>
+                                        </div>
+                                        <span class="badge badge-primary" id="autobackup-status-badge">Activo</span>
+                                    </div>
+
+                                    <div style="display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; margin-bottom: 14px;">
+                                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13.5px; font-weight: 500;">
+                                            <input type="checkbox" id="autobackup-enabled" checked style="width: 16px; height: 16px;">
+                                            Activar respaldo nocturno
+                                        </label>
+
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <label for="autobackup-time" style="font-size: 13px; color: var(--text-muted); margin: 0;">Hora nocturna:</label>
+                                            <input type="time" id="autobackup-time" value="21:00" style="padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-color); font-size: 13px;">
+                                        </div>
+
+                                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text-muted);">
+                                            <input type="checkbox" id="autobackup-autodownload" style="width: 15px; height: 15px;">
+                                            Descargar .json automático si no uso carpeta ni servidor local
+                                        </label>
+                                    </div>
+
+                                    <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px;">
+                                        <button type="button" class="btn btn-primary" id="autobackup-now-btn">
+                                            <i data-lucide="shield-check"></i> Respaldar Ahora
+                                        </button>
+                                        <button type="button" class="btn btn-secondary btn-outline" id="autobackup-pick-dir-btn">
+                                            <i data-lucide="folder-open"></i> Elegir Carpeta Automática en PC
+                                        </button>
+                                        <span class="text-muted small" id="autobackup-dir-label">Guardando en historial interno del sistema (y servidor local si está activo)</span>
+                                    </div>
+
+                                    <div class="text-muted small" id="autobackup-last-run" style="margin-bottom: 10px;">
+                                        Último respaldo automático: Sin registros todavía
+                                    </div>
+
+                                    <div class="table-responsive" style="max-height: 220px; overflow-y: auto;">
+                                        <table class="data-table" style="font-size: 13px;">
+                                            <thead>
+                                                <tr>
+                                                    <th>Fecha</th>
+                                                    <th>Origen</th>
+                                                    <th>Productos</th>
+                                                    <th>Ventas</th>
+                                                    <th class="text-center">Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="autobackup-history-body">
+                                                <tr><td colspan="5" class="text-center text-muted">Cargando historial de respaldos...</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

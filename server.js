@@ -13,6 +13,68 @@ const PORT = 8000;
 const IS_PKG = typeof process.pkg !== 'undefined';
 const REAL_DIR = IS_PKG ? path.dirname(process.execPath) : __dirname;
 const DB_PATH = path.join(REAL_DIR, 'dhmotopartes_db.json');
+const BACKUP_DIR = path.join(REAL_DIR, 'backups');
+const MAX_LOCAL_BACKUPS = 60;
+
+function getLocalDateStr(d = new Date()) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function hasSubstantialData(st) {
+    if (!st || typeof st !== 'object') return false;
+    return (Array.isArray(st.products) && st.products.length > 0) ||
+           (Array.isArray(st.sales) && st.sales.length > 0) ||
+           (Array.isArray(st.customers) && st.customers.length > 0);
+}
+
+function pruneOldBackups() {
+    try {
+        if (!fs.existsSync(BACKUP_DIR)) return;
+        const files = fs.readdirSync(BACKUP_DIR)
+            .filter(f => f.startsWith('dhmotopartes_backup_') && f.endsWith('.json'))
+            .sort();
+        while (files.length > MAX_LOCAL_BACKUPS) {
+            const oldest = files.shift();
+            fs.unlinkSync(path.join(BACKUP_DIR, oldest));
+        }
+    } catch (e) {
+        console.warn('Error limpiando backups antiguos:', e.message);
+    }
+}
+
+function saveBackupSnapshot(stateObj, dateStr) {
+    if (!hasSubstantialData(stateObj)) {
+        return { saved: false, reason: 'empty_state' };
+    }
+    const safeDate = /^\d{4}-\d{2}-\d{2}$/.test(dateStr || '') ? dateStr : getLocalDateStr();
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    const filename = `dhmotopartes_backup_${safeDate}.json`;
+    const target = path.join(BACKUP_DIR, filename);
+    fs.writeFileSync(target, JSON.stringify(stateObj, null, 2), 'utf8');
+    pruneOldBackups();
+    return { saved: true, filename, path: target };
+}
+
+function checkNightlyLocalBackup() {
+    try {
+        const now = new Date();
+        if (now.getHours() < 21) return;
+        const today = getLocalDateStr(now);
+        const target = path.join(BACKUP_DIR, `dhmotopartes_backup_${today}.json`);
+        if (fs.existsSync(target) || !fs.existsSync(DB_PATH)) return;
+        const raw = fs.readFileSync(DB_PATH, 'utf8');
+        const parsed = JSON.parse(raw);
+        const res = saveBackupSnapshot(parsed, today);
+        if (res.saved) {
+            console.log(`💾 Backup nocturno automático guardado: ${res.filename}`);
+        }
+    } catch (e) {
+        console.warn('No se pudo ejecutar backup nocturno local:', e.message);
+    }
+}
 
 const MIME_TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -68,6 +130,7 @@ const server = http.createServer((req, res) => {
             mode: IS_PKG ? 'executable' : 'script',
             dirname: __dirname,
             realDir: REAL_DIR,
+            backupDir: BACKUP_DIR,
             embeddedFiles
         }));
         return;
@@ -92,28 +155,84 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // 3b. Daily Backup POST API
+    if (req.method === 'POST' && reqPath === '/api/backup') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            try {
+                const payload = JSON.parse(body);
+                const stateObj = payload && payload.state ? payload.state : payload;
+                const dateStr = payload && payload.date ? payload.date : getLocalDateStr();
+                const result = saveBackupSnapshot(stateObj, dateStr);
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ status: 'success', ...result }));
+            } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ status: 'error', message: err.message }));
+            }
+        });
+        return;
+    }
+
+    // 3c. List Backups GET API
+    if (req.method === 'GET' && reqPath === '/api/backups') {
+        try {
+            const list = fs.existsSync(BACKUP_DIR)
+                ? fs.readdirSync(BACKUP_DIR)
+                    .filter(f => f.startsWith('dhmotopartes_backup_') && f.endsWith('.json'))
+                    .sort()
+                    .reverse()
+                    .map(f => {
+                        const stat = fs.statSync(path.join(BACKUP_DIR, f));
+                        return { filename: f, size: stat.size, modifiedAt: stat.mtime.toISOString() };
+                    })
+                : [];
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ status: 'success', backupDir: BACKUP_DIR, backups: list }));
+        } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ status: 'error', message: err.message }));
+        }
+        return;
+    }
+
+    // 3d. Download specific Backup GET API
+    if (req.method === 'GET' && reqPath.startsWith('/api/backups/')) {
+        const safeName = path.basename(reqPath);
+        const filePath = path.join(BACKUP_DIR, safeName);
+        if (safeName.startsWith('dhmotopartes_backup_') && safeName.endsWith('.json') && fs.existsSync(filePath)) {
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            fs.createReadStream(filePath).pipe(res);
+        } else {
+            res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ status: 'error', message: 'Backup no encontrado' }));
+        }
+        return;
+    }
+
     // 4. Static file serving (Embed-first / Real-disk fallback)
     const cleanRelPath = reqPath.replace(/^\/+/, '');
     const realFilePath = path.join(REAL_DIR, cleanRelPath);
     const embeddedFilePath = path.join(__dirname, cleanRelPath);
 
-        let targetPath = null;
-        if (fs.existsSync(realFilePath) && fs.statSync(realFilePath).isFile()) {
-            targetPath = realFilePath;
-        } else if (fs.existsSync(embeddedFilePath) && fs.statSync(embeddedFilePath).isFile()) {
-            targetPath = embeddedFilePath;
-        }
+    let targetPath = null;
+    if (fs.existsSync(realFilePath) && fs.statSync(realFilePath).isFile()) {
+        targetPath = realFilePath;
+    } else if (fs.existsSync(embeddedFilePath) && fs.statSync(embeddedFilePath).isFile()) {
+        targetPath = embeddedFilePath;
+    }
 
-        if (targetPath) {
-            const ext = path.extname(targetPath).toLowerCase();
-            const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-            res.writeHead(200, { 'Content-Type': contentType });
-            fs.createReadStream(targetPath).pipe(res);
-        } else {
-            res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-            res.end('404 Not Found');
-        }
-    });
+    if (targetPath) {
+        const ext = path.extname(targetPath).toLowerCase();
+        const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+        res.writeHead(200, { 'Content-Type': contentType });
+        fs.createReadStream(targetPath).pipe(res);
+    } else {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('404 Not Found');
+    }
+});
 
 function getLocalIp() {
     const interfaces = os.networkInterfaces();
@@ -134,10 +253,13 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log('======================================================');
     console.log(`  💻 Acceso local:       http://localhost:${PORT}/`);
     console.log(`  📱 En red local/Wi-Fi: http://${localIp}:${PORT}/`);
+    console.log(`  💾 Carpeta backups:    ${BACKUP_DIR}`);
     console.log('======================================================\n');
+
+    setInterval(checkNightlyLocalBackup, 15 * 60 * 1000);
+    checkNightlyLocalBackup();
 
     // Automatically open browser on Windows
     const startCmd = process.platform === 'win32' ? 'start' : (process.platform === 'darwin' ? 'open' : 'xdg-open');
     exec(`${startCmd} http://localhost:${PORT}/`);
 });
-

@@ -25,3 +25,7 @@ env/
 # PyInstaller build directories
 build/
 dist/
+
+# Local backups and nightly backup credentials
+backups/
+backup-config.json
