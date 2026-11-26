@@ -131,6 +131,508 @@ let historyPage = 1;
 let cajaPage = 1;
 let posPage = 1;
 const posItemsPerPage = 16;
+let posSelectedCardIndex = -1;
+let posDisplayedProducts = [];
+
+/**
+ * Normalizes text for fast accent-insensitive, whitespace-clean searching.
+ */
+function normalizeSearchText(text) {
+    return String(text || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/**
+ * Computes a relevance score (>= 0) if product matches all query tokens, or -1 if it does not match.
+ */
+function getProductMatchScore(product, normalizedQuery, tokens, stockSource = null) {
+    if (!tokens || tokens.length === 0) return 0;
+
+    const sku = normalizeSearchText(product.sku);
+    const name = normalizeSearchText(product.name);
+    const category = normalizeSearchText(product.category);
+    const haystack = `${sku} ${name} ${category}`.trim();
+
+    if (!tokens.every(t => haystack.includes(t))) {
+        return -1;
+    }
+
+    let score = 1;
+    if (sku === normalizedQuery) score += 1000;
+    else if (sku.startsWith(normalizedQuery)) score += 500;
+    else if (sku.includes(normalizedQuery)) score += 250;
+
+    if (name.startsWith(normalizedQuery)) score += 200;
+    else if (name.includes(normalizedQuery)) score += 120;
+
+    if (tokens.every(t => name.includes(t))) score += 60;
+
+    tokens.forEach(t => {
+        if (haystack.startsWith(t) || haystack.includes(` ${t}`)) {
+            score += 20;
+        }
+    });
+
+    if (stockSource) {
+        const stock = (product.isCombo && typeof window.getComboStock === 'function')
+            ? window.getComboStock(product, stockSource)
+            : (stockSource === 'wholesale' ? (product.stockWholesale || 0) : (product.stock || 0));
+        if (stock > 0) score += 15;
+    }
+
+    return score;
+}
+
+/**
+ * Filters and ranks products using multi-word, accent-insensitive matching across SKU, name and category.
+ */
+function filterAndRankProducts(products, rawQuery, options = {}) {
+    const { category = '', stockSource = null, extraFilter = null } = options;
+    const normalizedQuery = normalizeSearchText(rawQuery);
+    const tokens = normalizedQuery ? normalizedQuery.split(' ') : [];
+
+    const matched = [];
+    (products || []).forEach((p, idx) => {
+        if (category && p.category !== category) return;
+        if (extraFilter && !extraFilter(p)) return;
+        const score = getProductMatchScore(p, normalizedQuery, tokens, stockSource);
+        if (score >= 0) {
+            matched.push({ product: p, score, idx });
+        }
+    });
+
+    if (tokens.length > 0) {
+        matched.sort((a, b) => (b.score - a.score) || (a.idx - b.idx));
+    }
+
+    return matched.map(m => m.product);
+}
+
+function getActiveModalId() {
+    const activeModals = document.querySelectorAll('.modal-backdrop.active');
+    if (!activeModals || activeModals.length === 0) return null;
+    return activeModals[activeModals.length - 1].id || null;
+}
+
+function focusPOSSearch(selectAll = false) {
+    if (window.location.hash !== '#pos') return;
+    const input = document.getElementById('pos-search-input');
+    if (!input) return;
+    input.focus();
+    if (selectAll && input.value) {
+        input.select();
+    }
+}
+
+let posQuickForceMode = null; // null (auto) | 'amount' | 'qty'
+let lastPOSQuickLeftRaw = '';
+
+function clearPOSSearch(keepFocus = true) {
+    const input = document.getElementById('pos-search-input');
+    const clearBtn = document.getElementById('pos-clear-search');
+    if (!input) return;
+    input.value = '';
+    if (clearBtn) clearBtn.style.display = 'none';
+    posPage = 1;
+    posSelectedCardIndex = -1;
+    posQuickForceMode = null;
+    lastPOSQuickLeftRaw = '';
+    renderPOSProductGrid();
+    if (keepFocus) input.focus();
+}
+
+function getPOSProductStock(product) {
+    if (!product) return 0;
+    const stockSourceSelect = document.getElementById('cart-stock-source-select');
+    const stockSource = stockSourceSelect ? stockSourceSelect.value : 'local';
+    return (product.isCombo && typeof window.getComboStock === 'function')
+        ? window.getComboStock(product, stockSource)
+        : (stockSource === 'wholesale' ? (product.stockWholesale || 0) : (product.stock || 0));
+}
+
+function getPOSProductUnitPrice(product) {
+    if (!product) return 0;
+    const priceListSelect = document.getElementById('cart-price-list-select');
+    const priceKey = priceListSelect ? priceListSelect.value : 'price';
+    if (priceKey === 'priceWholesale') {
+        return parseFloat(product.priceWholesale) || parseFloat(product.price) || 0;
+    }
+    return parseFloat(product.price) || 0;
+}
+
+/**
+ * Parses quick POS search expressions like "2000 * aceite", "$1500 * ACE01", or "0.5 * aceite".
+ */
+function parsePOSQuickExpression(rawInput) {
+    const raw = String(rawInput || '');
+    const trimmed = raw.trim();
+    if (!trimmed || !trimmed.includes('*')) {
+        return { hasExpr: false, searchQuery: raw };
+    }
+
+    // If the full string matches an existing SKU literally, treat as normal search
+    if (typeof state !== 'undefined' && Array.isArray(state.products)) {
+        const exactFullSku = state.products.find(p => (p.sku || '').trim().toUpperCase() === trimmed.toUpperCase());
+        if (exactFullSku) {
+            return { hasExpr: false, searchQuery: raw };
+        }
+    }
+
+    const starIdx = raw.indexOf('*');
+    const leftRaw = raw.slice(0, starIdx).trim();
+    const rightRaw = raw.slice(starIdx + 1).trim();
+    if (!leftRaw) {
+        return { hasExpr: false, searchQuery: raw };
+    }
+
+    const explicitMoney = leftRaw.includes('$');
+    const withoutDollar = leftRaw.replace(/\$/g, '').trim();
+    const explicitQty = /(?:^|\d)\s*(?:u|un|uds|l|lt|lts|m|mt|mts|kg|g|cant)\s*$/i.test(withoutDollar);
+    const cleanedNum = withoutDollar
+        .replace(/\s*(?:u|un|uds|l|lt|lts|m|mt|mts|kg|g|cant)\s*$/i, '')
+        .replace(/,/g, '.')
+        .replace(/\s+/g, '');
+
+    if (!/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(cleanedNum)) {
+        return { hasExpr: false, searchQuery: raw };
+    }
+
+    const value = parseFloat(cleanedNum);
+    if (isNaN(value) || value <= 0) {
+        return { hasExpr: false, searchQuery: raw };
+    }
+
+    if (leftRaw !== lastPOSQuickLeftRaw) {
+        lastPOSQuickLeftRaw = leftRaw;
+        posQuickForceMode = null;
+    }
+
+    return {
+        hasExpr: true,
+        value,
+        rawLeft: leftRaw,
+        hasDecimal: /[.,]/.test(cleanedNum),
+        explicitMoney,
+        explicitQty,
+        searchQuery: rightRaw
+    };
+}
+
+/**
+ * Resolves a quick expression against a concrete product (amount vs quantity, calculated qty & stock check).
+ */
+function resolvePOSQuickExpression(product, expr) {
+    if (!product || !expr || !expr.hasExpr) return null;
+
+    const unitPrice = getPOSProductUnitPrice(product);
+    const maxStock = getPOSProductStock(product);
+    const existingInCart = state.cart.find(item => item.id === product.id);
+    const alreadyInCartQty = existingInCart ? existingInCart.quantity : 0;
+
+    let mode = 'qty';
+    if (!product.isFractional) {
+        if (expr.explicitMoney) {
+            return {
+                valid: false,
+                error: `"${product.name}" no es fraccionable; ingresa la cantidad sin $ (ej: 2 * ${product.sku}).`
+            };
+        }
+        if (!Number.isInteger(expr.value)) {
+            return {
+                valid: false,
+                error: `"${product.name}" no es fraccionable y no admite decimales.`
+            };
+        }
+        mode = 'qty';
+    } else {
+        if (expr.explicitMoney) {
+            mode = 'amount';
+        } else if (expr.explicitQty) {
+            mode = 'qty';
+        } else if (posQuickForceMode === 'amount' || posQuickForceMode === 'qty') {
+            mode = posQuickForceMode;
+        } else if (expr.hasDecimal) {
+            mode = 'qty';
+        } else if (expr.value > maxStock || expr.value >= 50) {
+            mode = 'amount';
+        } else {
+            mode = 'qty';
+        }
+    }
+
+    let qty = 0;
+    let totalAmount = 0;
+    if (mode === 'amount') {
+        if (unitPrice <= 0) {
+            return { valid: false, error: `"${product.name}" tiene precio $0.00 y no puede fraccionarse por dinero.` };
+        }
+        qty = Math.round((expr.value / unitPrice) * 10000) / 10000;
+        totalAmount = Math.round(expr.value * 100) / 100;
+    } else {
+        qty = Math.round(expr.value * 10000) / 10000;
+        totalAmount = Math.round((qty * unitPrice) * 100) / 100;
+    }
+
+    if (qty <= 0) {
+        return { valid: false, error: 'El importe ingresado resulta en cantidad 0.' };
+    }
+
+    const remainingStock = Math.max(0, Math.round((maxStock - alreadyInCartQty) * 10000) / 10000);
+    const exceedsStock = (alreadyInCartQty + qty) > (maxStock + 0.0001);
+    if (exceedsStock) {
+        return {
+            valid: false,
+            mode,
+            qty,
+            totalAmount,
+            unitPrice,
+            maxStock,
+            remainingStock,
+            error: `Stock insuficiente de "${product.name}". Disponible restante: ${remainingStock}.`
+        };
+    }
+
+    return {
+        valid: true,
+        mode,
+        qty,
+        totalAmount,
+        unitPrice,
+        maxStock,
+        remainingStock,
+        error: null
+    };
+}
+
+window.togglePOSQuickMode = function() {
+    const input = document.getElementById('pos-search-input');
+    const expr = parsePOSQuickExpression(input ? input.value : '');
+    if (!expr.hasExpr) return;
+
+    const targetIdx = posSelectedCardIndex >= 0 && posSelectedCardIndex < posDisplayedProducts.length ? posSelectedCardIndex : 0;
+    const product = posDisplayedProducts[targetIdx];
+    if (!product || !product.isFractional) return;
+
+    const current = resolvePOSQuickExpression(product, expr);
+    posQuickForceMode = (current && current.mode === 'amount') ? 'qty' : 'amount';
+    renderPOSQuickCalcPreview(expr);
+    focusPOSSearch(false);
+};
+
+function renderPOSQuickCalcPreview(exprArg = null) {
+    const previewEl = document.getElementById('pos-quick-calc-preview');
+    if (!previewEl) return;
+
+    const input = document.getElementById('pos-search-input');
+    const expr = exprArg || parsePOSQuickExpression(input ? input.value : '');
+
+    if (!expr.hasExpr) {
+        previewEl.style.display = 'none';
+        previewEl.classList.remove('is-error');
+        previewEl.innerHTML = '';
+        return;
+    }
+
+    const currency = (state.settings && state.settings.currency) || '$';
+    let targetProduct = null;
+    if (expr.searchQuery) {
+        targetProduct = state.products.find(p => (p.sku || '').trim().toUpperCase() === expr.searchQuery.toUpperCase()) || null;
+    }
+    if (!targetProduct && posDisplayedProducts.length > 0) {
+        const targetIdx = posSelectedCardIndex >= 0 && posSelectedCardIndex < posDisplayedProducts.length ? posSelectedCardIndex : 0;
+        targetProduct = posDisplayedProducts[targetIdx];
+    }
+
+    if (!targetProduct) {
+        previewEl.style.display = 'flex';
+        previewEl.classList.add('is-error');
+        previewEl.innerHTML = `<div class="pos-quick-calc-main"><strong>⚡ Carga rápida:</strong>&nbsp;Escribe el código o nombre del producto después de <code>*</code></div>`;
+        return;
+    }
+
+    const res = resolvePOSQuickExpression(targetProduct, expr);
+    if (!res) {
+        previewEl.style.display = 'none';
+        return;
+    }
+
+    const switchBtn = (targetProduct.isFractional && !expr.explicitMoney && !expr.explicitQty)
+        ? `<button type="button" class="pos-quick-mode-btn" onclick="togglePOSQuickMode()">${res.mode === 'amount' ? 'Usar como Cantidad' : 'Usar como Dinero ($)'}</button>`
+        : '';
+
+    if (!res.valid) {
+        previewEl.style.display = 'flex';
+        previewEl.classList.add('is-error');
+        previewEl.innerHTML = `
+            <div class="pos-quick-calc-main">
+                <strong>⚠ ${res.error}</strong>
+            </div>
+            <div class="pos-quick-calc-actions">${switchBtn}</div>
+        `;
+        return;
+    }
+
+    previewEl.style.display = 'flex';
+    previewEl.classList.remove('is-error');
+    const summaryText = res.mode === 'amount'
+        ? `<strong>${currency}${res.totalAmount.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> → <strong>${res.qty} un.</strong>`
+        : `<strong>${res.qty} un.</strong> → <strong>${currency}${res.totalAmount.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>`;
+
+    previewEl.innerHTML = `
+        <div class="pos-quick-calc-main">
+            <span>⚡</span>
+            <span>${summaryText}</span>
+            <span class="text-muted">de</span>
+            <strong>${targetProduct.name}</strong>
+            <span class="text-muted small">(${targetProduct.sku})</span>
+        </div>
+        <div class="pos-quick-calc-actions">
+            ${switchBtn}
+            <span><kbd class="shortcut-kbd">Enter</kbd> Agregar</span>
+            <span><kbd class="shortcut-kbd">Ctrl+Enter</kbd> Agregar y Cobrar</span>
+        </div>
+    `;
+}
+
+function addDirectQuantityToCart(product, qty, unitPrice, goToCheckout = false) {
+    if (!product || qty <= 0) return;
+    const maxStock = getPOSProductStock(product);
+    const existing = state.cart.find(item => item.id === product.id);
+    const currentQty = existing ? existing.quantity : 0;
+    if ((currentQty + qty) > (maxStock + 0.0001)) {
+        playScanSound('fail');
+        alert(`No hay suficiente stock disponible de "${product.name}". Stock máximo: ${maxStock}`);
+        focusPOSSearch(true);
+        return;
+    }
+
+    if (existing) {
+        existing.quantity = Math.round((existing.quantity + qty) * 10000) / 10000;
+        existing.price = unitPrice;
+    } else {
+        state.cart.push({
+            id: product.id,
+            name: product.name,
+            sku: product.sku,
+            price: unitPrice,
+            quantity: qty
+        });
+    }
+
+    playScanSound('success');
+    renderCart();
+    clearPOSSearch(!goToCheckout);
+    if (goToCheckout) {
+        openCheckoutModal();
+    }
+}
+
+function updatePOSCardHighlight() {
+    const grid = document.getElementById('pos-products-grid');
+    if (!grid) return;
+    const cards = grid.querySelectorAll('.prod-card');
+    cards.forEach((card, idx) => {
+        if (idx === posSelectedCardIndex) {
+            card.classList.add('keyboard-selected');
+            card.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+        } else {
+            card.classList.remove('keyboard-selected');
+        }
+    });
+}
+
+function movePOSCardSelection(delta) {
+    if (!posDisplayedProducts || posDisplayedProducts.length === 0) return;
+    if (posSelectedCardIndex < 0) {
+        posSelectedCardIndex = delta > 0 ? 0 : posDisplayedProducts.length - 1;
+    } else {
+        posSelectedCardIndex = (posSelectedCardIndex + delta + posDisplayedProducts.length) % posDisplayedProducts.length;
+    }
+    updatePOSCardHighlight();
+    renderPOSQuickCalcPreview();
+}
+
+function addSelectedPOSProductFromSearch(goToCheckout = false) {
+    const input = document.getElementById('pos-search-input');
+    const rawVal = input ? input.value.trim() : '';
+
+    const expr = parsePOSQuickExpression(rawVal);
+
+    // 1. Quick expression mode: "<monto o fraccion> * <codigo o producto>"
+    if (expr.hasExpr) {
+        let targetProduct = null;
+        if (expr.searchQuery) {
+            targetProduct = state.products.find(p => (p.sku || '').trim().toUpperCase() === expr.searchQuery.toUpperCase()) || null;
+        }
+        if (!targetProduct && posDisplayedProducts.length > 0) {
+            const targetIdx = posSelectedCardIndex >= 0 && posSelectedCardIndex < posDisplayedProducts.length ? posSelectedCardIndex : 0;
+            targetProduct = posDisplayedProducts[targetIdx];
+        }
+        if (!targetProduct) {
+            playScanSound('warning');
+            alert('No se encontró ningún producto coincidente después de "*".');
+            focusPOSSearch(false);
+            return;
+        }
+
+        const res = resolvePOSQuickExpression(targetProduct, expr);
+        if (!res || !res.valid) {
+            playScanSound('fail');
+            alert((res && res.error) || 'No se pudo calcular la carga rápida.');
+            focusPOSSearch(false);
+            return;
+        }
+
+        addDirectQuantityToCart(targetProduct, res.qty, res.unitPrice, goToCheckout);
+        return;
+    }
+
+    // 2. Exact SKU match anywhere in catalog adds immediately
+    if (rawVal) {
+        const exactProduct = state.products.find(p => (p.sku || '').trim().toUpperCase() === rawVal.toUpperCase());
+        if (exactProduct) {
+            if (getPOSProductStock(exactProduct) <= 0) {
+                playScanSound('fail');
+                alert(`El repuesto "${exactProduct.name}" no cuenta con stock disponible.`);
+                focusPOSSearch(true);
+                return;
+            }
+            addCartItem(exactProduct.id);
+            if (!exactProduct.isFractional) {
+                clearPOSSearch(!goToCheckout);
+                if (goToCheckout) openCheckoutModal();
+            }
+            return;
+        }
+    }
+
+    // 3. Otherwise add highlighted or first visible product when searching/navigating
+    if (posDisplayedProducts.length === 0 || (!rawVal && posSelectedCardIndex < 0)) return;
+    const targetIdx = posSelectedCardIndex >= 0 && posSelectedCardIndex < posDisplayedProducts.length ? posSelectedCardIndex : 0;
+    const targetProduct = posDisplayedProducts[targetIdx];
+    if (!targetProduct) return;
+
+    if (getPOSProductStock(targetProduct) <= 0) {
+        playScanSound('fail');
+        alert(`El repuesto "${targetProduct.name}" no cuenta con stock disponible.`);
+        focusPOSSearch(true);
+        return;
+    }
+
+    addCartItem(targetProduct.id);
+    if (!targetProduct.isFractional) {
+        if (goToCheckout) {
+            clearPOSSearch(false);
+            openCheckoutModal();
+        } else {
+            focusPOSSearch(true);
+        }
+    }
+}
 
 // Debounce utility for input event performance optimization
 function debounce(func, delay = 200) {
@@ -1368,6 +1870,9 @@ function handleRoute() {
         renderDashboard();
     } else if (targetView === 'pos') {
         renderPOS();
+        if (window.innerWidth > 768 && !getActiveModalId()) {
+            setTimeout(() => focusPOSSearch(false), 60);
+        }
     } else if (targetView === 'inventario') {
         renderInventory();
     } else if (targetView === 'clientes') {
@@ -1484,7 +1989,7 @@ function setupEventListeners() {
     // POS Search & Clear Inputs
     const posSearchInput = document.getElementById('pos-search-input');
     const posClearSearch = document.getElementById('pos-clear-search');
-    const debouncedRenderPOSGrid = debounce(renderPOSProductGrid, 150);
+    const debouncedRenderPOSGrid = debounce(renderPOSProductGrid, 60);
     posSearchInput.addEventListener('input', () => {
         if (posSearchInput.value) {
             posClearSearch.style.display = 'block';
@@ -1494,12 +1999,29 @@ function setupEventListeners() {
         posPage = 1; // Reset to page 1 on search
         debouncedRenderPOSGrid();
     });
+    posSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            movePOSCardSelection(1);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            movePOSCardSelection(-1);
+        } else if (e.key === 'Escape') {
+            if (posSearchInput.value) {
+                e.preventDefault();
+                e.stopPropagation();
+                clearPOSSearch(true);
+            }
+        } else if (e.key === 'Enter') {
+            const isLikelyHardwareScan = !e.ctrlKey && !e.altKey && !e.metaKey && barcodeBuffer.trim().length >= 3 && (Date.now() - lastKeyTime <= 50);
+            if (!isLikelyHardwareScan) {
+                e.preventDefault();
+                addSelectedPOSProductFromSearch(e.ctrlKey);
+            }
+        }
+    });
     posClearSearch.addEventListener('click', () => {
-        posSearchInput.value = '';
-        posClearSearch.style.display = 'none';
-        posSearchInput.focus();
-        posPage = 1; // Reset to page 1
-        renderPOSProductGrid();
+        clearPOSSearch(true);
     });
 
     // POS Cart Action Buttons
@@ -1513,6 +2035,7 @@ function setupEventListeners() {
     const fracAmountInput = document.getElementById('fractional-input-amount');
     const fracQtyInput = document.getElementById('fractional-input-qty');
     const fracConfirmBtn = document.getElementById('fractional-confirm-btn');
+    const fracConfirmCheckoutBtn = document.getElementById('fractional-confirm-checkout-btn');
 
     if (fracAmountBtn) fracAmountBtn.addEventListener('click', () => window.setFractionalMode('amount'));
     if (fracQtyBtn) fracQtyBtn.addEventListener('click', () => window.setFractionalMode('qty'));
@@ -1521,7 +2044,8 @@ function setupEventListeners() {
         fracAmountInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                window.confirmFractionalSale();
+                e.stopPropagation();
+                window.confirmFractionalSale(e.ctrlKey);
             }
         });
     }
@@ -1530,11 +2054,13 @@ function setupEventListeners() {
         fracQtyInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                window.confirmFractionalSale();
+                e.stopPropagation();
+                window.confirmFractionalSale(e.ctrlKey);
             }
         });
     }
-    if (fracConfirmBtn) fracConfirmBtn.addEventListener('click', window.confirmFractionalSale);
+    if (fracConfirmBtn) fracConfirmBtn.addEventListener('click', () => window.confirmFractionalSale(false));
+    if (fracConfirmCheckoutBtn) fracConfirmCheckoutBtn.addEventListener('click', () => window.confirmFractionalSale(true));
 
     // Price List and Customer selection auto-switch listeners in POS
     const cartPriceListSelect = document.getElementById('cart-price-list-select');
@@ -1577,6 +2103,15 @@ function setupEventListeners() {
 
     // Discount Save
     document.getElementById('discount-save-btn').addEventListener('click', applyCartDiscount);
+    const discountValueInput = document.getElementById('discount-value');
+    if (discountValueInput) {
+        discountValueInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                applyCartDiscount();
+            }
+        });
+    }
 
     // Customer Add Button in POS
     document.getElementById('pos-add-customer-btn').addEventListener('click', () => {
@@ -1631,47 +2166,7 @@ function setupEventListeners() {
     document.getElementById('checkout-method-selector').addEventListener('click', (e) => {
         const btn = e.target.closest('.method-btn');
         if (btn) {
-            document.querySelectorAll('.method-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-
-            const cashSection = document.getElementById('checkout-cash-inputs');
-            const creditInfo = document.getElementById('checkout-credit-info');
-            const digitalInfo = document.getElementById('checkout-digital-info');
-
-            if (btn.dataset.method === 'cash') {
-                cashSection.style.display = 'block';
-                if (creditInfo) creditInfo.style.display = 'none';
-                if (digitalInfo) digitalInfo.style.display = 'none';
-                calculateChange();
-            } else if (btn.dataset.method === 'credit') {
-                cashSection.style.display = 'none';
-                if (creditInfo) creditInfo.style.display = 'block';
-                if (digitalInfo) digitalInfo.style.display = 'none';
-                updateCreditCheckoutValidation();
-            } else if (btn.dataset.method === 'transfer' || btn.dataset.method === 'mercadopago') {
-                cashSection.style.display = 'none';
-                if (creditInfo) creditInfo.style.display = 'none';
-                if (digitalInfo) {
-                    digitalInfo.style.display = 'block';
-                    const aliasEl = document.getElementById('checkout-digital-alias');
-                    const holderEl = document.getElementById('checkout-digital-holder');
-                    const titleEl = document.getElementById('checkout-digital-title');
-                    if (aliasEl) aliasEl.textContent = (state.settings && state.settings.storeAlias) || 'DHMOTOPARTES';
-                    if (holderEl) holderEl.textContent = (state.settings && state.settings.storeHolder) || 'DANIEL OSCAR HIDALGO';
-                    if (titleEl) {
-                        titleEl.innerHTML = btn.dataset.method === 'mercadopago'
-                            ? '<i data-lucide="qr-code" style="width: 16px; height: 16px; vertical-align: middle;"></i> Datos para Cobro con Mercado Pago / CVU'
-                            : '<i data-lucide="arrow-left-right" style="width: 16px; height: 16px; vertical-align: middle;"></i> Datos para Transferencia Bancaria / CBU';
-                        if (window.lucide) lucide.createIcons();
-                    }
-                }
-                document.getElementById('checkout-confirm-btn').disabled = false;
-            } else {
-                cashSection.style.display = 'none';
-                if (creditInfo) creditInfo.style.display = 'none';
-                if (digitalInfo) digitalInfo.style.display = 'none';
-                document.getElementById('checkout-confirm-btn').disabled = false;
-            }
+            selectCheckoutMethod(btn.dataset.method);
         }
     });
 
@@ -1992,21 +2487,161 @@ function setupEventListeners() {
     document.getElementById('data-export-csv-btn').addEventListener('click', exportSalesCSV);
     setupAutoBackupListeners();
 
-    // Keyboard Shortcuts (F8 for Cobrar, F9 for Imprimir)
+    // Keyboard Shortcuts (POS & Modals)
     window.addEventListener('keydown', (e) => {
         if (!e || !e.key) return;
-        if (e.key === 'F8') {
+        const activeModalId = getActiveModalId();
+        const isPosView = window.location.hash === '#pos';
+
+        // Escape: close top modal or clear POS search
+        if (e.key === 'Escape') {
+            if (activeModalId) {
+                e.preventDefault();
+                closeModal(activeModalId);
+                return;
+            }
+            if (isPosView) {
+                const posInput = document.getElementById('pos-search-input');
+                if (posInput && posInput.value) {
+                    e.preventDefault();
+                    clearPOSSearch(true);
+                }
+            }
+            return;
+        }
+
+        // Shortcuts inside Checkout Modal
+        if (activeModalId === 'modal-checkout') {
+            if (e.altKey) {
+                const altMethodMap = {
+                    '1': 'cash',
+                    '2': 'mercadopago',
+                    '3': 'transfer',
+                    '4': 'card',
+                    '5': 'credit'
+                };
+                if (altMethodMap[e.key]) {
+                    e.preventDefault();
+                    selectCheckoutMethod(altMethodMap[e.key]);
+                    return;
+                }
+                if (e.key.toLowerCase() === 'e') {
+                    e.preventDefault();
+                    fillExactCashAmount();
+                    return;
+                }
+                if (e.key.toLowerCase() === 'f') {
+                    e.preventDefault();
+                    const emitCb = document.getElementById('checkout-emit-invoice');
+                    if (emitCb) emitCb.checked = !emitCb.checked;
+                    return;
+                }
+            }
+            if (e.key === 'Enter') {
+                const activeEl = document.activeElement;
+                const isCancelOrClose = activeEl && (activeEl.hasAttribute('data-close-modal') || activeEl.classList.contains('method-btn') || activeEl.classList.contains('quick-cash-btn'));
+                const confirmBtn = document.getElementById('checkout-confirm-btn');
+                if (!isCancelOrClose && confirmBtn && !confirmBtn.disabled) {
+                    e.preventDefault();
+                    processCheckout();
+                }
+            }
+            return;
+        }
+
+        // Shortcuts inside Fractional Modal
+        if (activeModalId === 'modal-fractional-qty') {
+            if (e.altKey && e.key.toLowerCase() === 'm') {
+                e.preventDefault();
+                if (activeFractionalContext) {
+                    window.setFractionalMode(activeFractionalContext.mode === 'amount' ? 'qty' : 'amount');
+                }
+                return;
+            }
+            if (e.key === 'Enter' && e.ctrlKey) {
+                const confirmCheckoutBtn = document.getElementById('fractional-confirm-checkout-btn');
+                if (confirmCheckoutBtn && !confirmCheckoutBtn.disabled) {
+                    e.preventDefault();
+                    window.confirmFractionalSale(true);
+                }
+                return;
+            }
+            return;
+        }
+
+        // F9: Print receipt when receipt modal is open
+        if (e.key === 'F9' && activeModalId === 'modal-receipt') {
+            e.preventDefault();
+            window.print();
+            return;
+        }
+
+        // F1: Toggle POS Keyboard Shortcuts Help
+        if (e.key === 'F1') {
+            if (activeModalId === 'modal-pos-shortcuts') {
+                e.preventDefault();
+                closeModal('modal-pos-shortcuts');
+                return;
+            }
+            if (isPosView && !activeModalId) {
+                e.preventDefault();
+                openModal('modal-pos-shortcuts');
+                return;
+            }
+        }
+
+        // F2: Jump to / Focus POS product search from anywhere (if allowed)
+        if (e.key === 'F2' && !activeModalId && currentUserRole !== 'saas_admin') {
+            e.preventDefault();
+            if (!isPosView) {
+                window.location.hash = '#pos';
+                setTimeout(() => focusPOSSearch(true), 80);
+            } else {
+                focusPOSSearch(true);
+            }
+            return;
+        }
+
+        // Remaining POS-only shortcuts when no modal is open
+        if (!isPosView || activeModalId) return;
+
+        if (e.key === 'F3') {
+            e.preventDefault();
+            const custSelect = document.getElementById('cart-customer-select');
+            if (custSelect) custSelect.focus();
+        } else if (e.key === 'F4') {
+            e.preventDefault();
+            const priceListSelect = document.getElementById('cart-price-list-select');
+            const stockSourceSelect = document.getElementById('cart-stock-source-select');
+            if (priceListSelect) {
+                const nextList = priceListSelect.value === 'price' ? 'priceWholesale' : 'price';
+                priceListSelect.value = nextList;
+                if (stockSourceSelect) {
+                    stockSourceSelect.value = nextList === 'priceWholesale' ? 'wholesale' : 'local';
+                }
+                window.changeCartPriceList();
+                playScanSound('success');
+            }
+        } else if (e.key === 'F6') {
+            e.preventDefault();
+            openModal('modal-discount');
+        } else if (e.key === 'F7') {
+            e.preventDefault();
+            if (state.cart && state.cart.length > 0) {
+                const lastItem = state.cart[state.cart.length - 1];
+                window.promptCartItemQty(lastItem.id);
+            }
+        } else if (e.key === 'F8') {
             const checkoutBtn = document.getElementById('cart-checkout-btn');
-            if (window.location.hash === '#pos' && checkoutBtn && !checkoutBtn.disabled) {
+            if (checkoutBtn && !checkoutBtn.disabled) {
                 e.preventDefault();
                 openCheckoutModal();
             }
-        }
-        if (e.key === 'F9') {
-            const printModal = document.getElementById('modal-receipt');
-            if (printModal && printModal.classList.contains('active')) {
-                e.preventDefault();
-                window.print();
+        } else if (e.key === 'F10') {
+            e.preventDefault();
+            if (state.cart && state.cart.length > 0 && confirm('¿Vaciar todo el carrito actual?')) {
+                clearCart();
+                focusPOSSearch(false);
             }
         }
     });
@@ -2290,13 +2925,15 @@ function setupBarcodeListener() {
             return;
         }
 
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.metaKey) {
             if (barcodeBuffer.trim().length >= 3) {
                 e.preventDefault();
-                processBarcodeScan(barcodeBuffer.trim());
+                const scannedCode = barcodeBuffer.trim();
                 barcodeBuffer = '';
+                const wasPosSearchFocused = activeEl && activeEl.id === 'pos-search-input';
+                processBarcodeScan(scannedCode, wasPosSearchFocused);
             }
-        } else {
+        } else if (e.key !== 'Enter') {
             // Standard single char keys
             if (e.key.length === 1) {
                 barcodeBuffer += e.key;
@@ -2305,11 +2942,11 @@ function setupBarcodeListener() {
     });
 }
 
-function processBarcodeScan(code) {
+function processBarcodeScan(code, clearPosSearchAfter = false) {
     console.log("Barcode scanned:", code);
 
     // Look for product by SKU or unique barcode
-    const product = state.products.find(p => p.sku.toUpperCase() === code.toUpperCase());
+    const product = state.products.find(p => (p.sku || '').trim().toUpperCase() === code.toUpperCase());
 
     if (product) {
         const stockSourceSelect = document.getElementById('cart-stock-source-select');
@@ -2321,6 +2958,7 @@ function processBarcodeScan(code) {
         if (currentStock <= 0) {
             playScanSound('fail');
             alert(`El repuesto "${product.name}" no cuenta con stock disponible.`);
+            if (clearPosSearchAfter) clearPOSSearch(true);
             return;
         }
 
@@ -2332,6 +2970,9 @@ function processBarcodeScan(code) {
 
         // Add to cart! If we redirected, handleRoute will render the page/cart, so avoid duplicate render.
         addCartItem(product.id, !needsRedirect);
+        if (clearPosSearchAfter && !product.isFractional) {
+            clearPOSSearch(true);
+        }
         // Flash barcode status indicator in UI
         const badge = document.getElementById('pos-barcode-badge');
         if (badge) {
@@ -2361,6 +3002,7 @@ function processBarcodeScan(code) {
             setTimeout(() => document.getElementById('prod-name').focus(), 300);
         } else {
             alert(`Código de barras "${code}" no encontrado en el catálogo.`);
+            if (clearPosSearchAfter) focusPOSSearch(true);
         }
     }
 }
@@ -2414,6 +3056,68 @@ function applyAccentTheme(color) {
 /* ==========================================================================
    Modals Control
    ========================================================================== */
+function selectCheckoutMethod(method) {
+    const selector = document.getElementById('checkout-method-selector');
+    if (!selector) return;
+    const btn = selector.querySelector(`.method-btn[data-method="${method}"]`);
+    if (!btn) return;
+
+    selector.querySelectorAll('.method-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const cashSection = document.getElementById('checkout-cash-inputs');
+    const creditInfo = document.getElementById('checkout-credit-info');
+    const digitalInfo = document.getElementById('checkout-digital-info');
+
+    if (method === 'cash') {
+        if (cashSection) cashSection.style.display = 'block';
+        if (creditInfo) creditInfo.style.display = 'none';
+        if (digitalInfo) digitalInfo.style.display = 'none';
+        calculateChange();
+        setTimeout(() => {
+            const cashInput = document.getElementById('checkout-cash-received');
+            if (cashInput) cashInput.focus();
+        }, 50);
+    } else if (method === 'credit') {
+        if (cashSection) cashSection.style.display = 'none';
+        if (creditInfo) creditInfo.style.display = 'block';
+        if (digitalInfo) digitalInfo.style.display = 'none';
+        updateCreditCheckoutValidation();
+    } else if (method === 'transfer' || method === 'mercadopago') {
+        if (cashSection) cashSection.style.display = 'none';
+        if (creditInfo) creditInfo.style.display = 'none';
+        if (digitalInfo) {
+            digitalInfo.style.display = 'block';
+            const aliasEl = document.getElementById('checkout-digital-alias');
+            const holderEl = document.getElementById('checkout-digital-holder');
+            const titleEl = document.getElementById('checkout-digital-title');
+            if (aliasEl) aliasEl.textContent = (state.settings && state.settings.storeAlias) || 'DHMOTOPARTES';
+            if (holderEl) holderEl.textContent = (state.settings && state.settings.storeHolder) || 'DANIEL OSCAR HIDALGO';
+            if (titleEl) {
+                titleEl.innerHTML = method === 'mercadopago'
+                    ? '<i data-lucide="qr-code" style="width: 16px; height: 16px; vertical-align: middle;"></i> Datos para Cobro con Mercado Pago / CVU'
+                    : '<i data-lucide="arrow-left-right" style="width: 16px; height: 16px; vertical-align: middle;"></i> Datos para Transferencia Bancaria / CBU';
+                if (window.lucide) lucide.createIcons();
+            }
+        }
+        document.getElementById('checkout-confirm-btn').disabled = false;
+    } else {
+        if (cashSection) cashSection.style.display = 'none';
+        if (creditInfo) creditInfo.style.display = 'none';
+        if (digitalInfo) digitalInfo.style.display = 'none';
+        document.getElementById('checkout-confirm-btn').disabled = false;
+    }
+}
+
+function fillExactCashAmount() {
+    selectCheckoutMethod('cash');
+    const cashInput = document.getElementById('checkout-cash-received');
+    if (!cashInput) return;
+    cashInput.value = (Math.round(checkoutTotalVal * 100) / 100).toFixed(2);
+    calculateChange();
+    cashInput.focus();
+}
+
 function openModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
@@ -2426,12 +3130,21 @@ function openModal(modalId) {
 
             // Auto focus cash input if method is cash
             const activeMethod = document.querySelector('#checkout-method-selector .method-btn.active');
-            if (activeMethod.dataset.method === 'cash') {
+            if (activeMethod && activeMethod.dataset.method === 'cash') {
                 setTimeout(() => cashInput.focus(), 150);
             }
         }
         if (modalId === 'modal-discount') {
-            setTimeout(() => document.getElementById('discount-value').focus(), 150);
+            setTimeout(() => {
+                const discInput = document.getElementById('discount-value');
+                if (discInput) {
+                    discInput.focus();
+                    discInput.select();
+                }
+            }, 150);
+        }
+        if (modalId === 'modal-pos-shortcuts' && window.lucide) {
+            lucide.createIcons();
         }
     }
 }
@@ -2440,6 +3153,12 @@ function closeModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.classList.remove('active');
+        const posReturnModals = ['modal-checkout', 'modal-receipt', 'modal-discount', 'modal-fractional-qty', 'modal-pos-shortcuts'];
+        if (posReturnModals.includes(modalId) && window.location.hash === '#pos' && window.innerWidth > 768) {
+            setTimeout(() => {
+                if (!getActiveModalId()) focusPOSSearch(false);
+            }, 50);
+        }
     }
 }
 
@@ -3002,15 +3721,19 @@ window.setPOSCategory = function (cat) {
 };
 
 function renderPOSProductGrid() {
-    const searchVal = document.getElementById('pos-search-input').value.toLowerCase();
+    const rawSearchVal = document.getElementById('pos-search-input').value;
+    const expr = parsePOSQuickExpression(rawSearchVal);
+    const effectiveSearch = expr.hasExpr ? expr.searchQuery : rawSearchVal;
     const grid = document.getElementById('pos-products-grid');
+    const priceListSelect = document.getElementById('cart-price-list-select');
+    const priceKey = priceListSelect ? priceListSelect.value : 'price';
+    const stockSourceSelect = document.getElementById('cart-stock-source-select');
+    const stockSource = stockSourceSelect ? stockSourceSelect.value : (priceKey === 'priceWholesale' ? 'wholesale' : 'local');
 
-    // Filter catalog products
-    const filtered = state.products.filter(p => {
-        const matchesCategory = !activePOSCategory || p.category === activePOSCategory;
-        const matchesSearch = p.name.toLowerCase().includes(searchVal) ||
-            p.sku.toLowerCase().includes(searchVal);
-        return matchesCategory && matchesSearch;
+    // Filter and rank catalog products (multi-word, accent-insensitive, SKU/name/category + in-stock boost)
+    const filtered = filterAndRankProducts(state.products, effectiveSearch, {
+        category: activePOSCategory,
+        stockSource
     });
 
     // Pagination slice to keep DOM footprint extremely low for old devices
@@ -3021,28 +3744,36 @@ function renderPOSProductGrid() {
     const startIdx = (posPage - 1) * posItemsPerPage;
     const endIdx = startIdx + posItemsPerPage;
     const pageItems = filtered.slice(startIdx, endIdx);
+    posDisplayedProducts = pageItems;
+
+    if ((effectiveSearch.trim() || expr.hasExpr) && pageItems.length > 0) {
+        const firstInStockIdx = pageItems.findIndex(p => getPOSProductStock(p) > 0);
+        posSelectedCardIndex = firstInStockIdx >= 0 ? firstInStockIdx : 0;
+    } else {
+        posSelectedCardIndex = -1;
+    }
 
     const posPagination = document.getElementById('pos-pagination');
 
     if (pageItems.length === 0) {
+        const switchAllBtn = (activePOSCategory && effectiveSearch.trim())
+            ? `<button type="button" class="btn btn-secondary btn-sm" style="margin-top: 10px;" onclick="setPOSCategory('')">Buscar en Todas las categorías</button>`
+            : '';
         grid.innerHTML = `
             <div class="empty-state-small" style="grid-column: 1 / -1;">
                 <i data-lucide="package-x" style="width: 48px; height: 48px; opacity: 0.3;"></i>
                 <p>No se encontraron repuestos o herramientas.</p>
+                ${switchAllBtn}
             </div>
         `;
         if (posPagination) posPagination.style.display = 'none';
     } else {
-        const priceListSelect = document.getElementById('cart-price-list-select');
-        const priceKey = priceListSelect ? priceListSelect.value : 'price';
-        const stockSourceSelect = document.getElementById('cart-stock-source-select');
-        const stockSource = stockSourceSelect ? stockSourceSelect.value : (priceKey === 'priceWholesale' ? 'wholesale' : 'local');
-
         let cardsHtml = '';
         pageItems.forEach(p => {
             cardsHtml += createPOSProductCard(p, state.settings.currency, priceKey, stockSource);
         });
         grid.innerHTML = cardsHtml;
+        updatePOSCardHighlight();
         
         // Render pagination controls
         if (posPagination) {
@@ -3062,6 +3793,7 @@ function renderPOSProductGrid() {
         }
     }
 
+    renderPOSQuickCalcPreview(expr);
     if (window.lucide) lucide.createIcons();
 }
 
@@ -3222,6 +3954,7 @@ window.recalcFractional = function() {
     const calcTotalEl = document.getElementById('fractional-calc-total');
     const warningEl = document.getElementById('fractional-calc-warning');
     const confirmBtn = document.getElementById('fractional-confirm-btn');
+    const confirmCheckoutBtn = document.getElementById('fractional-confirm-checkout-btn');
 
     if (calcQtyEl) calcQtyEl.textContent = qty > 0 ? qty.toString() : '0.000';
     if (calcTotalEl) calcTotalEl.textContent = `${currency}${total.toFixed(2)}`;
@@ -3240,12 +3973,12 @@ window.recalcFractional = function() {
         }
     }
 
-    if (confirmBtn) {
-        confirmBtn.disabled = qty <= 0 || exceedsStock;
-    }
+    const isDisabled = qty <= 0 || exceedsStock;
+    if (confirmBtn) confirmBtn.disabled = isDisabled;
+    if (confirmCheckoutBtn) confirmCheckoutBtn.disabled = isDisabled;
 };
 
-window.confirmFractionalSale = function() {
+window.confirmFractionalSale = function(goToCheckout = false) {
     if (!activeFractionalContext) return;
 
     const { product, existingCartItem, isEditing, unitPrice, maxStock, calculatedQty } = activeFractionalContext;
@@ -3281,6 +4014,9 @@ window.confirmFractionalSale = function() {
     playScanSound('success');
     closeModal('modal-fractional-qty');
     renderCart();
+    if (goToCheckout) {
+        openCheckoutModal();
+    }
 };
 
 // Shopping Cart Actions
@@ -3554,9 +4290,13 @@ function openCheckoutModal() {
 
     let cashBtns = '';
     uniqueOptions.forEach(opt => {
+        const isExact = opt === exactOption;
+        const label = isExact
+            ? `Exacto ${state.settings.currency}${opt} [Alt+E]`
+            : `${state.settings.currency}${opt}`;
         cashBtns += `
             <button class="quick-cash-btn" data-amount="${opt}">
-                ${state.settings.currency}${opt}
+                ${label}
             </button>
         `;
     });
@@ -3868,32 +4608,31 @@ function renderInventory() {
 }
 
 function renderInventoryTable() {
-    const searchVal = document.getElementById('inventory-search').value.toLowerCase();
+    const searchVal = document.getElementById('inventory-search').value;
     const catVal = document.getElementById('inventory-filter-category').value;
     const stockVal = document.getElementById('inventory-filter-stock').value;
     const tbody = document.getElementById('inventory-table-body');
 
-    // Apply filters
-    const filtered = state.products.filter(p => {
-        const matchesSearch = p.name.toLowerCase().includes(searchVal) ||
-            p.sku.toLowerCase().includes(searchVal);
+    // Apply filters with normalized multi-word search and relevance ranking
+    const filtered = filterAndRankProducts(state.products, searchVal, {
+        category: catVal,
+        extraFilter: (p) => {
+            if (!stockVal) return true;
+            const stockLocal = p.isCombo ? window.getComboStock(p, 'local') : p.stock;
+            const stockWholesale = p.isCombo ? window.getComboStock(p, 'wholesale') : (p.stockWholesale || 0);
+            const minWholesale = p.stockMinWholesale !== undefined ? p.stockMinWholesale : 5;
 
-        const matchesCategory = !catVal || p.category === catVal;
-
-        let matchesStock = true;
-        const stockLocal = p.isCombo ? window.getComboStock(p, 'local') : p.stock;
-        const stockWholesale = p.isCombo ? window.getComboStock(p, 'wholesale') : (p.stockWholesale || 0);
-        const minWholesale = p.stockMinWholesale !== undefined ? p.stockMinWholesale : 5;
-
-        if (stockVal === 'low') {
-            matchesStock = (stockLocal > 0 && stockLocal <= p.stockMin) || (stockWholesale > 0 && stockWholesale <= minWholesale);
-        } else if (stockVal === 'out') {
-            matchesStock = stockLocal <= 0 || stockWholesale <= 0;
-        } else if (stockVal === 'ok') {
-            matchesStock = stockLocal > p.stockMin && stockWholesale > minWholesale;
+            if (stockVal === 'low') {
+                return (stockLocal > 0 && stockLocal <= p.stockMin) || (stockWholesale > 0 && stockWholesale <= minWholesale);
+            }
+            if (stockVal === 'out') {
+                return stockLocal <= 0 || stockWholesale <= 0;
+            }
+            if (stockVal === 'ok') {
+                return stockLocal > p.stockMin && stockWholesale > minWholesale;
+            }
+            return true;
         }
-
-        return matchesSearch && matchesCategory && matchesStock;
     });
 
     // Pagination slice
@@ -5748,16 +6487,14 @@ window.setCatalogCategory = function (cat) {
 };
 
 function renderCatalogProductGrid() {
-    const searchVal = document.getElementById('catalog-search-input').value.toLowerCase();
+    const searchVal = document.getElementById('catalog-search-input').value;
     const grid = document.getElementById('catalog-products-grid');
     if (!grid) return;
 
-    const filtered = state.products.filter(p => {
-        if (p.isFractional) return false;
-        const matchesCategory = !activeCatalogCategory || p.category === activeCatalogCategory;
-        const matchesSearch = p.name.toLowerCase().includes(searchVal) ||
-            p.sku.toLowerCase().includes(searchVal);
-        return matchesCategory && matchesSearch;
+    const filtered = filterAndRankProducts(state.products, searchVal, {
+        category: activeCatalogCategory,
+        stockSource: 'local',
+        extraFilter: p => !p.isFractional
     });
 
     if (filtered.length === 0) {
@@ -8776,18 +9513,7 @@ window.authorizeStockReception = function() {
         }))
     });
 
-    // Register cash outflow if checkbox is active
-    const registerCash = document.getElementById('staging-register-cash-outflow')?.checked;
-    if (registerCash && totalCost > 0) {
-        if (!state.cashMovements) state.cashMovements = [];
-        state.cashMovements.push({
-            id: `cm_${Date.now()}`,
-            date: new Date().toISOString(),
-            type: 'outflow',
-            amount: totalCost,
-            concept: `Compra mercadería - Remito ${invoiceNum} (${supplierName})`
-        });
-    }
+    // Cash inflows and outflows are registered manually from the Caja module (never automatically on AI invoice reception).
 
     saveDatabase();
     closeModal('modal-reception-ai');
@@ -9473,7 +10199,7 @@ window.removeComboComponent = function(idx) {
 };
 
 window.handleComboSearch = function(e) {
-    const query = e.target.value.toLowerCase().trim();
+    const query = e.target.value.trim();
     const resultsContainer = document.getElementById('combo-search-results');
     if (!resultsContainer) return;
 
@@ -9485,10 +10211,8 @@ window.handleComboSearch = function(e) {
 
     const currentProdId = document.getElementById('product-id-field').value;
 
-    const matches = state.products.filter(p => {
-        return !p.isCombo && 
-               p.id !== currentProdId && 
-               (p.name.toLowerCase().includes(query) || p.sku.toLowerCase().includes(query));
+    const matches = filterAndRankProducts(state.products, query, {
+        extraFilter: p => !p.isCombo && p.id !== currentProdId
     });
 
     if (matches.length === 0) {

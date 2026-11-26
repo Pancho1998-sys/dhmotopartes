@@ -12,7 +12,7 @@
     <!-- Lucide Icons (Local bundle for offline support) -->
     <script src="lucide.min.js"></script>
     <!-- SheetJS for Excel import/export (loaded dynamically when needed) -->
-    <link rel="stylesheet" href="style.css?v=20261123_2">
+    <link rel="stylesheet" href="style.css?v=20261126_1">
     <!-- Dynamic custom styles for SaaS branding -->
     <style id="custom-brand-styles"></style>
 </head>
@@ -430,15 +430,20 @@
                                 <div class="pos-controls-header">
                                     <div class="search-box">
                                         <i data-lucide="search" class="search-icon"></i>
-                                        <input type="text" id="pos-search-input" placeholder="Buscar repuesto por nombre, SKU o código de barra..." aria-label="Buscar producto">
-                                        <button class="btn-clear-search" id="pos-clear-search" style="display: none;"><i data-lucide="x"></i></button>
+                                        <input type="text" id="pos-search-input" placeholder="Buscar o usar monto/fracción * código (ej: 2000 * aceite o 0.5 * aceite) [F2]" aria-label="Buscar producto">
+                                        <button class="btn-clear-search" id="pos-clear-search" title="Limpiar búsqueda [Esc]" style="display: none;"><i data-lucide="x"></i></button>
                                     </div>
+                                    <button type="button" class="btn btn-secondary btn-sm pos-shortcuts-btn" id="pos-shortcuts-btn" onclick="openModal('modal-pos-shortcuts')" title="Ver teclas rápidas [F1]">
+                                        <i data-lucide="keyboard"></i>
+                                        <span>Atajos [F1]</span>
+                                    </button>
                                     <div class="barcode-status-badge" id="pos-barcode-badge" title="Lector de código de barras físico/teclado activo. Escanea en cualquier momento.">
                                         <span class="status-dot online pulse"></span>
                                         <i data-lucide="scan-barcode"></i>
                                         <span>Lector Listo</span>
                                     </div>
                                 </div>
+                                <div id="pos-quick-calc-preview" class="pos-quick-calc-preview" style="display: none;"></div>
                                 <div class="category-tabs-container scrollable-x" id="pos-category-tabs">
                                     <!-- Category pills generated here -->
                                 </div>
@@ -459,7 +464,7 @@
                         <div class="pos-cart-panel">
                             <!-- Customer Selection -->
                             <div class="cart-customer-section">
-                                <div class="customer-picker-wrapper">
+                                <div class="customer-picker-wrapper" title="Seleccionar cliente [F3]">
                                     <i data-lucide="user" class="icon-inline text-muted"></i>
                                     <select id="cart-customer-select" aria-label="Seleccionar cliente para la venta">
                                         <option value="0">Consumidor Final</option>
@@ -472,8 +477,8 @@
 
                             <!-- Cart Options Bar (Compact Price List & Stock Source) -->
                             <div class="cart-options-bar">
-                                <div class="cart-option-item">
-                                    <label for="cart-price-list-select" class="cart-option-label"><i data-lucide="tag" style="width:13px; height:13px;"></i> Precios:</label>
+                                <div class="cart-option-item" title="Alternar lista de precios [F4]">
+                                    <label for="cart-price-list-select" class="cart-option-label"><i data-lucide="tag" style="width:13px; height:13px;"></i> Precios [F4]:</label>
                                     <select id="cart-price-list-select" class="cart-option-select">
                                         <option value="price">Minorista</option>
                                         <option value="priceWholesale">Mayorista</option>
@@ -513,7 +518,7 @@
                                     <span id="cart-summary-subtotal">$0.00</span>
                                 </div>
                                 <div class="summary-row">
-                                    <span class="flex-align-center">Descuento ($): <button class="btn-text-link" id="cart-apply-discount-btn">Editar</button></span>
+                                    <span class="flex-align-center">Descuento ($): <button class="btn-text-link" id="cart-apply-discount-btn" title="Aplicar descuento [F6]">Editar [F6]</button></span>
                                     <span id="cart-summary-discount" class="text-danger">-$0.00</span>
                                 </div>
                                 <div class="summary-row">
@@ -527,10 +532,10 @@
                                 </div>
 
                                 <div class="cart-actions-grid">
-                                    <button class="btn btn-danger btn-outline" id="cart-clear-btn">
-                                        <i data-lucide="trash-2"></i> Vaciar
+                                    <button class="btn btn-danger btn-outline" id="cart-clear-btn" title="Vaciar carrito [F10]">
+                                        <i data-lucide="trash-2"></i> Vaciar [F10]
                                     </button>
-                                    <button class="btn btn-primary btn-large btn-checkout" id="cart-checkout-btn" disabled>
+                                    <button class="btn btn-primary btn-large btn-checkout" id="cart-checkout-btn" disabled title="Cobrar venta [F8]">
                                         <i data-lucide="credit-card"></i> Cobrar [F8]
                                     </button>
                                 </div>
@@ -1878,13 +1883,13 @@
                 
                 <div class="checkout-form">
                     <div class="form-group">
-                        <label for="checkout-payment-method">Método de Pago</label>
+                        <label for="checkout-payment-method">Método de Pago <span class="text-muted small">(Alt+1 a Alt+5)</span></label>
                         <div class="payment-method-selector" id="checkout-method-selector">
-                            <button class="method-btn active" data-method="cash"><i data-lucide="banknote"></i> Efectivo</button>
-                            <button class="method-btn" data-method="mercadopago"><i data-lucide="qr-code"></i> Mercado Pago</button>
-                            <button class="method-btn" data-method="transfer"><i data-lucide="arrow-left-right"></i> Transferencia</button>
-                            <button class="method-btn" data-method="card"><i data-lucide="credit-card"></i> Tarjeta</button>
-                            <button class="method-btn" data-method="credit"><i data-lucide="notebook-pen"></i> Cuenta Corriente</button>
+                            <button class="method-btn active" data-method="cash" title="Efectivo [Alt+1]"><i data-lucide="banknote"></i> Efectivo <span class="method-shortcut-hint">Alt+1</span></button>
+                            <button class="method-btn" data-method="mercadopago" title="Mercado Pago [Alt+2]"><i data-lucide="qr-code"></i> Mercado Pago <span class="method-shortcut-hint">Alt+2</span></button>
+                            <button class="method-btn" data-method="transfer" title="Transferencia [Alt+3]"><i data-lucide="arrow-left-right"></i> Transferencia <span class="method-shortcut-hint">Alt+3</span></button>
+                            <button class="method-btn" data-method="card" title="Tarjeta [Alt+4]"><i data-lucide="credit-card"></i> Tarjeta <span class="method-shortcut-hint">Alt+4</span></button>
+                            <button class="method-btn" data-method="credit" title="Cuenta Corriente [Alt+5]"><i data-lucide="notebook-pen"></i> Cuenta Corriente <span class="method-shortcut-hint">Alt+5</span></button>
                         </div>
                     </div>
                     
@@ -1929,15 +1934,15 @@
                     <div class="form-group" style="margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px;">
                         <label class="flex-align-center cursor-pointer" style="gap: 10px; font-weight: 500; user-select: none;">
                             <input type="checkbox" id="checkout-emit-invoice" style="width: 18px; height: 18px; cursor: pointer;">
-                            <span>Emitir Factura Electrónica (ARCA / AFIP)</span>
+                            <span>Emitir Factura Electrónica (ARCA / AFIP) <span class="text-muted small">[Alt+F]</span></span>
                         </label>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary btn-outline" data-close-modal="modal-checkout">Cancelar</button>
+                <button class="btn btn-secondary btn-outline" data-close-modal="modal-checkout">Cancelar [Esc]</button>
                 <button class="btn btn-primary btn-large" id="checkout-confirm-btn" disabled>
-                    <i data-lucide="check-circle-2"></i> Confirmar y Generar Recibo
+                    <i data-lucide="check-circle-2"></i> Confirmar y Generar Recibo [Enter]
                 </button>
             </div>
         </div>
@@ -2053,11 +2058,16 @@
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary btn-outline" data-close-modal="modal-fractional-qty">Cancelar</button>
-                <button class="btn btn-primary" id="fractional-confirm-btn">
-                    <i data-lucide="shopping-cart"></i> <span id="fractional-confirm-btn-text">Agregar al Carrito</span>
-                </button>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+                <button class="btn btn-secondary btn-outline" data-close-modal="modal-fractional-qty">Cancelar [Esc]</button>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="btn btn-secondary" id="fractional-confirm-btn">
+                        <i data-lucide="shopping-cart"></i> <span id="fractional-confirm-btn-text">Agregar al Carrito</span> [Enter]
+                    </button>
+                    <button class="btn btn-primary" id="fractional-confirm-checkout-btn">
+                        <i data-lucide="credit-card"></i> <span id="fractional-confirm-checkout-text">Agregar y Cobrar</span> [Ctrl+Enter]
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -2432,7 +2442,7 @@
                     <i data-lucide="slash"></i> Anular Venta
                 </button>
                 <div class="flex-align-center" style="gap: 8px; margin-left: auto;">
-                    <button class="btn btn-secondary btn-outline" data-close-modal="modal-receipt">Cerrar</button>
+                    <button class="btn btn-secondary btn-outline" data-close-modal="modal-receipt">Cerrar [Esc]</button>
                     <button class="btn btn-primary" id="receipt-print-btn">
                         <i data-lucide="printer"></i> Imprimir [F9]
                     </button>
@@ -3075,10 +3085,10 @@
                         <i data-lucide="plus"></i> Añadir Repuesto Manual
                     </button>
                     
-                    <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; user-select: none;">
-                        <input type="checkbox" id="staging-register-cash-outflow" checked>
-                        <span>Registrar egreso automático en <strong>Caja Chica</strong> por el total de la compra</span>
-                    </label>
+                    <span class="small text-muted" style="display: flex; align-items: center; gap: 6px;">
+                        <i data-lucide="info" style="width: 14px; height: 14px; color: var(--primary);"></i>
+                        <span>Esta carga solo actualiza el stock. Los ingresos y egresos de dinero se registran manualmente en <strong>Caja</strong>.</span>
+                    </span>
                 </div>
             </div>
 
@@ -3102,6 +3112,56 @@
         </div>
     </div>
 
+    <!-- 12. POS KEYBOARD SHORTCUTS HELP MODAL -->
+    <div class="modal-backdrop" id="modal-pos-shortcuts">
+        <div class="modal-box modal-medium">
+            <div class="modal-header">
+                <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="keyboard" style="width: 20px; height: 20px; color: var(--primary);"></i>
+                    Teclas Rápidas del Punto de Venta (POS)
+                </h3>
+                <button class="btn-icon modal-close-btn" data-close-modal="modal-pos-shortcuts"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="shortcuts-grid">
+                    <div class="shortcuts-group">
+                        <h4 class="shortcuts-group-title">Búsqueda y Carrito</h4>
+                        <div class="shortcut-row"><span>Enfocar buscador de productos</span><kbd class="shortcut-kbd">F2</kbd></div>
+                        <div class="shortcut-row"><span>Navegar resultados encontrados</span><kbd class="shortcut-kbd">↑ / ↓</kbd></div>
+                        <div class="shortcut-row"><span>Agregar producto seleccionado</span><kbd class="shortcut-kbd">Enter</kbd></div>
+                        <div class="shortcut-row"><span>Agregar y pasar directo a Cobro</span><kbd class="shortcut-kbd">Ctrl + Enter</kbd></div>
+                        <div class="shortcut-row"><span>Carga rápida fraccionado / cantidad</span><kbd class="shortcut-kbd">valor * código</kbd></div>
+                        <div class="shortcut-row"><span>Limpiar búsqueda / Cerrar ventana</span><kbd class="shortcut-kbd">Esc</kbd></div>
+                        <div class="shortcut-row"><span>Seleccionar cliente</span><kbd class="shortcut-kbd">F3</kbd></div>
+                        <div class="shortcut-row"><span>Alternar Minorista / Mayorista</span><kbd class="shortcut-kbd">F4</kbd></div>
+                        <div class="shortcut-row"><span>Aplicar descuento</span><kbd class="shortcut-kbd">F6</kbd></div>
+                        <div class="shortcut-row"><span>Editar cantidad del último ítem</span><kbd class="shortcut-kbd">F7</kbd></div>
+                        <div class="shortcut-row"><span>Vaciar carrito</span><kbd class="shortcut-kbd">F10</kbd></div>
+                    </div>
+                    <div class="shortcuts-group">
+                        <h4 class="shortcuts-group-title">Cobro y Comprobante</h4>
+                        <div class="shortcut-row"><span>Abrir pantalla de Cobro</span><kbd class="shortcut-kbd">F8</kbd></div>
+                        <div class="shortcut-row"><span>Método: Efectivo</span><kbd class="shortcut-kbd">Alt + 1</kbd></div>
+                        <div class="shortcut-row"><span>Método: Mercado Pago</span><kbd class="shortcut-kbd">Alt + 2</kbd></div>
+                        <div class="shortcut-row"><span>Método: Transferencia</span><kbd class="shortcut-kbd">Alt + 3</kbd></div>
+                        <div class="shortcut-row"><span>Método: Tarjeta</span><kbd class="shortcut-kbd">Alt + 4</kbd></div>
+                        <div class="shortcut-row"><span>Método: Cuenta Corriente</span><kbd class="shortcut-kbd">Alt + 5</kbd></div>
+                        <div class="shortcut-row"><span>Cargar monto exacto (Efectivo)</span><kbd class="shortcut-kbd">Alt + E</kbd></div>
+                        <div class="shortcut-row"><span>Activar Factura ARCA / AFIP</span><kbd class="shortcut-kbd">Alt + F</kbd></div>
+                        <div class="shortcut-row"><span>Confirmar venta</span><kbd class="shortcut-kbd">Enter</kbd></div>
+                        <div class="shortcut-row"><span>Imprimir recibo</span><kbd class="shortcut-kbd">F9</kbd></div>
+                    </div>
+                </div>
+                <p class="small text-muted" style="margin-top: 14px; margin-bottom: 0;">
+                    💡 <strong>Fraccionados rápidos:</strong> Escribe <code>2000 * aceite</code> (por $) o <code>0.5 * aceite</code> (por fracción) y pulsa <strong>Enter</strong> para cargar directo al carrito, o <strong>Ctrl+Enter</strong> para ir directo a Cobrar.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-close-modal="modal-pos-shortcuts">Entendido [Esc]</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Supabase JS SDK (Local bundle for offline support) -->
     <script src="supabase.min.js"></script>
     <script src="supabase-config.js"></script>
@@ -3109,6 +3169,6 @@
     <!-- Application Script Files -->
     <script src="components.js?v=20261123_2"></script>
     <script src="fiscal.js?v=20261123_2"></script>
-    <script src="app.js?v=20261123_2"></script>
+    <script src="app.js?v=20261126_3"></script>
 </body>
 </html>
