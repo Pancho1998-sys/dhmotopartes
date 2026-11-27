@@ -250,6 +250,110 @@ function clearPOSSearch(keepFocus = true) {
     if (keepFocus) input.focus();
 }
 
+/* ==========================================================================
+   VARIANTES (TALLE / COLOR) CON STOCK POR COMBINACIÓN
+   - product.variants = [{ id, size, color, stock }]
+   - product.stock (local) se mantiene como la suma de las variantes
+   - Las líneas del carrito llevan variantId + key única (id::variantId)
+   ========================================================================== */
+function productHasVariants(product) {
+    return !!(product && !product.isCombo && !product.isFractional && Array.isArray(product.variants) && product.variants.length > 0);
+}
+
+function getVariantLabel(variant) {
+    if (!variant) return '';
+    const label = [variant.size, variant.color].map(x => (x || '').toString().trim()).filter(Boolean).join(' / ');
+    return label || 'Única';
+}
+
+function findProductVariant(product, variantId) {
+    if (!productHasVariants(product) || !variantId) return null;
+    return product.variants.find(v => v.id === variantId) || null;
+}
+
+function syncProductStockFromVariants(product) {
+    if (!productHasVariants(product)) return;
+    product.stock = product.variants.reduce((sum, v) => sum + (parseInt(v.stock, 10) || 0), 0);
+}
+
+// Suma (delta > 0) o descuenta (delta < 0) stock de una variante y recalcula el total del producto.
+function applyVariantStockDelta(product, variantId, delta) {
+    const variant = findProductVariant(product, variantId);
+    if (!variant) return false;
+    variant.stock = Math.max(0, (parseInt(variant.stock, 10) || 0) + Math.round(delta));
+    syncProductStockFromVariants(product);
+    return true;
+}
+
+function getCartItemKey(item) {
+    return (item && (item.key || item.id)) || '';
+}
+
+function getPOSStockSource() {
+    const stockSourceSelect = document.getElementById('cart-stock-source-select');
+    return stockSourceSelect ? stockSourceSelect.value : 'local';
+}
+
+// Stock máximo para una línea del carrito: la variante (stock local) o el producto.
+function getCartLineMaxStock(product, variantId) {
+    if (variantId && productHasVariants(product) && getPOSStockSource() !== 'wholesale') {
+        const variant = findProductVariant(product, variantId);
+        return variant ? (parseInt(variant.stock, 10) || 0) : 0;
+    }
+    return getPOSProductStock(product);
+}
+
+let variantPickerContext = null;
+
+window.openVariantPicker = function(product, qty = 1, goToCheckout = false) {
+    if (!productHasVariants(product)) return;
+    variantPickerContext = { productId: product.id, qty: qty > 0 ? Math.round(qty) : 1, goToCheckout };
+
+    const currency = (state.settings && state.settings.currency) || '$';
+    const titleEl = document.getElementById('variant-picker-product-name');
+    const subEl = document.getElementById('variant-picker-subtitle');
+    const listEl = document.getElementById('variant-picker-list');
+    if (titleEl) titleEl.textContent = product.name;
+    if (subEl) subEl.textContent = `SKU: ${product.sku || '---'} · ${currency}${(getPOSProductUnitPrice(product) || 0).toFixed(2)} · Cantidad: ${variantPickerContext.qty}`;
+    if (!listEl) return;
+
+    const useVariantStock = getPOSStockSource() !== 'wholesale';
+    listEl.innerHTML = product.variants.map(v => {
+        const key = `${product.id}::${v.id}`;
+        const inCart = state.cart.filter(item => getCartItemKey(item) === key).reduce((s, item) => s + item.quantity, 0);
+        const available = useVariantStock ? Math.max(0, (parseInt(v.stock, 10) || 0) - inCart) : null;
+        const disabled = useVariantStock && available < variantPickerContext.qty;
+        const safeLabel = getVariantLabel(v).replace(/</g, '&lt;');
+        const stockText = useVariantStock ? (available > 0 ? `Disponibles: ${available}` : 'Sin stock') : 'Stock mayorista';
+        return `
+            <button type="button" class="btn ${disabled ? 'btn-secondary' : 'btn-primary'}" ${disabled ? 'disabled' : ''}
+                onclick="pickVariantForCart('${v.id}')"
+                style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 12px 8px; min-height: 64px; ${disabled ? 'opacity: 0.45; cursor: not-allowed;' : ''}">
+                <strong style="font-size: 14px;">${safeLabel}</strong>
+                <span style="font-size: 11px; opacity: 0.85;">${stockText}</span>
+            </button>`;
+    }).join('');
+
+    openModal('modal-variant-picker');
+    setTimeout(() => {
+        const firstEnabled = listEl.querySelector('button:not([disabled])');
+        if (firstEnabled) firstEnabled.focus();
+    }, 120);
+};
+
+window.pickVariantForCart = function(variantId) {
+    if (!variantPickerContext) return;
+    const { productId, qty, goToCheckout } = variantPickerContext;
+    variantPickerContext = null;
+    closeModal('modal-variant-picker', false);
+    const added = window.addCartItem(productId, true, variantId, qty);
+    if (added && goToCheckout) {
+        openCheckoutModal();
+    } else if (typeof isPOSViewActive === 'function' && isPOSViewActive()) {
+        focusPOSSearch(false);
+    }
+};
+
 function getPOSProductStock(product) {
     if (!product) return 0;
     const stockSourceSelect = document.getElementById('cart-stock-source-select');
@@ -335,8 +439,10 @@ function resolvePOSQuickExpression(product, expr) {
 
     const unitPrice = getPOSProductUnitPrice(product);
     const maxStock = getPOSProductStock(product);
-    const existingInCart = state.cart.find(item => item.id === product.id);
-    const alreadyInCartQty = existingInCart ? existingInCart.quantity : 0;
+    // Suma todas las líneas del producto (un producto con talles puede tener varias líneas)
+    const alreadyInCartQty = state.cart
+        .filter(item => item.id === product.id)
+        .reduce((sum, item) => sum + (item.quantity || 0), 0);
 
     let mode = 'qty';
     if (!product.isFractional) {
@@ -505,6 +611,11 @@ function renderPOSQuickCalcPreview(exprArg = null) {
 
 function addDirectQuantityToCart(product, qty, unitPrice, goToCheckout = false) {
     if (!product || qty <= 0) return;
+    if (productHasVariants(product)) {
+        clearPOSSearch(false);
+        window.openVariantPicker(product, qty, goToCheckout);
+        return;
+    }
     const maxStock = getPOSProductStock(product);
     const existing = state.cart.find(item => item.id === product.id);
     const currentQty = existing ? existing.quantity : 0;
@@ -1203,6 +1314,8 @@ function syncSettingsInputs() {
         if (nameEl) nameEl.value = state.settings.storeName || "";
         if (addrEl) addrEl.value = state.settings.storeAddress || "";
         if (phoneEl) phoneEl.value = state.settings.storePhone || "";
+        const hoursEl = document.getElementById('set-store-hours');
+        if (hoursEl) hoursEl.value = state.settings.openingHours || "";
         if (whatsappEl) whatsappEl.value = state.settings.whatsapp || "";
         if (instagramEl) instagramEl.value = state.settings.instagram || "";
         if (descEl) descEl.value = state.settings.brandDescription || "";
@@ -1641,6 +1754,8 @@ async function saveDatabase(retryCount = 0) {
                                     const saleStockSource = sale.stockSource || 'local';
                                     if (saleStockSource === 'wholesale') {
                                         prod.stockWholesale = Math.max(0, Math.round(((prod.stockWholesale || 0) - item.quantity) * 1000) / 1000);
+                                    } else if (item.variantId && applyVariantStockDelta(prod, item.variantId, -item.quantity)) {
+                                        // Variante talle/color ajustada
                                     } else {
                                         prod.stock = Math.max(0, Math.round((prod.stock - item.quantity) * 1000) / 1000);
                                     }
@@ -2208,6 +2323,7 @@ function setupEventListeners() {
         if (comboSection) comboSection.style.display = 'none';
         tempComboComponents = [];
         window.updateComboComponentsTable();
+        window.setVariantsEditorState(false, []);
 
         // Reset image selector UI
         tempProductImageBase64 = "";
@@ -2226,6 +2342,7 @@ function setupEventListeners() {
     });
 
     document.getElementById('product-form').addEventListener('submit', saveProduct);
+    initVariantsEditorListeners();
 
     const btnGenerateSku = document.getElementById('btn-generate-sku');
     if (btnGenerateSku) {
@@ -2646,7 +2763,7 @@ function setupEventListeners() {
             e.preventDefault();
             if (state.cart && state.cart.length > 0) {
                 const lastItem = state.cart[state.cart.length - 1];
-                window.promptCartItemQty(lastItem.id);
+                window.promptCartItemQty(getCartItemKey(lastItem));
             }
         } else if (e.key === 'F8') {
             const checkoutBtn = document.getElementById('cart-checkout-btn');
@@ -2988,7 +3105,8 @@ function processBarcodeScan(code, clearPosSearchAfter = false) {
         // Add to cart! If we redirected, handleRoute will render the page/cart, so avoid duplicate render.
         addCartItem(product.id, !needsRedirect);
         if (clearPosSearchAfter && !product.isFractional) {
-            clearPOSSearch(true);
+            // Con talles/colores se abre el selector: limpiar sin robarle el foco
+            clearPOSSearch(!productHasVariants(product));
         }
         // Flash barcode status indicator in UI
         const badge = document.getElementById('pos-barcode-badge');
@@ -3015,6 +3133,7 @@ function processBarcodeScan(code, clearPosSearchAfter = false) {
             document.getElementById('product-form').reset();
             document.getElementById('prod-sku').value = code;
             document.getElementById('prod-sku').readOnly = false;
+            window.setVariantsEditorState(false, []);
             openModal('modal-product');
             setTimeout(() => document.getElementById('prod-name').focus(), 300);
         } else {
@@ -3170,7 +3289,7 @@ function closeModal(modalId, restoreFocus = true) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.classList.remove('active');
-        const posReturnModals = ['modal-checkout', 'modal-receipt', 'modal-discount', 'modal-fractional-qty', 'modal-pos-shortcuts'];
+        const posReturnModals = ['modal-checkout', 'modal-receipt', 'modal-discount', 'modal-fractional-qty', 'modal-pos-shortcuts', 'modal-variant-picker'];
         if (restoreFocus && posReturnModals.includes(modalId) && isPOSViewActive() && !getActiveModalId()) {
             focusPOSSearch(false);
         }
@@ -4035,30 +4154,43 @@ window.confirmFractionalSale = function(goToCheckout = false) {
 };
 
 // Shopping Cart Actions
-window.addCartItem = function(prodId, shouldRender = true) {
+window.addCartItem = function(prodId, shouldRender = true, variantId = null, qty = 1) {
     const product = state.products.find(p => p.id === prodId);
-    if (!product) return;
+    if (!product) return false;
+
+    // Producto con talles/colores: primero hay que elegir la combinación
+    const hasVariants = productHasVariants(product);
+    if (hasVariants && !variantId) {
+        window.openVariantPicker(product, qty);
+        return false;
+    }
+    const variant = hasVariants ? findProductVariant(product, variantId) : null;
+    if (hasVariants && !variant) return false;
+    const lineKey = variant ? `${product.id}::${variant.id}` : product.id;
 
     // Check stock availability
-    const existingInCart = state.cart.find(item => item.id === prodId);
+    const existingInCart = state.cart.find(item => getCartItemKey(item) === lineKey);
     const cartQty = existingInCart ? existingInCart.quantity : 0;
 
-    const stockSourceSelect = document.getElementById('cart-stock-source-select');
-    const stockSource = stockSourceSelect ? stockSourceSelect.value : 'local';
-    const maxStockAvailable = product.isCombo 
-        ? window.getComboStock(product, stockSource) 
-        : (stockSource === 'wholesale' ? (product.stockWholesale || 0) : product.stock);
+    const stockSource = getPOSStockSource();
+    const maxStockAvailable = variant
+        ? getCartLineMaxStock(product, variant.id)
+        : (product.isCombo
+            ? window.getComboStock(product, stockSource)
+            : (stockSource === 'wholesale' ? (product.stockWholesale || 0) : product.stock));
 
-    if (cartQty >= maxStockAvailable) {
+    const addQtyRequested = variant ? Math.max(1, Math.round(qty)) : 1;
+    const exceeds = variant ? (cartQty + addQtyRequested > maxStockAvailable) : (cartQty >= maxStockAvailable);
+    if (exceeds) {
         playScanSound('fail');
-        alert(`No hay más stock disponible de "${product.name}".`);
-        return;
+        alert(`No hay más stock disponible de "${product.name}${variant ? ` (${getVariantLabel(variant)})` : ''}".`);
+        return false;
     }
 
     // Modal interactivo para producto fraccionable (por importe $ o por cantidad)
     if (product.isFractional) {
         window.openFractionalModal(product, existingInCart, false);
-        return;
+        return false;
     }
 
     const priceListSelect = document.getElementById('cart-price-list-select');
@@ -4068,25 +4200,34 @@ window.addCartItem = function(prodId, shouldRender = true) {
         itemPrice = parseFloat(product.priceWholesale) || product.price;
     }
 
-    let addedQty = 1;
+    let addedQty = addQtyRequested;
 
     if (existingInCart) {
         existingInCart.quantity = Math.round((existingInCart.quantity + addedQty) * 1000) / 1000;
         existingInCart.price = itemPrice;
     } else {
-        state.cart.push({
+        const line = {
             id: product.id,
-            name: product.name,
+            name: variant ? `${product.name} (${getVariantLabel(variant)})` : product.name,
             sku: product.sku,
             price: itemPrice,
             quantity: addedQty
-        });
+        };
+        if (variant) {
+            line.key = lineKey;
+            line.variantId = variant.id;
+            line.variantLabel = getVariantLabel(variant);
+            line.size = variant.size || '';
+            line.color = variant.color || '';
+        }
+        state.cart.push(line);
     }
 
     playScanSound('success');
     if (shouldRender) {
         renderCart();
     }
+    return true;
 };
 
 window.changeCartPriceList = function() {
@@ -4109,18 +4250,19 @@ window.changeCartPriceList = function() {
     renderPOSProductGrid();
 };
 
-window.modifyCartItemQty = function (prodId, delta) {
-    const cartItem = state.cart.find(item => item.id === prodId);
+window.modifyCartItemQty = function (lineKey, delta) {
+    const cartItem = state.cart.find(item => getCartItemKey(item) === lineKey);
     if (!cartItem) return;
 
-    const product = state.products.find(p => p.id === prodId);
+    const product = state.products.find(p => p.id === cartItem.id);
     if (!product) return;
 
-    const stockSourceSelect = document.getElementById('cart-stock-source-select');
-    const stockSource = stockSourceSelect ? stockSourceSelect.value : 'local';
-    const maxStockAvailable = product.isCombo 
-        ? window.getComboStock(product, stockSource) 
-        : (stockSource === 'wholesale' ? (product.stockWholesale || 0) : product.stock);
+    const stockSource = getPOSStockSource();
+    const maxStockAvailable = cartItem.variantId
+        ? getCartLineMaxStock(product, cartItem.variantId)
+        : (product.isCombo
+            ? window.getComboStock(product, stockSource)
+            : (stockSource === 'wholesale' ? (product.stockWholesale || 0) : product.stock));
 
     const step = product.isFractional ? (cartItem.quantity < 1 ? 0.25 : 1) : 1;
     const appliedDelta = delta > 0 ? step : -step;
@@ -4133,17 +4275,17 @@ window.modifyCartItemQty = function (prodId, delta) {
 
     cartItem.quantity = Math.round((cartItem.quantity + appliedDelta) * 10000) / 10000;
     if (cartItem.quantity <= 0) {
-        state.cart = state.cart.filter(item => item.id !== prodId);
+        state.cart = state.cart.filter(item => getCartItemKey(item) !== lineKey);
     }
 
     renderCart();
 };
 
-window.promptCartItemQty = function(prodId) {
-    const cartItem = state.cart.find(item => item.id === prodId);
+window.promptCartItemQty = function(lineKey) {
+    const cartItem = state.cart.find(item => getCartItemKey(item) === lineKey);
     if (!cartItem) return;
 
-    const product = state.products.find(p => p.id === prodId);
+    const product = state.products.find(p => p.id === cartItem.id);
     if (!product) return;
 
     if (product.isFractional) {
@@ -4152,7 +4294,7 @@ window.promptCartItemQty = function(prodId) {
     }
 
     const defaultValue = cartItem.quantity;
-    const qtyInput = prompt(`Ingrese la cantidad para "${product.name}":`, defaultValue);
+    const qtyInput = prompt(`Ingrese la cantidad para "${cartItem.name || product.name}":`, defaultValue);
     if (qtyInput === null) return; // cancelado
 
     const parsedQty = parseFloat(qtyInput);
@@ -4161,11 +4303,12 @@ window.promptCartItemQty = function(prodId) {
         return;
     }
 
-    const stockSourceSelect = document.getElementById('cart-stock-source-select');
-    const stockSource = stockSourceSelect ? stockSourceSelect.value : 'local';
-    const maxStockAvailable = product.isCombo 
-        ? window.getComboStock(product, stockSource) 
-        : (stockSource === 'wholesale' ? (product.stockWholesale || 0) : product.stock);
+    const stockSource = getPOSStockSource();
+    const maxStockAvailable = cartItem.variantId
+        ? getCartLineMaxStock(product, cartItem.variantId)
+        : (product.isCombo
+            ? window.getComboStock(product, stockSource)
+            : (stockSource === 'wholesale' ? (product.stockWholesale || 0) : product.stock));
 
     if (parsedQty > maxStockAvailable) {
         playScanSound('fail');
@@ -4212,6 +4355,7 @@ function renderCart() {
 
     let itemsHtml = '';
     state.cart.forEach(item => {
+        const lineKey = getCartItemKey(item);
         itemsHtml += `
             <div class="cart-item">
                 <div>
@@ -4219,9 +4363,9 @@ function renderCart() {
                     <div class="cart-item-sku">SKU: ${item.sku} | ${state.settings.currency}${item.price.toFixed(2)}</div>
                 </div>
                 <div class="cart-item-qty">
-                    <button class="qty-btn" onclick="modifyCartItemQty('${item.id}', -1)">-</button>
-                    <span class="qty-val" style="min-width: 24px; width: auto; padding: 0 4px; cursor: pointer;" title="Haga clic para editar cantidad" onclick="promptCartItemQty('${item.id}')">${item.quantity}</span>
-                    <button class="qty-btn" onclick="modifyCartItemQty('${item.id}', 1)">+</button>
+                    <button class="qty-btn" onclick="modifyCartItemQty('${lineKey}', -1)">-</button>
+                    <span class="qty-val" style="min-width: 24px; width: auto; padding: 0 4px; cursor: pointer;" title="Haga clic para editar cantidad" onclick="promptCartItemQty('${lineKey}')">${item.quantity}</span>
+                    <button class="qty-btn" onclick="modifyCartItemQty('${lineKey}', 1)">+</button>
                 </div>
                 <div class="cart-item-price">
                     ${state.settings.currency}${(item.price * item.quantity).toFixed(2)}
@@ -4491,6 +4635,8 @@ async function processCheckout() {
                 // Deduct stock of simple product
                 if (stockSource === 'wholesale') {
                     prod.stockWholesale = Math.max(0, Math.round(((prod.stockWholesale || 0) - cartItem.quantity) * 1000) / 1000);
+                } else if (cartItem.variantId && applyVariantStockDelta(prod, cartItem.variantId, -cartItem.quantity)) {
+                    // Stock descontado de la combinación talle/color vendida
                 } else {
                     prod.stock = Math.max(0, Math.round((prod.stock - cartItem.quantity) * 1000) / 1000);
                 }
@@ -4825,7 +4971,29 @@ function saveProduct(e) {
     const image = isFileMode ? tempProductImageBase64 : document.getElementById('prod-image').value.trim();
 
     const isCombo = document.getElementById('prod-type-combo').checked;
-    const finalStock = isCombo ? 0 : stock;
+
+    // Talles / colores con stock por combinación
+    const hasVariants = isVariantsEditorEnabled();
+    if (hasVariants) {
+        if (isCombo || isFractional) {
+            alert('Los talles/colores solo se pueden usar en productos simples no fraccionables. Desmarque "Combo" o "Fraccionable", o quite los talles.');
+            return;
+        }
+        if (tempProductVariants.length === 0) {
+            alert('Agregue al menos una combinación de talle/color, o desmarque "Tiene Talles / Colores".');
+            return;
+        }
+    }
+    const variants = hasVariants
+        ? tempProductVariants.map(v => ({
+            id: v.id,
+            size: (v.size || '').trim(),
+            color: (v.color || '').trim(),
+            stock: Math.max(0, parseInt(v.stock, 10) || 0)
+        }))
+        : [];
+    const effectiveStock = hasVariants ? variants.reduce((sum, v) => sum + v.stock, 0) : stock;
+    const finalStock = isCombo ? 0 : effectiveStock;
     const finalStockWholesale = isCombo ? 0 : stockWholesale;
 
     // Auto-generate unique random SKU on creation if omitted; require non-empty on edit
@@ -4850,7 +5018,8 @@ function saveProduct(e) {
             image,
             isCombo,
             isFractional,
-            components: isCombo ? [...tempComboComponents] : []
+            components: isCombo ? [...tempComboComponents] : [],
+            variants
         });
     } else {
         if (!sku) {
@@ -4877,8 +5046,9 @@ function saveProduct(e) {
             product.isCombo = isCombo;
             product.isFractional = isFractional;
             product.components = isCombo ? [...tempComboComponents] : [];
+            product.variants = variants;
             if (!isCombo) {
-                product.stock = stock;
+                product.stock = effectiveStock;
                 product.stockWholesale = stockWholesale;
             } else {
                 product.stock = 0;
@@ -4959,6 +5129,7 @@ window.editProduct = function (id) {
         tempComboComponents = [];
     }
     window.updateComboComponentsTable();
+    window.setVariantsEditorState(productHasVariants(p), p.variants || []);
 
     // Reset image uploader UI first
     tempProductImageBase64 = "";
@@ -6080,6 +6251,8 @@ function voidSale() {
                             compProd.stock = Math.round((compProd.stock + (comp.quantity * item.quantity)) * 1000) / 1000;
                         }
                     });
+                } else if (item.variantId && (sale.stockSource || 'local') !== 'wholesale' && applyVariantStockDelta(prod, item.variantId, item.quantity)) {
+                    // Stock devuelto a la combinación talle/color original
                 } else {
                     prod.stock = Math.round((prod.stock + item.quantity) * 1000) / 1000;
                 }
@@ -6114,6 +6287,8 @@ function saveSettings(e) {
     const storeName = document.getElementById('set-store-name').value.trim();
     const storeAddress = document.getElementById('set-store-address').value.trim();
     const storePhone = document.getElementById('set-store-phone').value.trim();
+    const openingHoursEl = document.getElementById('set-store-hours');
+    const openingHours = openingHoursEl ? openingHoursEl.value.trim() : (state.settings.openingHours || '');
     const whatsapp = document.getElementById('set-store-whatsapp').value.trim();
     const instagram = document.getElementById('set-store-instagram').value.trim();
     const brandDescription = document.getElementById('set-store-description').value.trim();
@@ -6143,6 +6318,7 @@ function saveSettings(e) {
         storeName,
         storeAddress,
         storePhone,
+        openingHours,
         storeAlias,
         storeHolder,
         currency,
@@ -8696,7 +8872,8 @@ function confirmExcelImport() {
                 prod.priceWholesale = p.priceWholesale;
                 prod.priceDiscount = p.priceWholesale; // mantener sincronizado
                 if (!prod.isCombo) {
-                    prod.stock = p.stock;
+                    // Con talles/colores el stock local se edita por combinación en el producto
+                    if (!productHasVariants(prod)) prod.stock = p.stock;
                     prod.stockWholesale = p.stockWholesale !== undefined ? p.stockWholesale : (prod.stockWholesale || 0);
                 }
                 prod.stockMin = p.stockMin;
@@ -9522,6 +9699,7 @@ window.authorizeStockReception = function() {
     let updated = 0;
     let totalUnits = 0;
     let totalCost = 0;
+    const variantProductsPending = [];
 
     tempStagingItems.forEach(item => {
         const qty = Math.max(0.1, parseFloat(item.quantity) || 1);
@@ -9540,7 +9718,12 @@ window.authorizeStockReception = function() {
 
         if (prod) {
             // Update existing product
-            prod.stock = (parseFloat(prod.stock) || 0) + qty;
+            if (productHasVariants(prod)) {
+                // No se sabe a qué talle/color corresponde: se carga manualmente desde el producto
+                variantProductsPending.push(`${prod.name} (+${qty})`);
+            } else {
+                prod.stock = (parseFloat(prod.stock) || 0) + qty;
+            }
             prod.cost = cost;
             prod.price = price;
             prod.priceWholesale = priceWholesale;
@@ -9621,7 +9804,10 @@ window.authorizeStockReception = function() {
           `• ${created} repuestos nuevos creados en catálogo.\n` +
           `• ${updated} repuestos existentes con stock actualizado.\n` +
           `• Total de unidades ingresadas: ${totalUnits}\n` +
-          `• Costo total de compra: ${currency}${totalCost.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+          `• Costo total de compra: ${currency}${totalCost.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` +
+          (variantProductsPending.length > 0
+              ? `\n\n⚠ Productos con talles/colores (su stock NO se sumó; cárguelo por combinación en Editar producto):\n• ${variantProductsPending.join('\n• ')}`
+              : ''));
 };
 
 /* ==========================================================================
@@ -10196,6 +10382,140 @@ window.sendCatalogOrder = function (e) {
 // COMBOS & BUNDLES UTILITIES & EVENT HANDLERS
 // ==========================================================================
 let tempComboComponents = [];
+
+/* ==========================================================================
+   EDITOR DE VARIANTES (TALLE / COLOR) EN FORMULARIO DE PRODUCTO
+   ========================================================================== */
+let tempProductVariants = [];
+
+function isVariantsEditorEnabled() {
+    const cb = document.getElementById('prod-has-variants');
+    return !!(cb && cb.checked);
+}
+
+function escapeVariantText(text) {
+    return (text || '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function updateVariantsTotalStock() {
+    const stockInput = document.getElementById('prod-stock');
+    if (!stockInput || !isVariantsEditorEnabled()) return;
+    stockInput.value = tempProductVariants.reduce((sum, v) => sum + (parseInt(v.stock, 10) || 0), 0);
+    stockInput.readOnly = true;
+}
+
+window.renderVariantsEditor = function() {
+    const body = document.getElementById('variants-table-body');
+    if (!body) return;
+    if (tempProductVariants.length === 0) {
+        body.innerHTML = `<tr><td colspan="4" class="text-muted small" style="text-align: center; padding: 10px;">Sin combinaciones. Agregue talle y/o color con su stock.</td></tr>`;
+    } else {
+        body.innerHTML = tempProductVariants.map((v, idx) => `
+            <tr>
+                <td>${escapeVariantText(v.size) || '<span class="text-muted">—</span>'}</td>
+                <td>${escapeVariantText(v.color) || '<span class="text-muted">—</span>'}</td>
+                <td><input type="number" min="0" step="1" value="${parseInt(v.stock, 10) || 0}" style="width: 90px; padding: 4px 6px;" oninput="updateTempVariantStock(${idx}, this.value)"></td>
+                <td><button type="button" class="btn-icon" title="Quitar" onclick="removeTempVariant(${idx})"><i data-lucide="trash-2" style="width: 15px; height: 15px;"></i></button></td>
+            </tr>`).join('');
+    }
+    updateVariantsTotalStock();
+    if (window.lucide) lucide.createIcons();
+};
+
+window.updateTempVariantStock = function(idx, value) {
+    if (!tempProductVariants[idx]) return;
+    tempProductVariants[idx].stock = Math.max(0, parseInt(value, 10) || 0);
+    updateVariantsTotalStock();
+};
+
+window.removeTempVariant = function(idx) {
+    tempProductVariants.splice(idx, 1);
+    window.renderVariantsEditor();
+};
+
+function addTempVariantFromInputs() {
+    const sizeEl = document.getElementById('variant-new-size');
+    const colorEl = document.getElementById('variant-new-color');
+    const stockEl = document.getElementById('variant-new-stock');
+    const size = sizeEl ? sizeEl.value.trim() : '';
+    const color = colorEl ? colorEl.value.trim() : '';
+    const stock = Math.max(0, parseInt(stockEl ? stockEl.value : '0', 10) || 0);
+
+    if (!size && !color) {
+        alert('Ingrese al menos un talle o un color.');
+        if (sizeEl) sizeEl.focus();
+        return;
+    }
+    const norm = (s) => s.trim().toLowerCase();
+    const duplicate = tempProductVariants.find(v => norm(v.size || '') === norm(size) && norm(v.color || '') === norm(color));
+    if (duplicate) {
+        alert(`La combinación "${getVariantLabel({ size, color })}" ya existe. Modifique su stock en la tabla.`);
+        return;
+    }
+
+    tempProductVariants.push({
+        id: `v_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+        size,
+        color,
+        stock
+    });
+    if (colorEl) colorEl.value = '';
+    if (stockEl) stockEl.value = '';
+    window.renderVariantsEditor();
+    if (colorEl && size) colorEl.focus(); else if (sizeEl) sizeEl.focus();
+}
+
+window.setVariantsEditorState = function(enabled, variants = []) {
+    const cb = document.getElementById('prod-has-variants');
+    const editor = document.getElementById('variants-editor');
+    const stockInput = document.getElementById('prod-stock');
+    tempProductVariants = (variants || []).map(v => ({ ...v }));
+    if (cb) cb.checked = !!enabled;
+    if (editor) editor.style.display = enabled ? 'block' : 'none';
+    ['variant-new-size', 'variant-new-color', 'variant-new-stock'].forEach(fid => {
+        const el = document.getElementById(fid);
+        if (el) el.value = '';
+    });
+    if (enabled) {
+        window.renderVariantsEditor();
+    } else if (stockInput) {
+        const isCombo = document.getElementById('prod-type-combo');
+        stockInput.readOnly = !!(isCombo && isCombo.checked);
+    }
+};
+
+function initVariantsEditorListeners() {
+    const cb = document.getElementById('prod-has-variants');
+    if (cb) {
+        cb.addEventListener('change', () => {
+            if (cb.checked) {
+                const isCombo = document.getElementById('prod-type-combo');
+                const isFractional = document.getElementById('prod-is-fractional');
+                if ((isCombo && isCombo.checked) || (isFractional && isFractional.checked)) {
+                    alert('Los talles/colores solo se pueden usar en productos simples no fraccionables.');
+                    cb.checked = false;
+                    return;
+                }
+                window.setVariantsEditorState(true, tempProductVariants);
+            } else {
+                window.setVariantsEditorState(false, tempProductVariants);
+            }
+        });
+    }
+    const addBtn = document.getElementById('variant-add-btn');
+    if (addBtn) addBtn.addEventListener('click', addTempVariantFromInputs);
+    ['variant-new-size', 'variant-new-color', 'variant-new-stock'].forEach(fid => {
+        const el = document.getElementById(fid);
+        if (el) {
+            el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // evitar que Enter envíe el formulario del producto
+                    addTempVariantFromInputs();
+                }
+            });
+        }
+    });
+}
 
 window.getComboStock = function(comboProduct, stockSource = 'local') {
     if (!comboProduct.components || comboProduct.components.length === 0) return 0;

@@ -1307,6 +1307,11 @@
                                         <label for="set-store-phone">Teléfono de Contacto</label>
                                         <input type="text" id="set-store-phone" value="+54 9 11 5555-1234">
                                     </div>
+                                    <div class="form-group">
+                                        <label for="set-store-hours">Horario de Atención</label>
+                                        <input type="text" id="set-store-hours" placeholder="Ej: Lunes a Sábado: 08:30 a 13:00 y 16:30 a 20:30 hs">
+                                        <span class="small text-muted">Se muestra en la página web de la tienda.</span>
+                                    </div>
                                     <div class="form-row">
                                         <div class="form-group col-6">
                                             <label for="set-store-whatsapp">WhatsApp (Número/Link)</label>
@@ -1976,6 +1981,21 @@
     </div>
 
     <!-- 2.1 FRACTIONAL PRODUCT MODAL (Venta por importe o cantidad) -->
+    <div class="modal-backdrop" id="modal-variant-picker">
+        <div class="modal-box modal-medium">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title" id="variant-picker-product-name">Elegir Talle / Color</h3>
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;" id="variant-picker-subtitle">Seleccione la combinación vendida</p>
+                </div>
+                <button class="btn-icon modal-close-btn" data-close-modal="modal-variant-picker"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <div id="variant-picker-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px;"></div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-backdrop" id="modal-fractional-qty">
         <div class="modal-box modal-medium">
             <div class="modal-header">
@@ -2169,6 +2189,44 @@
                                 <input type="checkbox" id="prod-is-fractional" style="width: 16px; height: 16px;">
                                 <span>Producto Fraccionable (permite venta por importe $, fraccionamiento y decimales)</span>
                             </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="variants-section">
+                        <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="prod-has-variants" style="width: 16px; height: 16px;">
+                            <span>Tiene Talles / Colores (indumentaria) — stock por combinación</span>
+                        </label>
+                        <div id="variants-editor" style="display: none; margin-top: 10px; padding: 12px; border: 1px solid var(--border-color, rgba(255,255,255,0.12)); border-radius: 10px;">
+                            <div class="form-row" style="align-items: flex-end;">
+                                <div class="form-group col-4" style="margin-bottom: 0;">
+                                    <label for="variant-new-size">Talle</label>
+                                    <input type="text" id="variant-new-size" placeholder="Ej. M, 42, Único">
+                                </div>
+                                <div class="form-group col-4" style="margin-bottom: 0;">
+                                    <label for="variant-new-color">Color</label>
+                                    <input type="text" id="variant-new-color" placeholder="Ej. Negro">
+                                </div>
+                                <div class="form-group col-2" style="margin-bottom: 0;">
+                                    <label for="variant-new-stock">Stock</label>
+                                    <input type="number" id="variant-new-stock" min="0" step="1" placeholder="0">
+                                </div>
+                                <div class="form-group col-2" style="margin-bottom: 0;">
+                                    <button type="button" class="btn btn-secondary" id="variant-add-btn" style="width: 100%;">
+                                        <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+                                        <span>Agregar</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div style="overflow-x: auto; margin-top: 10px;">
+                                <table class="data-table" style="width: 100%;">
+                                    <thead>
+                                        <tr><th>Talle</th><th>Color</th><th style="width: 110px;">Stock</th><th style="width: 50px;"></th></tr>
+                                    </thead>
+                                    <tbody id="variants-table-body"></tbody>
+                                </table>
+                            </div>
+                            <span class="small text-muted" style="display: block; margin-top: 6px;">El Stock Local del producto es la suma de todas las combinaciones. Al vender se pide elegir talle y color.</span>
                         </div>
                     </div>
 
@@ -3175,6 +3233,6 @@
     <!-- Application Script Files -->
     <script src="components.js?v=20261123_2"></script>
     <script src="fiscal.js?v=20261123_2"></script>
-    <script src="app.js?v=20261126_4"></script>
+    <script src="app.js?v=20261127_1"></script>
 </body>
 </html>

@@ -202,7 +202,7 @@ BEGIN
   -- Filtramos la lista de productos excluyendo aquellos que tienen isFractional = true
   SELECT COALESCE(
     (
-      SELECT jsonb_agg(elem)
+      SELECT jsonb_agg(elem - 'cost')
       FROM jsonb_array_elements(COALESCE(state->'products', '[]'::jsonb)) AS elem
       WHERE COALESCE((elem->>'isFractional')::boolean, false) = false
     ),
@@ -221,7 +221,9 @@ BEGIN
       'storeName', COALESCE(state->'settings'->>'storeName', 'DH Motopartes'),
       'storeAddress', COALESCE(state->'settings'->>'storeAddress', ''),
       'storePhone', COALESCE(state->'settings'->>'storePhone', ''),
+      'openingHours', COALESCE(state->'settings'->>'openingHours', ''),
       'storeAlias', COALESCE(state->'settings'->>'storeAlias', ''),
+      'storeHolder', COALESCE(state->'settings'->>'storeHolder', ''),
       'currency', COALESCE(state->'settings'->>'currency', '$'),
       'logo', COALESCE(state->'settings'->>'logo', ''),
       'whatsapp', COALESCE(state->'settings'->>'whatsapp', ''),
