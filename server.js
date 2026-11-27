@@ -212,15 +212,22 @@ const server = http.createServer((req, res) => {
     }
 
     // 4. Static file serving (Embed-first / Real-disk fallback)
-    const cleanRelPath = reqPath.replace(/^\/+/, '');
-    const realFilePath = path.join(REAL_DIR, cleanRelPath);
-    const embeddedFilePath = path.join(__dirname, cleanRelPath);
+    // Los archivos embebidos en el .exe tienen prioridad: así, reemplazando SOLO el .exe
+    // se actualiza el sistema aunque en la carpeta queden app.js/index.html viejos de
+    // instalaciones anteriores. El disco solo se usa para archivos que no vienen embebidos.
+    let decodedPath = reqPath;
+    try { decodedPath = decodeURIComponent(reqPath); } catch (e) { /* URL mal formada: usar tal cual */ }
+    const cleanRelPath = decodedPath.replace(/^\/+/, '');
+    const realFilePath = path.resolve(REAL_DIR, cleanRelPath);
+    const embeddedFilePath = path.resolve(__dirname, cleanRelPath);
+    const isInside = (base, p) => p === path.resolve(base) || p.startsWith(path.resolve(base) + path.sep);
+    const isFile = (p) => fs.existsSync(p) && fs.statSync(p).isFile();
 
     let targetPath = null;
-    if (fs.existsSync(realFilePath) && fs.statSync(realFilePath).isFile()) {
-        targetPath = realFilePath;
-    } else if (fs.existsSync(embeddedFilePath) && fs.statSync(embeddedFilePath).isFile()) {
+    if (isInside(__dirname, embeddedFilePath) && isFile(embeddedFilePath)) {
         targetPath = embeddedFilePath;
+    } else if (isInside(REAL_DIR, realFilePath) && isFile(realFilePath)) {
+        targetPath = realFilePath;
     }
 
     if (targetPath) {
