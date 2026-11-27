@@ -2595,26 +2595,8 @@ function setupEventListeners() {
         }
     });
 
-    document.getElementById('data-reset-btn').addEventListener('click', async () => {
-        if (confirm("ATENCIÓN: Se eliminarán todos los productos, ventas y clientes de forma permanente. ¿Deseas continuar?")) {
-            if (confirm("Última confirmación: ¿realmente deseas borrar toda la base de datos de la tienda?")) {
-                await runDailyAutoBackup('pre_reset', true);
-                window._explicitResetConfirmed = true;
-                try {
-                    state.products = [];
-                    state.sales = [];
-                    state.customers = [];
-                    state.cart = [];
-                    await saveDatabase();
-                    renderApp();
-                    playScanSound('fail');
-                    alert("El sistema ha sido reiniciado por completo.");
-                } finally {
-                    window._explicitResetConfirmed = false;
-                }
-            }
-        }
-    });
+    // "Limpieza Total del Sistema" ya no está en Configuración: solo el Administrador SaaS
+    // puede ejecutarla desde el Panel SaaS (ver saasResetStore), validado en Supabase.
 
     document.getElementById('data-export-btn').addEventListener('click', exportJSONBackup);
     document.getElementById('data-import-input').addEventListener('change', importJSONBackup);
@@ -9991,15 +9973,21 @@ async function loadSaasStores() {
         }
 
         let rowsHtml = '';
+        const escHtml = (t) => String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         stores.forEach(s => {
             rowsHtml += `
                 <tr>
                     <td style="font-family: monospace; font-size: 12px;" class="text-muted">${s.id}</td>
-                    <td style="font-weight: 600;">${s.name}</td>
+                    <td style="font-weight: 600;">${escHtml(s.name)}</td>
                     <td>${new Date(s.created_at).toLocaleDateString('es-ES')}</td>
-                    <td class="text-center">
+                    <td class="text-center" style="white-space: nowrap;">
                         <button class="btn btn-secondary btn-icon-only" onclick="navigator.clipboard.writeText('${s.id}')" title="Copiar ID" style="width: 28px; height: 28px;">
                             <i data-lucide="copy" style="width:12px; height:12px;"></i>
+                        </button>
+                        <button class="btn btn-danger btn-outline btn-icon-only" data-store-id="${s.id}" data-store-name="${escHtml(s.name)}"
+                            onclick="saasResetStore(this.dataset.storeId, this.dataset.storeName)"
+                            title="Limpieza Total: borra productos, ventas y clientes de esta empresa" style="width: 28px; height: 28px; margin-left: 4px;">
+                            <i data-lucide="alert-octagon" style="width:12px; height:12px;"></i>
                         </button>
                     </td>
                 </tr>
@@ -10018,6 +10006,40 @@ async function loadSaasStores() {
         `;
     }
 }
+
+// Limpieza Total de una empresa: solo Administrador SaaS.
+// La función saas_reset_store vuelve a verificar el rango en Supabase y guarda
+// una copia completa en store_reset_backups antes de vaciar.
+window.saasResetStore = async function (storeId, storeName) {
+    if (!supabaseInitialized || currentUserRole !== 'saas_admin') {
+        alert('Solo el Administrador SaaS puede ejecutar la limpieza total del sistema.');
+        return;
+    }
+    if (!storeId) return;
+
+    if (!confirm(`ATENCIÓN: Se eliminarán TODOS los productos, ventas y clientes de "${storeName}" de forma permanente.\n\n(Se guarda una copia de respaldo antes de borrar.)\n\n¿Deseas continuar?`)) return;
+
+    const typed = prompt(`Para confirmar, escribe el nombre exacto de la empresa:\n\n${storeName}`);
+    if (typed === null) return;
+    if (typed.trim() !== String(storeName).trim()) {
+        alert('El nombre no coincide. Limpieza cancelada.');
+        return;
+    }
+
+    try {
+        const { data, error } = await supabaseClient.rpc('saas_reset_store', { target_store_id: storeId });
+        if (error) throw error;
+        playScanSound('fail');
+        alert(`Limpieza completada para "${storeName}".\n\n` +
+              `• Productos borrados: ${data.products}\n` +
+              `• Ventas borradas: ${data.sales}\n` +
+              `• Clientes borrados: ${data.customers}\n\n` +
+              `Respaldo guardado (ID: ${data.backup_id}).`);
+    } catch (err) {
+        console.error('Error en limpieza total:', err);
+        alert('No se pudo ejecutar la limpieza: ' + (err.message || err));
+    }
+};
 
 window.createNewSaasStore = async function () {
     if (!supabaseInitialized || currentUserRole !== 'saas_admin') return;
